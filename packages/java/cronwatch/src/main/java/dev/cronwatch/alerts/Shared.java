@@ -32,7 +32,9 @@ final class Shared {
     if (type.equals(AlertType.RECOVERED)) {
       return "info";
     }
-    if (type.equals(AlertType.SLOW) || type.equals(AlertType.OVER_BUDGET)) {
+    if (type.equals(AlertType.SLOW)
+        || type.equals(AlertType.OVER_BUDGET)
+        || type.equals(AlertType.UNDER_FLOOR)) {
       return "warning";
     }
     return "error";

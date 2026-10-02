@@ -1,6 +1,6 @@
 # cronwatch-sdk
 
-Cron and scheduled-job monitoring that lives inside your Python app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make.
+Cron and scheduled-job monitoring that lives inside your Python app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make.
 
 This is the Python port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Python process can share one database with a Node, Ruby, PHP, Go or Rust process, and [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) works against any of them.
 
@@ -65,7 +65,7 @@ A run that is never finished is marked stuck by the first check after the job's 
 
 ### Options
 
-`job(name, ...)`: `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; default the process's), `grace` (default `"10m"`), `timeout` (default `"1h"`), `max_duration`, `budget` (`{"metric": ceiling}`), `expect` (a string the output must contain, a compiled `re` pattern it must match, or a function), `failures_before_alert` (default 1), `description`, `tags`. Durations are strings like `"1h30m"`, milliseconds, or `datetime.timedelta`; a duration string is at most 64 characters, and a longer one raises `ValueError`. A job name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit.
+`job(name, ...)`: `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; default the process's), `grace` (default `"10m"`), `timeout` (default `"1h"`), `max_duration`, `budget` (`{"metric": ceiling}`), `floor` (`{"metric": floor}`), `expect` (a string the output must contain, a compiled `re` pattern it must match, or a function), `failures_before_alert` (default 1), `description`, `tags`. Durations are strings like `"1h30m"`, milliseconds, or `datetime.timedelta`; a duration string is at most 64 characters, and a longer one raises `ValueError`. A job name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit.
 
 An `expect` pattern is searched in your process by `re`, which backtracks and, like an `expect` function, has no time limit. A pattern with unbounded repeats that can match the same text (`\n*\n*x`, `(a+)+b`, even `.*x`) can take seconds or longer on a long output that does not match: anchor it, avoid a repeat next to or inside another over the same characters, or use a plain string. See [expect rules](https://cronwatch.dev/docs/conditions/#expect-rules).
 

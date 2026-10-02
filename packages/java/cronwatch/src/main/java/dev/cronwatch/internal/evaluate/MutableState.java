@@ -25,6 +25,7 @@ public final class MutableState {
   public @Nullable Long version;
   public final JsObject extra;
   public @Nullable List<SendingAlert> sending;
+  public @Nullable List<String> underFloor;
 
   private MutableState(JobState s) {
     job = s.job();
@@ -37,6 +38,7 @@ public final class MutableState {
     version = s.version();
     extra = s.extra();
     sending = s.sending() == null ? null : new ArrayList<>(s.sending());
+    underFloor = s.underFloor() == null ? null : new ArrayList<>(s.underFloor());
   }
 
   /** A changeable copy of the state. */
@@ -76,6 +78,7 @@ public final class MutableState {
         undelivered,
         version,
         extra,
-        sending);
+        sending,
+        underFloor);
   }
 }

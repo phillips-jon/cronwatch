@@ -7,7 +7,7 @@ group: Elixir
 
 # Elixir
 
-The `cronwatch` package is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so an Elixir process can share one database with a Node, Ruby, Python, PHP, Go, Rust, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers the package itself: a Phoenix app, a worker, a release a crontab runs. Oban and Quantum have a page of their own: [Elixir schedulers](/docs/elixir-schedulers/).
+The `cronwatch` package is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow, over budget and under floor by the same rules, sends the same alert text, and writes the same rows, so an Elixir process can share one database with a Node, Ruby, Python, PHP, Go, Rust, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers the package itself: a Phoenix app, a worker, a release a crontab runs. Oban and Quantum have a page of their own: [Elixir schedulers](/docs/elixir-schedulers/).
 
 ```elixir
 # mix.exs
@@ -63,7 +63,7 @@ Jobs are declared in the instance's `jobs:`, when it starts, or with `Cronwatch.
 Cronwatch.run("nightly-report", fn job ->
   path = MyApp.Reports.build()                  # Cronwatch.cancelled?(job) turns true at the timeout
   Cronwatch.log(job, "Report written: #{path}")  # kept with the run, shown in alerts
-  Cronwatch.metric(job, "cost", 1.2)             # watched against budgets and baselines
+  Cronwatch.metric(job, "cost", 1.2)             # watched against budgets, floors and baselines
   {:ok, path}
 end)
 ```
@@ -355,7 +355,7 @@ The instance's options:
 | `on_error` | `Logger.error` | a function of the error and where, for failures outside jobs: the store, a channel, triage |
 | `clock` | the system clock | a function answering epoch milliseconds; for tests |
 
-A job's options: `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA, matched without regard to case; the zone `$TZ` or `/etc/localtime` names by default, else UTC), `grace` (`"10m"`), `timeout` (`"1h"`) and `max_duration` (see below), `budget` (a keyword list of metric and ceiling, `[cost: 2]`), `expect`, `failures_before_alert` (1), `description` and `tags`, with the rules in the [TypeScript API reference](/docs/api/).
+A job's options: `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA, matched without regard to case; the zone `$TZ` or `/etc/localtime` names by default, else UTC), `grace` (`"10m"`), `timeout` (`"1h"`) and `max_duration` (see below), `budget` (a keyword list of metric and ceiling, `[cost: 2]`), `floor` (a keyword list of metric and floor, `[rows: 1]`), `expect`, `failures_before_alert` (1), `description` and `tags`, with the rules in the [TypeScript API reference](/docs/api/).
 
 `timeout` and `max_duration` both measure a run's length. `timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure) and the job is stuck. `max_duration` is for a run that finished: one that succeeded but took longer is slow, and stays a success. So set `timeout` well above `max_duration`: `max_duration: "10m", timeout: "1h"` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
 
@@ -422,7 +422,7 @@ A 1.x release keeps what it does not know in the stored data: a field of a job's
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses.
 
-A map given where the SDK keeps an object's order (a `budget`, metrics) is written in its keys' term order, since Elixir maps have none; a keyword list keeps the order given. The cron reader matches croner, and the SDK, on every schedule, including the two that never make sense (see [Schedules](/docs/schedules/#schedule-syntax)).
+A map given where the SDK keeps an object's order (a `budget` or `floor`, metrics) is written in its keys' term order, since Elixir maps have none; a keyword list keeps the order given. The cron reader matches croner, and the SDK, on every schedule, including the two that never make sense (see [Schedules](/docs/schedules/#schedule-syntax)).
 
 ## Kept in step
 

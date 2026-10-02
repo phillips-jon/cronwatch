@@ -47,6 +47,7 @@ public sealed class HoneybadgerChannel : IChannel
         ["stuck"] = "CronWatch::Stuck",
         ["slow"] = "CronWatch::Slow",
         ["over_budget"] = "CronWatch::OverBudget",
+        ["under_floor"] = "CronWatch::UnderFloor",
         ["recovered"] = "CronWatch::Recovered",
     };
 

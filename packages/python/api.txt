@@ -31,6 +31,7 @@ class AlertType(StrEnum)
     STUCK = 'stuck'
     SLOW = 'slow'
     OVER_BUDGET = 'over_budget'
+    UNDER_FLOOR = 'under_floor'
     RECOVERED = 'recovered'
 class ChannelContext
     def __init__(self, on_error: Callable[[BaseException], None]) -> None
@@ -49,6 +50,7 @@ class Condition(StrEnum)
     STUCK = 'stuck'
     SLOW = 'slow'
     OVER_BUDGET = 'over_budget'
+    UNDER_FLOOR = 'under_floor'
 class Console
     name = 'console'
     def send(self, alert: Alert, context: ChannelContext | None=None) -> None
@@ -85,7 +87,7 @@ class JobContext
     def metrics(self, values: Mapping[str, float] | None=None, **more: float) -> None
     @property def aborted(self) -> bool
 class JobDefinition
-    FIELDS: dict[str, str] = {'name': 'name', 'schedule': 'schedule', 'timezone': 'timezone', 'grace': 'grace', 'timeout': 'timeout', 'max_duration': 'maxDuration', 'budget': 'budget', 'expect': 'expect', 'failures_before_alert': 'failuresBeforeAlert', 'description': 'description', 'tags': 'tags'}
+    FIELDS: dict[str, str] = {'name': 'name', 'schedule': 'schedule', 'timezone': 'timezone', 'grace': 'grace', 'timeout': 'timeout', 'max_duration': 'maxDuration', 'budget': 'budget', 'floor': 'floor', 'expect': 'expect', 'failures_before_alert': 'failuresBeforeAlert', 'description': 'description', 'tags': 'tags'}
     OPTIONS: tuple[str, ...] = tuple((k for k in FIELDS if k != 'name'))
     def __init__(self, fields: Mapping[str, Any] | None=None) -> None
     @classmethod def from_dict(cls, data: Mapping[str, Any] | JobDefinition | None) -> JobDefinition
@@ -96,6 +98,7 @@ class JobDefinition
     timeout = property(lambda self: self._fields.get('timeout'))
     max_duration = property(lambda self: self._fields.get('maxDuration'))
     budget = property(lambda self: self._fields.get('budget'))
+    floor = property(lambda self: self._fields.get('floor'))
     expect = property(lambda self: self._fields.get('expect'))
     failures_before_alert = property(lambda self: self._fields.get('failuresBeforeAlert'))
     description = property(lambda self: self._fields.get('description'))
@@ -133,6 +136,7 @@ class JobState
     undelivered: list[Alert] | None = None
     sending: list[Any] | None = None
     version: int | None = None
+    under_floor: list[str] | None = None
     extra: dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
     @classmethod def from_dict(cls, data: Mapping[str, Any] | JobState) -> JobState
     def to_dict(self) -> dict[str, Any]
@@ -649,6 +653,7 @@ class AlertType(StrEnum)
     STUCK = 'stuck'
     SLOW = 'slow'
     OVER_BUDGET = 'over_budget'
+    UNDER_FLOOR = 'under_floor'
     RECOVERED = 'recovered'
 class CheckResult
     checked_at: int
@@ -662,8 +667,9 @@ class Condition(StrEnum)
     STUCK = 'stuck'
     SLOW = 'slow'
     OVER_BUDGET = 'over_budget'
+    UNDER_FLOOR = 'under_floor'
 class JobDefinition
-    FIELDS: dict[str, str] = {'name': 'name', 'schedule': 'schedule', 'timezone': 'timezone', 'grace': 'grace', 'timeout': 'timeout', 'max_duration': 'maxDuration', 'budget': 'budget', 'expect': 'expect', 'failures_before_alert': 'failuresBeforeAlert', 'description': 'description', 'tags': 'tags'}
+    FIELDS: dict[str, str] = {'name': 'name', 'schedule': 'schedule', 'timezone': 'timezone', 'grace': 'grace', 'timeout': 'timeout', 'max_duration': 'maxDuration', 'budget': 'budget', 'floor': 'floor', 'expect': 'expect', 'failures_before_alert': 'failuresBeforeAlert', 'description': 'description', 'tags': 'tags'}
     OPTIONS: tuple[str, ...] = tuple((k for k in FIELDS if k != 'name'))
     def __init__(self, fields: Mapping[str, Any] | None=None) -> None
     @classmethod def from_dict(cls, data: Mapping[str, Any] | JobDefinition | None) -> JobDefinition
@@ -674,6 +680,7 @@ class JobDefinition
     timeout = property(lambda self: self._fields.get('timeout'))
     max_duration = property(lambda self: self._fields.get('maxDuration'))
     budget = property(lambda self: self._fields.get('budget'))
+    floor = property(lambda self: self._fields.get('floor'))
     expect = property(lambda self: self._fields.get('expect'))
     failures_before_alert = property(lambda self: self._fields.get('failuresBeforeAlert'))
     description = property(lambda self: self._fields.get('description'))
@@ -699,6 +706,7 @@ class JobState
     undelivered: list[Alert] | None = None
     sending: list[Any] | None = None
     version: int | None = None
+    under_floor: list[str] | None = None
     extra: dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
     @classmethod def from_dict(cls, data: Mapping[str, Any] | JobState) -> JobState
     def to_dict(self) -> dict[str, Any]

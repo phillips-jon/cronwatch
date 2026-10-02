@@ -1,6 +1,6 @@
 # cronwatch for Elixir
 
-Cron and scheduled-job monitoring that lives inside your Elixir service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
+Cron and scheduled-job monitoring that lives inside your Elixir service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
 
 This is the Elixir port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so an Elixir process and a Node, Ruby, Python, PHP, Go or Rust process can share one database, and every port reads the tables the others write. It is built in phases ([DESIGN.md](https://github.com/phillips-jon/cronwatch/blob/main/packages/elixir/DESIGN.md) has the plan and how each part works). Phases 1 and 2 have the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook, telemetry), the memory store, the SQL store over Ecto on SQLite, Postgres, MySQL and MariaDB, the pg_cron source, the SDK's fifteen alert channels and Claude triage; phase 3 adds the dashboard and a job's handler, as Plugs; phase 4 the Oban and Quantum integrations and a crontab's check.
 
@@ -45,7 +45,7 @@ and a job's function is run as a recorded run, in the calling process:
 Cronwatch.run("nightly-report", fn job ->
   path = MyApp.Reports.build()                 # Cronwatch.cancelled?(job) turns true at the timeout
   Cronwatch.log(job, "Report written: #{path}") # kept with the run, shown in alerts
-  Cronwatch.metric(job, "cost", 1.2)            # watched against budgets and baselines
+  Cronwatch.metric(job, "cost", 1.2)            # watched against budgets, floors and baselines
   {:ok, path}
 end)
 ```

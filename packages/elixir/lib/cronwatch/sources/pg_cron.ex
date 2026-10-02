@@ -562,7 +562,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
 
     # The options of a definition that can be declared again, without its
     # schedule: from the options last declared, or from a stored definition.
-    @unscheduled [:description, :tags, :grace, :timeout, :max_duration, :budget, :failures_before_alert]
+    @unscheduled [:description, :tags, :grace, :timeout, :max_duration, :budget, :floor, :failures_before_alert]
     @json_keys %{
       "description" => :description,
       "tags" => :tags,
@@ -570,6 +570,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       "timeout" => :timeout,
       "maxDuration" => :max_duration,
       "budget" => :budget,
+      "floor" => :floor,
       "failuresBeforeAlert" => :failures_before_alert
     }
 
@@ -581,6 +582,8 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
           {nil, _} -> []
           {:budget, %Object{} = b} -> [budget: Enum.filter(Object.to_list(b), fn {_, n} -> is_number(n) end)]
           {:budget, _} -> []
+          {:floor, %Object{} = f} -> [floor: Enum.filter(Object.to_list(f), fn {_, n} -> is_number(n) end)]
+          {:floor, _} -> []
           {:tags, tags} when is_list(tags) -> [tags: Enum.filter(tags, &is_binary/1)]
           {:tags, _} -> []
           {:description, d} when is_binary(d) -> [description: d]

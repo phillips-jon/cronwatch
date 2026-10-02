@@ -71,7 +71,7 @@ public sealed class PgCronSource : ISource
 
     internal const string NewestSql = "SELECT " + Columns + " FROM cron.job_run_details d WHERE d.jobid = $1 ORDER BY d.runid DESC LIMIT 20";
 
-    private static readonly string[] Unscheduled = ["description", "tags", "grace", "timeout", "maxDuration", "budget", "failuresBeforeAlert"];
+    private static readonly string[] Unscheduled = ["description", "tags", "grace", "timeout", "maxDuration", "budget", "floor", "failuresBeforeAlert"];
 
     private readonly PgCronQuery _db;
     private readonly PgCronOptions _o;

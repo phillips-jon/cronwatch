@@ -21,7 +21,7 @@
   <packaging>jar</packaging>
 
   <name>CronWatch</name>
-  <description>Monitoring for scheduled jobs on the JVM: missed, failed, stuck, slow and over-budget runs, alerted once and recovered once. The same library as @cronwatch/sdk.</description>
+  <description>Monitoring for scheduled jobs on the JVM: missed, failed, stuck, slow, over-budget and under-floor runs, alerted once and recovered once. The same library as @cronwatch/sdk.</description>
 
   <dependencies>
     <dependency>

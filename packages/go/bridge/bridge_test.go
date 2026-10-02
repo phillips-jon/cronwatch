@@ -95,13 +95,13 @@ func TestWatchDeclaresEntriesAndUnschedulesTheGone(t *testing.T) {
 	w.Declare([]bridge.Entry{
 		{Name: "nightly", Where: "entry 1", Schedule: "0 2 * * *", Timezone: "UTC",
 			Defaults: []cronwatch.JobOption{cronwatch.Grace("5m")},
-			Options:  []cronwatch.JobOption{cronwatch.Budget("cost", 2), cronwatch.Tags("reports")}},
+			Options:  []cronwatch.JobOption{cronwatch.Budget("cost", 2), cronwatch.Floor("rows", 1), cronwatch.Tags("reports")}},
 		{Name: "twice", Where: "entry 2", Schedule: "0 3 * * *"},
 		{Name: "twice", Where: "entry 3", Schedule: "0 4 * * *"},
 		{Name: "odd", Where: "entry 4", Problem: errors.New("cronwatch: entry 4 cannot be read")},
 	})
 	check(t, cw)
-	eq(t, "nightly", stored(t, store, "nightly"), `{"grace":"5m","schedule":"0 2 * * *","timezone":"UTC","budget":{"cost":2},"tags":["reports","gocron","gocron:billing"],"name":"nightly"}`)
+	eq(t, "nightly", stored(t, store, "nightly"), `{"grace":"5m","schedule":"0 2 * * *","timezone":"UTC","budget":{"cost":2},"floor":{"rows":1},"tags":["reports","gocron","gocron:billing"],"name":"nightly"}`)
 	eq(t, "twice", stored(t, store, "twice"), `{"tags":["gocron","gocron:billing"],"name":"twice"}`)
 	eq(t, "odd", stored(t, store, "odd"), `{"tags":["gocron","gocron:billing"],"name":"odd"}`)
 	eq(t, "reported", strings.Join(errs.List(), "\n"), `declaring entry 2: cronwatch: "twice" is run by 2 gocron entries on different schedules (0 3 * * *; 0 4 * * *), so it is watched without a schedule; give each a name of its own`+"\n"+
@@ -113,7 +113,7 @@ func TestWatchDeclaresEntriesAndUnschedulesTheGone(t *testing.T) {
 	w.Declare([]bridge.Entry{
 		{Name: "nightly", Where: "entry 1", Schedule: "0 2 * * *", Timezone: "UTC",
 			Defaults: []cronwatch.JobOption{cronwatch.Grace("5m")},
-			Options:  []cronwatch.JobOption{cronwatch.Budget("cost", 2), cronwatch.Tags("reports")}},
+			Options:  []cronwatch.JobOption{cronwatch.Budget("cost", 2), cronwatch.Floor("rows", 1), cronwatch.Tags("reports")}},
 		{Name: "twice", Where: "entry 2", Schedule: "0 3 * * *"},
 		{Name: "twice", Where: "entry 3", Schedule: "0 4 * * *"},
 	})
@@ -121,7 +121,7 @@ func TestWatchDeclaresEntriesAndUnschedulesTheGone(t *testing.T) {
 	eq(t, "reported once", len(errs.List()), 2)
 	w.Declare(nil)
 	check(t, cw)
-	eq(t, "gone", stored(t, store, "nightly"), `{"description":"A scheduled task (no longer scheduled)","tags":["reports","gocron","gocron:billing"],"grace":"5m","budget":{"cost":2},"name":"nightly"}`)
+	eq(t, "gone", stored(t, store, "nightly"), `{"description":"A scheduled task (no longer scheduled)","tags":["reports","gocron","gocron:billing"],"grace":"5m","budget":{"cost":2},"floor":{"rows":1},"name":"nightly"}`)
 }
 
 func TestUnscheduleTakesOnlyThisAppsJobs(t *testing.T) {
@@ -162,7 +162,7 @@ func TestFallbackKeepsTheStoredDefinition(t *testing.T) {
 	store := cronwatch.NewMemoryStore()
 	scheduler, _ := newClient(t, store)
 	if _, err := scheduler.Job("report", cronwatch.Grace("5m"), cronwatch.Schedule("0 2 * * *"), cronwatch.Timezone("UTC"), cronwatch.Timeout(7200000),
-		cronwatch.MaxDuration("30m"), cronwatch.Budget("cost", 2), cronwatch.Budget("rows", 10), cronwatch.FailuresBeforeAlert(2),
+		cronwatch.MaxDuration("30m"), cronwatch.Budget("cost", 2), cronwatch.Budget("rows", 10), cronwatch.Floor("rows", 1), cronwatch.FailuresBeforeAlert(2),
 		cronwatch.Description("Nightly"), cronwatch.Tags("river", "river:billing"), cronwatch.Expect("Report written")); err != nil {
 		t.Fatal(err)
 	}

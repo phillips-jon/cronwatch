@@ -214,6 +214,17 @@ defmodule Cronwatch.Format do
     {"#{name} went over budget", lines}
   end
 
+  defp compose("under_floor", run, d, _def, name, now) do
+    lines =
+      Enum.map(d.breaches, fn
+        %{basis: "floor"} = b -> "#{b.metric}: #{format_number(b.value)}, below the floor of #{format_number(b.limit)}."
+        b -> "#{b.metric}: #{format_number(b.value)} (#{b.basis})."
+      end)
+
+    lines = if run, do: lines ++ ["Started #{when_at(run.started_at, now)}."], else: lines
+    {"#{name} fell short", lines}
+  end
+
   defp compose("recovered", _run, %{reason: "unscheduled"} = d, _def, name, now) do
     missed = if d.since != nil, do: "Missed since #{when_at(d.since, now)}. ", else: ""
 

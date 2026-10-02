@@ -322,6 +322,20 @@ internal static class AlertFormat
             }
             title = name + " went over budget";
         }
+        else if (type == AlertType.UnderFloor && details is AlertDetails.UnderFloor u)
+        {
+            foreach (var b in u.Breaches)
+            {
+                lines.Add(b.Basis == "floor"
+                    ? b.Metric + ": " + FormatNumber(b.Value) + ", below the floor of " + FormatNumber(b.Limit) + "."
+                    : b.Metric + ": " + FormatNumber(b.Value) + " (" + b.Basis + ").");
+            }
+            if (run != null)
+            {
+                lines.Add("Started " + When(run.StartedAt, now) + ".");
+            }
+            title = name + " fell short";
+        }
         else if (type == AlertType.Recovered && details is AlertDetails.Recovered r)
         {
             if (r.Reason == "unscheduled")

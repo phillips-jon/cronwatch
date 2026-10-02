@@ -176,7 +176,7 @@ end
 
 Every `perform` is recorded as a run with the trigger `"active-job"` (runs recorded before 1.0 carry `"active_job"`, which nothing changes; see [triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)). The job is named after the class, without `Job`, underscored and dasherized, with `::` becoming `:`: `NightlyReportJob` is `nightly-report` and `Reports::NightlyJob` is `reports:nightly`. Pass `name:` to choose another; an anonymous class must. Keep names stable: they are the key everything in the store hangs off. The gem prefixes none of them, since a Rails app's class names do not collide with anything of the platform's ([job names](/docs/dashboard/#triggers-tags-and-job-names) are prefixed only where they would).
 
-`cronwatch` takes `name` and the options a job declared by hand takes: `schedule`, `timezone`, `grace`, `timeout`, `max_duration`, `budget`, `expect`, `failures_before_alert`, `description` and `tags`. A bad option raises `ArgumentError`.
+`cronwatch` takes `name` and the options a job declared by hand takes: `schedule`, `timezone`, `grace`, `timeout`, `max_duration`, `budget`, `floor`, `expect`, `failures_before_alert`, `description` and `tags`. A bad option raises `ArgumentError`.
 
 Only a class that calls `cronwatch` is monitored. Including the concern without it does nothing, and a subclass of a monitored job is not monitored until it calls `cronwatch` itself.
 

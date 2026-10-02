@@ -268,6 +268,18 @@ func composeAlert(draft alertDraft, def Definition, now int64) Alert {
 		if run != nil {
 			lines = append(lines, "Started "+whenInt(&run.StartedAt, now)+".")
 		}
+	case AlertUnderFloor:
+		title = name + " fell short"
+		for _, b := range draft.Details.(UnderFloorDetails).Breaches {
+			if b.Basis == "floor" {
+				lines = append(lines, b.Metric+": "+formatNumber(b.Value)+", below the floor of "+formatNumber(b.Limit)+".")
+			} else {
+				lines = append(lines, b.Metric+": "+formatNumber(b.Value)+" ("+b.Basis+").")
+			}
+		}
+		if run != nil {
+			lines = append(lines, "Started "+whenInt(&run.StartedAt, now)+".")
+		}
 	case AlertRecovered:
 		d := draft.Details.(RecoveredDetails)
 		if d.Reason == "unscheduled" {

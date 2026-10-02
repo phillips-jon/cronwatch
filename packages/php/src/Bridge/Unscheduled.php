@@ -29,7 +29,7 @@ use Cronwatch\Cronwatch;
 final class Unscheduled
 {
     /** The options kept when a job is declared again without its schedule. */
-    private const KEPT = ['tags', 'grace', 'timeout', 'maxDuration', 'budget', 'failuresBeforeAlert'];
+    private const KEPT = ['tags', 'grace', 'timeout', 'maxDuration', 'budget', 'floor', 'failuresBeforeAlert'];
 
     /**
      * The tag that names the app under an integration's tag: "<tag>:<app>",

@@ -23,6 +23,9 @@ public final class AlertType {
   /** Over budget opened. */
   public static final AlertType OVER_BUDGET = new AlertType("over_budget");
 
+  /** Under floor opened. */
+  public static final AlertType UNDER_FLOOR = new AlertType("under_floor");
+
   /** Conditions that alerted have closed. */
   public static final AlertType RECOVERED = new AlertType("recovered");
 
@@ -40,6 +43,7 @@ public final class AlertType {
       case "stuck" -> STUCK;
       case "slow" -> SLOW;
       case "over_budget" -> OVER_BUDGET;
+      case "under_floor" -> UNDER_FLOOR;
       case "recovered" -> RECOVERED;
       default -> new AlertType(Objects.requireNonNull(value, "value"));
     };

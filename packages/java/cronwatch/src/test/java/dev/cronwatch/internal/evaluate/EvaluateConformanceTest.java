@@ -202,7 +202,7 @@ class EvaluateConformanceTest {
     JsObject f = Fixtures.load("evaluate");
     Fixtures.Failures fails = new Fixtures.Failures();
     List<JsObject> scenarios = Fixtures.objects(f, "scenarios");
-    assertEquals(50, scenarios.size(), "evaluate.json scenarios");
+    assertEquals(56, scenarios.size(), "evaluate.json scenarios");
     int events = 0;
     for (JsObject sc : scenarios) {
       String name = Fixtures.string(sc, "name");

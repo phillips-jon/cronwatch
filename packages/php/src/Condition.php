@@ -12,6 +12,7 @@ final class Condition
     public const STUCK = 'stuck';
     public const SLOW = 'slow';
     public const OVER_BUDGET = 'over_budget';
+    public const UNDER_FLOOR = 'under_floor';
 
-    public const ALL = [self::MISSED, self::FAILED, self::STUCK, self::SLOW, self::OVER_BUDGET];
+    public const ALL = [self::MISSED, self::FAILED, self::STUCK, self::SLOW, self::OVER_BUDGET, self::UNDER_FLOOR];
 }

@@ -104,7 +104,7 @@ internal static class Html
     /// <summary><c>c.replace("_", " ")</c>: the first underscore only.</summary>
     internal static string ConditionText(Condition c) => WebText.ReplaceFirst(c.Value, "_", " ");
 
-    /// <summary>The job's health, with any open condition it does not already say (over budget, slow).</summary>
+    /// <summary>The job's health, with any open condition it does not already say (over budget, under floor, slow).</summary>
     private static string HealthState(JobSummary job)
     {
         var (cls, label) = HealthLabel(job.Health);
@@ -511,6 +511,8 @@ internal static class Html
             + "\n  "
             + BudgetRow(d)
             + "\n  "
+            + FloorRow(d)
+            + "\n  "
             + DefinitionRow(d, "expect", "Expect")
             + "\n  "
             + AlertAfterRow(d)
@@ -560,9 +562,13 @@ internal static class Html
         return v == null ? "" : "<dt>" + label + "</dt><dd>" + WebText.EscapeValue(v) + "</dd>";
     }
 
-    private static string BudgetRow(Definition d)
+    private static string BudgetRow(Definition d) => LimitsRow(d, "budget", "Budget", " ≤ ");
+
+    private static string FloorRow(Definition d) => LimitsRow(d, "floor", "Floor", " ≥ ");
+
+    private static string LimitsRow(Definition d, string key, string label, string sign)
     {
-        object? v = TruthyField(d, "budget");
+        object? v = TruthyField(d, key);
         if (v == null)
         {
             return "";
@@ -572,10 +578,10 @@ internal static class Html
         {
             foreach (var e in o)
             {
-                parts.Add(e.Key + " ≤ " + AlertFormat.JsText(e.Value));
+                parts.Add(e.Key + sign + AlertFormat.JsText(e.Value));
             }
         }
-        return "<dt>Budget</dt><dd>" + H(string.Join(", ", parts)) + "</dd>";
+        return "<dt>" + label + "</dt><dd>" + H(string.Join(", ", parts)) + "</dd>";
     }
 
     private static string AlertAfterRow(Definition d)

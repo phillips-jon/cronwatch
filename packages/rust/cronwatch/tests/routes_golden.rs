@@ -86,6 +86,7 @@ async fn seed() -> Kit {
                 .grace("15m")
                 .max_duration("10m")
                 .budget("cost", 2.0)
+                .floor("rows", 40.0)
                 .expect("Report written")
                 .failures_before_alert(2)
                 .description("Builds the <b>PDF</b>")
@@ -103,6 +104,18 @@ async fn seed() -> Kit {
                 job.metric("rows", 40.0 + i as f64).unwrap();
                 job.metric("2", 0.123456).unwrap();
                 k.advance(d);
+                async { Ok::<_, std::io::Error>(()) }
+            })
+            .await;
+    }
+    // Five runs that wrote rows, then one that wrote none: under its floor.
+    let importer = k.cw.job("import", JobOptions::new().schedule("0 * * * *")).unwrap();
+    for i in 0..6 {
+        k.set(T0 - (6 - i) * HOUR - 30 * MIN);
+        let _ = importer
+            .run(|job| {
+                job.metric("rows", if i == 5 { 0.0 } else { 120.0 + i as f64 }).unwrap();
+                k.advance(800);
                 async { Ok::<_, std::io::Error>(()) }
             })
             .await;

@@ -22,7 +22,7 @@ final class Kept {
 
   /** The alert types this release reads the details of. */
   static final Set<String> KNOWN_TYPES =
-      Set.of("missed", "failed", "stuck", "slow", "over_budget", "recovered");
+      Set.of("missed", "failed", "stuck", "slow", "over_budget", "under_floor", "recovered");
 
   private Kept() {}
 

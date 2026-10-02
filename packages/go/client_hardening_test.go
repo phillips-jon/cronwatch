@@ -224,6 +224,9 @@ func TestJobRejectsNumbersThatWouldTurnACheckOff(t *testing.T) {
 		{[]cronwatch.JobOption{cronwatch.Budget("cost", math.NaN())}, `job "a": budget.cost must be a finite number, 0 or more (got NaN)`},
 		{[]cronwatch.JobOption{cronwatch.Budget("cost", math.Inf(1))}, `job "a": budget.cost must be a finite number, 0 or more (got Infinity)`},
 		{[]cronwatch.JobOption{cronwatch.Budget("cost", -1)}, `job "a": budget.cost must be a finite number, 0 or more (got -1)`},
+		{[]cronwatch.JobOption{cronwatch.Floor("rows", math.NaN())}, `job "a": floor.rows must be a finite number (got NaN)`},
+		{[]cronwatch.JobOption{cronwatch.Floor("rows", math.Inf(-1))}, `job "a": floor.rows must be a finite number (got -Infinity)`},
+		{[]cronwatch.JobOption{cronwatch.Floor("cost", 3), cronwatch.Budget("cost", 2)}, `job "a": floor.cost (3) is above budget.cost (2), so every run would alert`},
 		{[]cronwatch.JobOption{cronwatch.Grace(math.NaN())}, `grace must be a non-negative number of milliseconds`},
 		{[]cronwatch.JobOption{cronwatch.Timeout(0)}, `job "a": timeout must be longer than zero`},
 		{[]cronwatch.JobOption{cronwatch.MaxDuration("0s")}, `job "a": maxDuration must be longer than zero`},
@@ -242,6 +245,7 @@ func TestJobRejectsNumbersThatWouldTurnACheckOff(t *testing.T) {
 		t.Error(err)
 	}
 	must[*cronwatch.Job](t)(k.cw.Job("a", cronwatch.Budget("errors", 0), cronwatch.FailuresBeforeAlert(2), cronwatch.Timeout("5m")))
+	must[*cronwatch.Job](t)(k.cw.Job("c", cronwatch.Floor("delta", -5), cronwatch.Budget("delta", 5)))
 }
 
 func TestAReturnedStringIsCappedLikeLoggedOutput(t *testing.T) {

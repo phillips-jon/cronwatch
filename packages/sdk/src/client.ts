@@ -284,6 +284,18 @@ function validateDefinition(def: JobDefinition): void {
       }
     }
   }
+  if (def.floor !== undefined) {
+    if (typeof def.floor !== "object" || def.floor === null) throw new Error(`job "${name}": floor must be an object of { metric: floor }`);
+    for (const [metric, floor] of Object.entries(def.floor)) {
+      if (typeof floor !== "number" || !Number.isFinite(floor)) {
+        throw new Error(`job "${name}": floor.${metric} must be a finite number (got ${String(floor)})`);
+      }
+      const ceiling = def.budget?.[metric];
+      if (ceiling !== undefined && floor > ceiling) {
+        throw new Error(`job "${name}": floor.${metric} (${floor}) is above budget.${metric} (${ceiling}), so every run would alert`);
+      }
+    }
+  }
   if (def.expect !== undefined && typeof def.expect !== "string" && !(def.expect instanceof RegExp) && typeof def.expect !== "function") {
     throw new Error(`job "${name}": expect must be a string, a RegExp or a function`);
   }

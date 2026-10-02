@@ -27,6 +27,7 @@ final class Discord implements AlertChannel
         'stuck' => 0xc62828,
         'slow' => 0xb7791f,
         'over_budget' => 0xb7791f,
+        'under_floor' => 0xb7791f,
         'recovered' => 0x1f8a4c,
     ];
 

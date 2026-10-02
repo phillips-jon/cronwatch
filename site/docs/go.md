@@ -7,7 +7,7 @@ group: Go
 
 # Go
 
-`cronwatch.dev/go` is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a Go process can share one database with a Node, Ruby, Python, PHP, Rust, Elixir, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers the module itself: a `main` a crontab runs, a service with a `net/http` server, a Lambda function. robfig/cron, gocron, River and Asynq have a page of their own: [Go schedulers](/docs/go-schedulers/).
+`cronwatch.dev/go` is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow, over budget and under floor by the same rules, sends the same alert text, and writes the same rows, so a Go process can share one database with a Node, Ruby, Python, PHP, Rust, Elixir, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers the module itself: a `main` a crontab runs, a service with a `net/http` server, a Lambda function. robfig/cron, gocron, River and Asynq have a page of their own: [Go schedulers](/docs/go-schedulers/).
 
 ```bash
 go get cronwatch.dev/go
@@ -84,7 +84,7 @@ err = nightly.Run(ctx, func(ctx context.Context, job *cronwatch.JobContext) erro
 		return err
 	}
 	job.Log("Report written:", path) // kept with the run, shown in alerts
-	job.Metric("cost", 1.2)          // watched against budgets and baselines
+	job.Metric("cost", 1.2)          // watched against budgets, floors and baselines
 	return nil
 })
 ```
@@ -399,7 +399,7 @@ There is no Anthropic SDK to install: the Messages API is one POST, and it sends
 | `WithErrorHandler(fn)` | standard error | `func(err error, where string)` for failures outside jobs: the store, a channel, triage |
 | `WithClock(fn)` | the system clock | a function returning epoch milliseconds; for tests |
 
-`cw.Job(name, options...)` takes `Schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `Timezone` (IANA; the process's zone, `time.Local`, by default), `Grace` (`"10m"`), `Timeout` (`"1h"`), `MaxDuration`, `Budget(metric, ceiling)` (once per metric), `Expect(text)` (the output must contain it), `ExpectMatch(re)` (a `*regexp.Regexp` it must match, stored as `matches /source/`), `ExpectFunc(fn)` (a function of the output; a panic in it fails the run), `FailuresBeforeAlert` (1), `Description` and `Tags`, with the rules in the [TypeScript API reference](/docs/api/). `cronwatch.DescribeJob(name, options...)` is the definition options give, without a client.
+`cw.Job(name, options...)` takes `Schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `Timezone` (IANA; the process's zone, `time.Local`, by default), `Grace` (`"10m"`), `Timeout` (`"1h"`), `MaxDuration`, `Budget(metric, ceiling)` (once per metric), `Floor(metric, floor)` (once per metric; any finite number, no higher than the same metric's budget), `Expect(text)` (the output must contain it), `ExpectMatch(re)` (a `*regexp.Regexp` it must match, stored as `matches /source/`), `ExpectFunc(fn)` (a function of the output; a panic in it fails the run), `FailuresBeforeAlert` (1), `Description` and `Tags`, with the rules in the [TypeScript API reference](/docs/api/). `cronwatch.DescribeJob(name, options...)` is the definition options give, without a client.
 
 `Timeout` and `MaxDuration` both measure a run's length, and are easy to mix up. `Timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure), the job is stuck, and the job's context is cancelled. `MaxDuration` is for a run that finished: one that succeeded but took longer is slow, and stays a success; without it, slow is more than twice the p95 of recent successful runs. So set `Timeout` well above `MaxDuration`: `MaxDuration("10m"), Timeout("1h")` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
 

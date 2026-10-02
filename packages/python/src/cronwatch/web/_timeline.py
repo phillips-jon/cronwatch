@@ -254,7 +254,7 @@ def _tone_of(run: Run, job: JobSummary, now: int) -> str:
     if status == "timeout":
         return "timeout"
     latest = job.last_run is not None and job.last_run.id == run.id
-    return "warn" if latest and (_is_open(job, "over_budget") or _is_open(job, "slow")) else "ok"
+    return "warn" if latest and (_is_open(job, "over_budget") or _is_open(job, "under_floor") or _is_open(job, "slow")) else "ok"
 
 
 def _timeout_text(job: JobSummary) -> str:
@@ -269,7 +269,9 @@ def _describe_run(run: Run, tone: str, job: JobSummary, now: int) -> str:
     if tone == "stuck":
         return f"running since {at}, past its {_timeout_text(job)} timeout"
     took = "" if run.duration_ms is None else f", took {format_duration(run.duration_ms)}"
-    extra = (", over budget" if _is_open(job, "over_budget") else ", slow") if tone == "warn" else ""
+    extra = ""
+    if tone == "warn":
+        extra = ", over budget" if _is_open(job, "over_budget") else ", under floor" if _is_open(job, "under_floor") else ", slow"
     return f"{run.status} at {at}{took}{extra}"
 
 
@@ -282,6 +284,13 @@ def _over_ceilings(job: JobSummary) -> list[str]:
         if (-math.inf if value is None else value) > limit:
             over.append(key)
     return over
+
+
+def _under_floors(job: JobSummary) -> list[str]:
+    """The metrics of the job's last run under their floors, or at 0 or less without one."""
+    floors = dict(entries(job.definition.floor))
+    metrics = job.last_run.metrics if job.last_run is not None else {}
+    return [key for key, value in entries(metrics) if (value < floors[key] if key in floors else value <= 0)]
 
 
 def lane_note(job: JobSummary, missed: int | None, now: int) -> str | None:
@@ -306,6 +315,9 @@ def lane_note(job: JobSummary, missed: int | None, now: int) -> str | None:
     if _is_open(job, "over_budget") and last is not None:
         over = _over_ceilings(job)
         return f"went over budget{' on ' + ' and '.join(over) if over else ''} at {when(last.started_at, now)}"
+    if _is_open(job, "under_floor") and last is not None:
+        under = _under_floors(job)
+        return f"fell short{' on ' + ' and '.join(under) if under else ''} at {when(last.started_at, now)}"
     if _is_open(job, "slow") and last is not None and last.duration_ms is not None:
         return f"slow: took {format_duration(last.duration_ms)}"
     if _is_open(job, "failed"):
@@ -471,7 +483,7 @@ def _legend() -> str:
         (box("run ok"), "ran"),
         (box("run bad"), "failed"),
         (box("run timeout"), "timed out"),
-        (box("run warn"), "over budget or slow"),
+        (box("run warn"), "over budget, under floor or slow"),
         (box("run running"), "running"),
         (box("missed"), "missed"),
     ]

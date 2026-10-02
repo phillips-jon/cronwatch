@@ -157,7 +157,7 @@ function toneOf(run: Run, job: JobSummary, now: number): Tone {
   if (run.status === "failed") return "bad";
   if (run.status === "timeout") return "timeout";
   const latest = job.lastRun?.id === run.id;
-  return latest && (job.open.includes("over_budget") || job.open.includes("slow")) ? "warn" : "ok";
+  return latest && (job.open.includes("over_budget") || job.open.includes("under_floor") || job.open.includes("slow")) ? "warn" : "ok";
 }
 
 function timeoutText(job: JobSummary): string {
@@ -170,7 +170,7 @@ function describeRun(run: Run, tone: Tone, job: JobSummary, now: number): string
   if (tone === "running") return `running since ${at}, ${formatDuration(now - run.startedAt)} so far`;
   if (tone === "stuck") return `running since ${at}, past its ${timeoutText(job)} timeout`;
   const took = run.durationMs !== null ? `, took ${formatDuration(run.durationMs)}` : "";
-  const extra = tone === "warn" ? (job.open.includes("over_budget") ? ", over budget" : ", slow") : "";
+  const extra = tone === "warn" ? (job.open.includes("over_budget") ? ", over budget" : job.open.includes("under_floor") ? ", under floor" : ", slow") : "";
   return `${run.status} at ${at}${took}${extra}`;
 }
 
@@ -178,6 +178,12 @@ function describeRun(run: Run, tone: Tone, job: JobSummary, now: number): string
 function overCeilings(job: JobSummary): string[] {
   const metrics = job.lastRun?.metrics ?? {};
   return Object.entries(job.definition.budget ?? {}).filter(([k, limit]) => (metrics[k] ?? -Infinity) > limit).map(([k]) => k);
+}
+
+/** The metrics of the job's last run under their floors, or at 0 or less without one. */
+function underFloors(job: JobSummary): string[] {
+  const floors = job.definition.floor ?? {};
+  return Object.entries(job.lastRun?.metrics ?? {}).filter(([k, v]) => (floors[k] !== undefined ? v < floors[k] : v <= 0)).map(([k]) => k);
 }
 
 /** What is worth saying about the job in a few words, or null when all is well. */
@@ -195,6 +201,10 @@ export function laneNote(job: JobSummary, missed: number | null, now: number): s
   if (job.open.includes("over_budget") && last) {
     const over = overCeilings(job);
     return `went over budget${over.length ? ` on ${over.join(" and ")}` : ""} at ${when(last.startedAt, now)}`;
+  }
+  if (job.open.includes("under_floor") && last) {
+    const under = underFloors(job);
+    return `fell short${under.length ? ` on ${under.join(" and ")}` : ""} at ${when(last.startedAt, now)}`;
   }
   if (job.open.includes("slow") && last?.durationMs != null) return `slow: took ${formatDuration(last.durationMs)}`;
   if (job.open.includes("failed")) return "failing";
@@ -350,7 +360,7 @@ function legend(): string {
     [box("run ok"), "ran"],
     [box("run bad"), "failed"],
     [box("run timeout"), "timed out"],
-    [box("run warn"), "over budget or slow"],
+    [box("run warn"), "over budget, under floor or slow"],
     [box("run running"), "running"],
     [box("missed"), "missed"],
   ];

@@ -1,5 +1,5 @@
 # @cronwatch/sdk
-type Alert = (AlertBase & { type: 'missed'; details: { dueAt: number; deadline: number; graceMs: number; lastRunAt: number | null; }; }) | (AlertBase & { type: 'failed'; details: { consecutiveFailures: number; threshold: number; }; }) | (AlertBase & { type: 'stuck'; details: { consecutiveFailures: number; threshold: number; }; }) | (AlertBase & { type: 'slow'; details: { durationMs: number; thresholdMs: number; basis: string; }; }) | (AlertBase & { type: 'over_budget'; details: { breaches: Array<BudgetBreach>; }; }) | (AlertBase & { type: 'recovered'; details: { after: Array<Condition>; reason?: 'unscheduled' | undefined; since?: number | undefined; }; })
+type Alert = (AlertBase & { type: 'missed'; details: { dueAt: number; deadline: number; graceMs: number; lastRunAt: number | null; }; }) | (AlertBase & { type: 'failed'; details: { consecutiveFailures: number; threshold: number; }; }) | (AlertBase & { type: 'stuck'; details: { consecutiveFailures: number; threshold: number; }; }) | (AlertBase & { type: 'slow'; details: { durationMs: number; thresholdMs: number; basis: string; }; }) | (AlertBase & { type: 'over_budget'; details: { breaches: Array<BudgetBreach>; }; }) | (AlertBase & { type: 'under_floor'; details: { breaches: Array<BudgetBreach>; }; }) | (AlertBase & { type: 'recovered'; details: { after: Array<Condition>; reason?: 'unscheduled' | undefined; since?: number | undefined; }; })
 interface AlertChannel
   name: string
   send(alert: Alert, context?: ChannelContext | undefined): Promise<void>
@@ -9,8 +9,9 @@ interface AlertDetails
   stuck: { consecutiveFailures: number; threshold: number }
   slow: { durationMs: number; thresholdMs: number; basis: string }
   over_budget: { breaches: BudgetBreach[] }
+  under_floor: { breaches: BudgetBreach[] }
   recovered: { after: Condition[]; reason?: "unscheduled"; since?: number }
-type AlertDraft = { type: 'missed'; run: Run | null; details: { dueAt: number; deadline: number; graceMs: number; lastRunAt: number | null; }; } | { type: 'failed'; run: Run | null; details: { consecutiveFailures: number; threshold: number; }; } | { type: 'stuck'; run: Run | null; details: { consecutiveFailures: number; threshold: number; }; } | { type: 'slow'; run: Run | null; details: { durationMs: number; thresholdMs: number; basis: string; }; } | { type: 'over_budget'; run: Run | null; details: { breaches: Array<BudgetBreach>; }; } | { type: 'recovered'; run: Run | null; details: { after: Array<Condition>; reason?: 'unscheduled' | undefined; since?: number | undefined; }; }
+type AlertDraft = { type: 'missed'; run: Run | null; details: { dueAt: number; deadline: number; graceMs: number; lastRunAt: number | null; }; } | { type: 'failed'; run: Run | null; details: { consecutiveFailures: number; threshold: number; }; } | { type: 'stuck'; run: Run | null; details: { consecutiveFailures: number; threshold: number; }; } | { type: 'slow'; run: Run | null; details: { durationMs: number; thresholdMs: number; basis: string; }; } | { type: 'over_budget'; run: Run | null; details: { breaches: Array<BudgetBreach>; }; } | { type: 'under_floor'; run: Run | null; details: { breaches: Array<BudgetBreach>; }; } | { type: 'recovered'; run: Run | null; details: { after: Array<Condition>; reason?: 'unscheduled' | undefined; since?: number | undefined; }; }
 type AlertType = Condition | 'recovered'
 interface BudgetBreach
   metric: string
@@ -24,7 +25,7 @@ interface CheckResult
   jobs: JobSummary[]
   alerts: Alert[]
   pruned: number
-type Condition = 'missed' | 'failed' | 'stuck' | 'slow' | 'over_budget'
+type Condition = 'missed' | 'failed' | 'stuck' | 'slow' | 'over_budget' | 'under_floor'
 type CronWatch = Cronwatch (deprecated)
 const CronWatch: typeof Cronwatch (deprecated)
 type CronWatchOptions = CronwatchOptions (deprecated)
@@ -92,6 +93,7 @@ interface JobDefinition
   timeout?: Duration
   maxDuration?: Duration
   budget?: Record<string, number>
+  floor?: Record<string, number>
   expect?: ExpectRule
   failuresBeforeAlert?: number
   description?: string
@@ -112,6 +114,7 @@ interface JobOptions
   timeout?: Duration
   maxDuration?: Duration
   budget?: Record<string, number>
+  floor?: Record<string, number>
   expect?: ExpectRule
   failuresBeforeAlert?: number
   description?: string
@@ -125,6 +128,7 @@ interface JobState
   pendingRecovery?: Condition[]
   undelivered?: Alert[]
   sending?: SendingAlert[]
+  underFloor?: string[]
   version?: number
 interface JobSummary
   name: string
@@ -221,6 +225,7 @@ interface StoredJobDefinition
   schedule?: string
   maxDuration?: Duration
   budget?: Record<string, number>
+  floor?: Record<string, number>
   description?: string
   tags?: string[]
 interface TriageContext

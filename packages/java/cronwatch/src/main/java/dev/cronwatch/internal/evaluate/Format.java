@@ -265,6 +265,22 @@ public final class Format {
         lines.add("Started " + when(run.startedAt(), now) + ".");
       }
       title = name + " went over budget";
+    } else if (type.equals(AlertType.UNDER_FLOOR) && details instanceof AlertDetails.UnderFloor u) {
+      for (BudgetBreach b : u.breaches()) {
+        lines.add(
+            b.basis().equals("floor")
+                ? b.metric()
+                    + ": "
+                    + formatNumber(b.value())
+                    + ", below the floor of "
+                    + formatNumber(b.limit())
+                    + "."
+                : b.metric() + ": " + formatNumber(b.value()) + " (" + b.basis() + ").");
+      }
+      if (run != null) {
+        lines.add("Started " + when(run.startedAt(), now) + ".");
+      }
+      title = name + " fell short";
     } else if (type.equals(AlertType.RECOVERED) && details instanceof AlertDetails.Recovered r) {
       if ("unscheduled".equals(r.reason())) {
         String missed = r.since() == null ? "" : "Missed since " + when(r.since(), now) + ". ";

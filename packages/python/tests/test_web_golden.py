@@ -52,6 +52,7 @@ def seed(errors: list[str] | None = None) -> Cronwatch:
         grace="15m",
         max_duration="10m",
         budget={"cost": 2},
+        floor={"rows": 40},
         expect="Report written",
         failures_before_alert=2,
         description="Builds the <b>PDF</b>",
@@ -69,6 +70,17 @@ def seed(errors: list[str] | None = None) -> Cronwatch:
             clock.advance(duration)
 
         quietly(lambda work=work: nightly.run(work))
+
+    # Five runs that wrote rows, then one that wrote none: under its floor.
+    importer = cw.job("import", schedule="0 * * * *")
+    for i in range(6):
+        clock.set(T0 - (6 - i) * HOUR - 30 * MIN)
+
+        def wrote(job: Any, i: int = i) -> None:
+            job.metric("rows", 0 if i == 5 else 120 + i)
+            clock.advance(800)
+
+        importer.run(wrote)
 
     broken = cw.job("broken", expect="done")
     clock.set(T0 - 2 * HOUR)

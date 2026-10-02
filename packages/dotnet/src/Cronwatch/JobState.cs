@@ -12,7 +12,7 @@ public sealed record JobState
 {
     private static readonly HashSet<string> KnownKeys = new(StringComparer.Ordinal)
     {
-        "job", "open", "consecutiveFailures", "silencedUntil", "lastAlertAt", "pendingRecovery", "undelivered", "sending",
+        "job", "open", "consecutiveFailures", "silencedUntil", "lastAlertAt", "pendingRecovery", "undelivered", "sending", "underFloor",
     };
 
     /// <summary>The job's name.</summary>
@@ -47,6 +47,12 @@ public sealed record JobState
     /// before the field existed; an empty list is written as no key.
     /// </summary>
     public ValueList<SendingAlert>? Sending { get; init; }
+
+    /// <summary>
+    /// The metrics under their floor at the job's last successful run. Null when none, and in
+    /// state written before the field existed; an empty list is written as no key.
+    /// </summary>
+    public ValueList<string>? UnderFloor { get; init; }
 
     /// <summary>
     /// The version as stored when it is a whole number (any other value reads as null); see
@@ -121,6 +127,10 @@ public sealed record JobState
             }
             o.Set("sending", list);
         }
+        if (UnderFloor is { Count: > 0 })
+        {
+            o.Set("underFloor", new List<object?>(UnderFloor));
+        }
         bool wroteVersion = false;
         foreach (var e in _extra)
         {
@@ -152,7 +162,7 @@ public sealed record JobState
     /// <summary>
     /// A state read from a JSON value, leniently, as the SDK's <c>normalizeState</c> reads a stored
     /// state: an <c>open</c> entry whose time is not a number is left out, as is a
-    /// <c>pendingRecovery</c> entry that is not a string and an <c>undelivered</c> entry that is
+    /// <c>pendingRecovery</c> or <c>underFloor</c> entry that is not a string and an <c>undelivered</c> entry that is
     /// not an object; <c>silencedUntil</c> and <c>lastAlertAt</c> that are not numbers read as
     /// null. A value that is not an object is no state at all, which
     /// <c>Evaluate.NormalizeState</c> reads as a fresh one.
@@ -213,6 +223,17 @@ public sealed record JobState
                 sending.Add(SendingAlert.FromValue(e));
             }
         }
+        List<string>? underFloor = null;
+        if (o.Get("underFloor") is List<object?> fl)
+        {
+            foreach (var m in fl)
+            {
+                if (m is string s)
+                {
+                    (underFloor ??= []).Add(s);
+                }
+            }
+        }
         long? version = null;
         var extra = new JsObject();
         foreach (var e in o)
@@ -239,6 +260,7 @@ public sealed record JobState
             PendingRecovery = pending == null ? null : ValueList<Condition>.Of(pending),
             Undelivered = undelivered == null ? null : ValueList<Alert>.Of(undelivered),
             Sending = sending == null ? null : ValueList<SendingAlert>.Of(sending),
+            UnderFloor = underFloor == null ? null : ValueList<string>.Of(underFloor),
             Version = version,
             Extra = extra,
         };

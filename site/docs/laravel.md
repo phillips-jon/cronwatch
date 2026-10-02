@@ -86,7 +86,7 @@ Schedule::command('orders:sync')->everyFifteenMinutes()->when(fn () => config('s
 Schedule::command('cache:prune-stale-tags')->hourly()->cronwatch(false);
 ```
 
-It takes `name` and the options of a job declared by hand: `schedule`, `timezone`, `grace`, `timeout`, `maxDuration`, `budget`, `expect`, `failuresBeforeAlert`, `description` and `tags` (see [PHP](/docs/php/#api)). `defaults` in `config/cronwatch.php` applies `grace`, `timeout`, `timezone` and `failuresBeforeAlert` to every job that sets none, and `schedule.exclude` lists job names to leave out. `CRONWATCH_WATCH_SCHEDULE=false` stops watching the schedule altogether; the check is still scheduled unless `CRONWATCH_SCHEDULE_CHECK=false`.
+It takes `name` and the options of a job declared by hand: `schedule`, `timezone`, `grace`, `timeout`, `maxDuration`, `budget`, `floor`, `expect`, `failuresBeforeAlert`, `description` and `tags` (see [PHP](/docs/php/#api)). `defaults` in `config/cronwatch.php` applies `grace`, `timeout`, `timezone` and `failuresBeforeAlert` to every job that sets none, and `schedule.exclude` lists job names to leave out. `CRONWATCH_WATCH_SCHEDULE=false` stops watching the schedule altogether; the check is still scheduled unless `CRONWATCH_SCHEDULE_CHECK=false`.
 
 ## Queued jobs
 

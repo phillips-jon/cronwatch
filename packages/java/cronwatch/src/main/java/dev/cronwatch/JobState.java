@@ -39,6 +39,8 @@ import org.jspecify.annotations.Nullable;
  * @param sending the outbox: alerts written with the state that opened their condition while the
  *     process that wrote them sends them (see {@link SendingAlert}); null when there are none, as
  *     the key is absent then, and an empty list is made null
+ * @param underFloor the metrics under their floor at the job's last successful run; null when there
+ *     are none, as the key is absent then, and an empty list is made null
  */
 public record JobState(
     String job,
@@ -50,7 +52,8 @@ public record JobState(
     @Nullable List<Alert> undelivered,
     @Nullable Long version,
     JsObject extra,
-    @Nullable List<SendingAlert> sending) {
+    @Nullable List<SendingAlert> sending,
+    @Nullable List<String> underFloor) {
 
   private static final Set<String> KEYS =
       Set.of(
@@ -61,7 +64,8 @@ public record JobState(
           "lastAlertAt",
           "pendingRecovery",
           "undelivered",
-          "sending");
+          "sending",
+          "underFloor");
 
   /** Keeps unmodifiable copies. */
   public JobState {
@@ -71,6 +75,33 @@ public record JobState(
     undelivered = undelivered == null ? null : List.copyOf(undelivered);
     extra = extra.copy();
     sending = sending == null || sending.isEmpty() ? null : List.copyOf(sending);
+    underFloor = underFloor == null || underFloor.isEmpty() ? null : List.copyOf(underFloor);
+  }
+
+  /** A state with no metric under its floor, as states were made before it existed. */
+  public JobState(
+      String job,
+      Map<Condition, Long> open,
+      long consecutiveFailures,
+      @Nullable Long silencedUntil,
+      @Nullable Long lastAlertAt,
+      @Nullable List<Condition> pendingRecovery,
+      @Nullable List<Alert> undelivered,
+      @Nullable Long version,
+      JsObject extra,
+      @Nullable List<SendingAlert> sending) {
+    this(
+        job,
+        open,
+        consecutiveFailures,
+        silencedUntil,
+        lastAlertAt,
+        pendingRecovery,
+        undelivered,
+        version,
+        extra,
+        sending,
+        null);
   }
 
   /** A state with no alert in {@link #sending}, as states were made before it existed. */
@@ -94,12 +125,13 @@ public record JobState(
         undelivered,
         version,
         extra,
+        null,
         null);
   }
 
   /**
-   * A state with these fields, nothing in {@link #sending} and no keys beyond the SDK's: for a
-   * state built in code (a store reads one with {@link #fromJson}).
+   * A state with these fields, nothing in {@link #sending} or {@link #underFloor} and no keys
+   * beyond the SDK's: for a state built in code (a store reads one with {@link #fromJson}).
    */
   public static JobState of(
       String job,
@@ -120,6 +152,7 @@ public record JobState(
         undelivered,
         version,
         new JsObject(),
+        null,
         null);
   }
 
@@ -160,7 +193,8 @@ public record JobState(
         undelivered,
         version,
         extra,
-        sending);
+        sending,
+        underFloor);
   }
 
   /** The state as the SDK writes it. */
@@ -196,6 +230,9 @@ public record JobState(
         list.add(s.toValue());
       }
       o.set("sending", list);
+    }
+    if (underFloor != null) {
+      o.set("underFloor", new ArrayList<Object>(underFloor));
     }
     boolean wroteVersion = false;
     for (Map.Entry<String, @Nullable Object> e : extra.entries()) {
@@ -234,7 +271,7 @@ public record JobState(
    * silencedUntil} and {@code lastAlertAt} that are not numbers read as null. A queued entry that
    * is not an alert is dropped rather than fail every read of the state, since it could never be
    * delivered, and so is an entry of {@code sending} that is not an object ({@link SendingAlert}
-   * reads the rest leniently).
+   * reads the rest leniently). {@code underFloor} keeps only its strings, and is absent when none.
    *
    * @throws Json.JsonException when it is not an object
    */
@@ -281,6 +318,15 @@ public record JobState(
         }
       }
     }
+    List<String> underFloor = null;
+    if (o.get("underFloor") instanceof List<?> list) {
+      underFloor = new ArrayList<>();
+      for (Object m : list) {
+        if (m instanceof String s) {
+          underFloor.add(s);
+        }
+      }
+    }
     Long version = null;
     JsObject extra = new JsObject();
     for (Map.Entry<String, @Nullable Object> e : o.entries()) {
@@ -307,6 +353,7 @@ public record JobState(
         undelivered,
         version,
         extra,
-        sending);
+        sending,
+        underFloor);
   }
 }

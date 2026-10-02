@@ -2,6 +2,24 @@
 
 Every notable change to CronWatch, newest first. All the packages, in every language, share one version, so each release is one section here, with a line per language where it matters. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and from 1.0 the versions follow [Semantic Versioning](https://semver.org) as the [Stability](https://cronwatch.dev/docs/stability/) page describes. The WordPress plugin, the Drupal module and the Craft CMS plugin keep their own changelogs too, for their stores.
 
+## Unreleased
+
+### Added
+
+Every language:
+
+- A new condition, `under_floor`, for the job that exits cleanly and did nothing. A job's `floor` option sets a minimum per metric (`floor: { rows: 1 }`); a metric without one is under its floor when it reports 0 or less and the five to twenty successful runs before it all reported more than 0. It alerts once as a warning and stays open while the metric stays down, however long that is (the metrics under their floor are kept in the job's state, as `underFloor`), and closes with a recovery. `floor: { name: 0 }` lets a metric reach 0. A floor above the same metric's `budget` is refused. The webhook's alert types gain `under_floor`, with `details` shaped as `over_budget`'s. See [under_floor](https://cronwatch.dev/docs/conditions/#under_floor).
+
+Java:
+
+- `AlertDetails` gains `UnderFloor`, so an exhaustive `switch` over the sealed interface needs a case for it.
+
+### Fixed
+
+Go:
+
+- The pg_cron source keeps a job's `budget` when the job leaves pg_cron's schedule. It read the option in a form it never matched, so the ceilings were dropped and the job fell back to the three-times-the-median baseline.
+
 ## 0.11.1 - 2026-10-01
 
 ### Added

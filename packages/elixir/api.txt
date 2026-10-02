@@ -94,6 +94,7 @@
   function over_budget/0
   function slow/0
   function stuck/0
+  function under_floor/0
 # Cronwatch.Context
   function current/0
   type t/0

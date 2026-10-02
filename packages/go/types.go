@@ -3,6 +3,7 @@ package cronwatch
 import (
 	"fmt"
 	"math"
+	"slices"
 
 	"cronwatch.dev/go/internal/js"
 )
@@ -35,6 +36,7 @@ const (
 	ConditionStuck      Condition = "stuck"
 	ConditionSlow       Condition = "slow"
 	ConditionOverBudget Condition = "over_budget"
+	ConditionUnderFloor Condition = "under_floor"
 )
 
 // AlertType is a condition opening, or "recovered".
@@ -47,6 +49,7 @@ const (
 	AlertStuck      AlertType = "stuck"
 	AlertSlow       AlertType = "slow"
 	AlertOverBudget AlertType = "over_budget"
+	AlertUnderFloor AlertType = "under_floor"
 	AlertRecovered  AlertType = "recovered"
 )
 
@@ -516,13 +519,18 @@ type JobState struct {
 	// check. Nil is absent, as it is when empty and in state written before
 	// the field existed.
 	Sending []SendingAlert
+	// The metrics under their floor at the job's last successful run (see
+	// floorBreaches). Nil is absent, as it is when none and in state
+	// written before the field existed.
+	UnderFloor []string
 	// Goes up by one on every write (see Store.CompareAndSetState). Nil is
 	// a state written before versions, which counts as 0, as does a
 	// version outside 0 to 2^53 - 1. One that is not a whole number (a
 	// foreign row's 1.5 or "x") reads as nil.
 	Version *int64
 
-	// Keys after the known ones, in stored order: "version", "sending" and
+	// Keys after the known ones, in stored order: "version", "sending",
+	// "underFloor" and
 	// any a newer writer added (their values in extra), so a state is
 	// written back as the SDK's spread would write it.
 	tail  []string
@@ -536,6 +544,24 @@ func (s JobState) openAt(c Condition) (int64, bool) {
 		}
 	}
 	return 0, false
+}
+
+// setUnderFloor keeps the metrics of breaches as UnderFloor, or with none
+// takes the field away, as the SDK sets and deletes the key: a key it did
+// not have goes last.
+func (s *JobState) setUnderFloor(breaches []BudgetBreach) {
+	if len(breaches) == 0 {
+		s.UnderFloor = nil
+		s.tail = slices.DeleteFunc(s.tail, func(k string) bool { return k == "underFloor" })
+		return
+	}
+	s.UnderFloor = make([]string, len(breaches))
+	for i, b := range breaches {
+		s.UnderFloor[i] = b.Metric
+	}
+	if !slices.Contains(s.tail, "underFloor") {
+		s.tail = append(s.tail, "underFloor")
+	}
 }
 
 // version is the version the state counts as for CompareAndSetState, as
@@ -573,6 +599,9 @@ func (s JobState) clone() JobState {
 		for i, e := range s.Sending {
 			c.Sending[i] = e.clone()
 		}
+	}
+	if s.UnderFloor != nil {
+		c.UnderFloor = append([]string{}, s.UnderFloor...)
 	}
 	c.Version = copyInt(s.Version)
 	c.tail = append([]string(nil), s.tail...)
@@ -617,7 +646,14 @@ func (s JobState) JSValue() any {
 		}
 		return list
 	}
-	wroteVersion, wroteSending := false, false
+	underFloor := func() any {
+		list := make([]any, len(s.UnderFloor))
+		for i, m := range s.UnderFloor {
+			list[i] = m
+		}
+		return list
+	}
+	wroteVersion, wroteSending, wroteUnderFloor := false, false, false
 	for _, k := range s.tail {
 		switch k {
 		case "version":
@@ -632,10 +668,19 @@ func (s JobState) JSValue() any {
 				wroteSending = true
 				continue
 			}
+		case "underFloor":
+			if s.UnderFloor != nil {
+				o.Set("underFloor", underFloor())
+				wroteUnderFloor = true
+				continue
+			}
 		}
 		if v, ok := s.extra[k]; ok {
 			o.Set(k, v)
 		}
+	}
+	if s.UnderFloor != nil && !wroteUnderFloor {
+		o.Set("underFloor", underFloor())
 	}
 	if s.Sending != nil && !wroteSending {
 		o.Set("sending", sending())
@@ -723,6 +768,19 @@ func stateFrom(v any) (JobState, error) {
 				continue
 			}
 		}
+		if k == "underFloor" {
+			// Keeps only its strings; anything but a list is kept as it
+			// was, until normalizeState drops it.
+			if list, ok := get(o, "underFloor").([]any); ok {
+				s.UnderFloor = []string{}
+				for _, m := range list {
+					if name, ok := m.(string); ok {
+						s.UnderFloor = append(s.UnderFloor, name)
+					}
+				}
+				continue
+			}
+		}
 		if k == "version" {
 			// A whole number is kept as it is (version() counts one outside
 			// 0 to 2^53 - 1 as 0); anything else (a foreign row's 1.5 or
@@ -740,12 +798,13 @@ func stateFrom(v any) (JobState, error) {
 	return s, nil
 }
 
-// BudgetBreach is one metric over its ceiling or its baseline.
+// BudgetBreach is one metric over its ceiling or its baseline, or under its
+// floor.
 type BudgetBreach struct {
 	Metric string
 	Value  float64
 	Limit  float64
-	// "budget", or how the baseline was worked out.
+	// "budget", "floor", or how the baseline was worked out.
 	Basis string
 }
 
@@ -755,7 +814,7 @@ func (b BudgetBreach) jsValue() any {
 
 // AlertDetails is what an alert carries beyond its title and message: a
 // MissedDetails, FailureDetails (failed and stuck), SlowDetails,
-// OverBudgetDetails or RecoveredDetails.
+// OverBudgetDetails, UnderFloorDetails or RecoveredDetails.
 type AlertDetails interface {
 	jsValue() any
 }
@@ -806,6 +865,15 @@ func (d OverBudgetDetails) jsValue() any {
 	}
 	return js.NewObject("breaches", list)
 }
+
+// UnderFloorDetails lists the metrics under their floors. A breach's Limit
+// is the floor, or for a metric without one the lowest of the earlier runs
+// it was judged against.
+type UnderFloorDetails struct {
+	Breaches []BudgetBreach
+}
+
+func (d UnderFloorDetails) jsValue() any { return OverBudgetDetails(d).jsValue() }
 
 // RecoveredDetails names the conditions that closed. Reason "unscheduled"
 // closes missed alone because the job no longer has a schedule; Since is
@@ -898,6 +966,9 @@ func (a Alert) clone() Alert {
 	case OverBudgetDetails:
 		d.Breaches = append([]BudgetBreach(nil), d.Breaches...)
 		c.Details = d
+	case UnderFloorDetails:
+		d.Breaches = append([]BudgetBreach(nil), d.Breaches...)
+		c.Details = d
 	case RecoveredDetails:
 		d.After = append([]Condition(nil), d.After...)
 		d.Since = copyInt(d.Since)
@@ -985,6 +1056,7 @@ var detailKeys = map[AlertType]map[string]bool{
 	AlertStuck:      {"consecutiveFailures": true, "threshold": true},
 	AlertSlow:       {"durationMs": true, "thresholdMs": true, "basis": true},
 	AlertOverBudget: {"breaches": true},
+	AlertUnderFloor: {"breaches": true},
 	AlertRecovered:  {"after": true, "reason": true, "since": true},
 }
 
@@ -992,13 +1064,14 @@ var detailKeys = map[AlertType]map[string]bool{
 var breachKeys = map[string]bool{"metric": true, "value": true, "limit": true, "basis": true}
 
 // keepDetails is a known type's details as written, with the keys a newer
-// release added to them, and to each breach of over_budget, as read.
+// release added to them, and to each breach of over_budget and under_floor,
+// as read.
 func keepDetails(t AlertType, written *js.Object, read any) any {
 	ro, ok := read.(*js.Object)
 	if !ok {
 		return written
 	}
-	if t == AlertOverBudget {
+	if t == AlertOverBudget || t == AlertUnderFloor {
 		wl, _ := written.Get("breaches")
 		rl, _ := ro.Get("breaches")
 		wb, _ := wl.([]any)
@@ -1027,7 +1100,7 @@ func (otherDetails) jsValue() any { return &js.Object{} }
 
 // keepsUnknown is whether an alert as read is of a type this release does
 // not know, or holds a key it does not write, at its top, in its details
-// or in a breach of over_budget.
+// or in a breach of over_budget or under_floor.
 func keepsUnknown(t AlertType, o *js.Object) bool {
 	known, ok := detailKeys[t]
 	if !ok || unknownOnly(o, alertKeys) != nil {
@@ -1037,7 +1110,7 @@ func keepsUnknown(t AlertType, o *js.Object) bool {
 	if unknownOnly(d, known) != nil {
 		return true
 	}
-	if t == AlertOverBudget {
+	if t == AlertOverBudget || t == AlertUnderFloor {
 		list, _ := get(d, "breaches").([]any)
 		for _, b := range list {
 			if bo, ok := b.(*js.Object); ok && unknownOnly(bo, breachKeys) != nil {
@@ -1174,15 +1247,17 @@ func detailsFrom(t AlertType, o *js.Object) AlertDetails {
 		return FailureDetails{ConsecutiveFailures: int(integer(o, "consecutiveFailures")), Threshold: int(integer(o, "threshold"))}
 	case AlertSlow:
 		return SlowDetails{DurationMs: integer(o, "durationMs"), ThresholdMs: toFloat(get(o, "thresholdMs")), Basis: str(o, "basis")}
-	case AlertOverBudget:
-		var d OverBudgetDetails
-		d.Breaches = []BudgetBreach{}
+	case AlertOverBudget, AlertUnderFloor:
+		breaches := []BudgetBreach{}
 		list, _ := get(o, "breaches").([]any)
 		for _, b := range list {
 			bo, _ := b.(*js.Object)
-			d.Breaches = append(d.Breaches, BudgetBreach{Metric: str(bo, "metric"), Value: toFloat(get(bo, "value")), Limit: toFloat(get(bo, "limit")), Basis: str(bo, "basis")})
+			breaches = append(breaches, BudgetBreach{Metric: str(bo, "metric"), Value: toFloat(get(bo, "value")), Limit: toFloat(get(bo, "limit")), Basis: str(bo, "basis")})
 		}
-		return d
+		if t == AlertUnderFloor {
+			return UnderFloorDetails{Breaches: breaches}
+		}
+		return OverBudgetDetails{Breaches: breaches}
 	case AlertRecovered:
 		d := RecoveredDetails{After: []Condition{}, Reason: str(o, "reason"), Since: nullableInt(o, "since")}
 		list, _ := get(o, "after").([]any)

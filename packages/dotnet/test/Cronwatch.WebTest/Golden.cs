@@ -209,6 +209,7 @@ public static partial class Golden
             Grace = "15m",
             MaxDuration = "10m",
             Budget = { ["cost"] = 2 },
+            Floor = { ["rows"] = 40 },
             Expect = "Report written",
             FailuresBeforeAlert = 2,
             Description = "Builds the <b>PDF</b>",
@@ -228,6 +229,20 @@ public static partial class Golden
                 now += durations[n];
                 return Task.CompletedTask;
             }));
+        }
+
+        // Five runs that wrote rows, then one that wrote none: under its floor.
+        Job importer = cw.Job("import", new JobOptions { Schedule = "0 * * * *" });
+        for (int i = 0; i < 6; i++)
+        {
+            int n = i;
+            now = T0 - ((6 - i) * Hour) - (30 * Min);
+            await importer.RunAsync((job, ct) =>
+            {
+                job.Metric("rows", n == 5 ? 0 : 120 + n);
+                now += 800;
+                return Task.CompletedTask;
+            });
         }
 
         Job broken = cw.Job("broken", new JobOptions { Expect = "done" });

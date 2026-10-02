@@ -5864,6 +5864,3719 @@
       ]
     },
     {
+      "name": "under a floor, and recovered",
+      "definition": {
+        "name": "j",
+        "floor": {
+          "rows": 10,
+          "delta": -5
+        }
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "start",
+          "id": "r1",
+          "at": 1767605400000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r1",
+          "at": 1767605401000,
+          "status": "ok",
+          "metrics": {
+            "rows": 12,
+            "delta": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r2",
+          "at": 1767609000000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r2",
+          "at": 1767609001000,
+          "status": "ok",
+          "metrics": {
+            "rows": 9,
+            "delta": -6
+          },
+          "expect": {
+            "alerts": [
+              {
+                "type": "under_floor",
+                "run": {
+                  "id": "r2",
+                  "job": "j",
+                  "status": "ok",
+                  "startedAt": 1767609000000,
+                  "finishedAt": 1767609001000,
+                  "durationMs": 1000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {
+                    "rows": 9,
+                    "delta": -6
+                  },
+                  "trigger": "run"
+                },
+                "details": {
+                  "breaches": [
+                    {
+                      "metric": "rows",
+                      "value": 9,
+                      "limit": 10,
+                      "basis": "floor"
+                    },
+                    {
+                      "metric": "delta",
+                      "value": -6,
+                      "limit": -5,
+                      "basis": "floor"
+                    }
+                  ]
+                },
+                "job": "j",
+                "definition": {
+                  "name": "j",
+                  "floor": {
+                    "rows": 10,
+                    "delta": -5
+                  }
+                },
+                "title": "j fell short",
+                "message": "rows: 9, below the floor of 10.\ndelta: -6, below the floor of -5.\nStarted 2026-01-05 10:30:00 UTC (now).",
+                "at": 1767609001000
+              }
+            ],
+            "state": {
+              "job": "j",
+              "open": {
+                "under_floor": 1767609001000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows",
+                "delta"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r3",
+          "at": 1767612600000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {
+                "under_floor": 1767609001000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows",
+                "delta"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r3",
+          "at": 1767612601000,
+          "status": "ok",
+          "metrics": {
+            "rows": 5
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {
+                "under_floor": 1767609001000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r4",
+          "at": 1767616200000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {
+                "under_floor": 1767609001000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r4",
+          "at": 1767616201000,
+          "status": "ok",
+          "metrics": {
+            "rows": 10,
+            "delta": -5
+          },
+          "expect": {
+            "alerts": [
+              {
+                "type": "recovered",
+                "run": {
+                  "id": "r4",
+                  "job": "j",
+                  "status": "ok",
+                  "startedAt": 1767616200000,
+                  "finishedAt": 1767616201000,
+                  "durationMs": 1000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {
+                    "rows": 10,
+                    "delta": -5
+                  },
+                  "trigger": "run"
+                },
+                "details": {
+                  "after": [
+                    "under_floor"
+                  ]
+                },
+                "job": "j",
+                "definition": {
+                  "name": "j",
+                  "floor": {
+                    "rows": 10,
+                    "delta": -5
+                  }
+                },
+                "title": "j recovered",
+                "message": "A run 2026-01-05 12:30:00 UTC (now) succeeded after: under floor.\nRan 1s.",
+                "at": 1767616201000
+              }
+            ],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "down to 0 after five runs that all reported more, and an always-0 metric",
+      "definition": {
+        "name": "import"
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "start",
+          "id": "r1",
+          "at": 1767605400000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r1",
+          "at": 1767605401000,
+          "status": "ok",
+          "metrics": {
+            "rows": 4812,
+            "errors": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r2",
+          "at": 1767609000000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r2",
+          "at": 1767609001000,
+          "status": "ok",
+          "metrics": {
+            "rows": 5120,
+            "errors": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r3",
+          "at": 1767612600000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r3",
+          "at": 1767612601000,
+          "status": "ok",
+          "metrics": {
+            "rows": 4990,
+            "errors": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r4",
+          "at": 1767616200000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r4",
+          "at": 1767616201000,
+          "status": "ok",
+          "metrics": {
+            "rows": 6001.5,
+            "errors": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r5",
+          "at": 1767619800000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r5",
+          "at": 1767619801000,
+          "status": "ok",
+          "metrics": {
+            "rows": 5003,
+            "errors": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r6",
+          "at": 1767623400000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r6",
+          "at": 1767623401000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0,
+            "errors": 0
+          },
+          "expect": {
+            "alerts": [
+              {
+                "type": "under_floor",
+                "run": {
+                  "id": "r6",
+                  "job": "import",
+                  "status": "ok",
+                  "startedAt": 1767623400000,
+                  "finishedAt": 1767623401000,
+                  "durationMs": 1000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {
+                    "rows": 0,
+                    "errors": 0
+                  },
+                  "trigger": "run"
+                },
+                "details": {
+                  "breaches": [
+                    {
+                      "metric": "rows",
+                      "value": 0,
+                      "limit": 4812,
+                      "basis": "the last 5 runs all reported more than 0, the lowest 4,812"
+                    }
+                  ]
+                },
+                "job": "import",
+                "definition": {
+                  "name": "import"
+                },
+                "title": "import fell short",
+                "message": "rows: 0 (the last 5 runs all reported more than 0, the lowest 4,812).\nStarted 2026-01-05 14:30:00 UTC (now).",
+                "at": 1767623401000
+              }
+            ],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r7",
+          "at": 1767627000000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r7",
+          "at": 1767627001000,
+          "status": "ok",
+          "metrics": {
+            "rows": -2,
+            "errors": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r8",
+          "at": 1767630600000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r8",
+          "at": 1767630601000,
+          "status": "ok",
+          "metrics": {
+            "rows": 7,
+            "errors": 0
+          },
+          "expect": {
+            "alerts": [
+              {
+                "type": "recovered",
+                "run": {
+                  "id": "r8",
+                  "job": "import",
+                  "status": "ok",
+                  "startedAt": 1767630600000,
+                  "finishedAt": 1767630601000,
+                  "durationMs": 1000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {
+                    "rows": 7,
+                    "errors": 0
+                  },
+                  "trigger": "run"
+                },
+                "details": {
+                  "after": [
+                    "under_floor"
+                  ]
+                },
+                "job": "import",
+                "definition": {
+                  "name": "import"
+                },
+                "title": "import recovered",
+                "message": "A run 2026-01-05 16:30:00 UTC (now) succeeded after: under floor.\nRan 1s.",
+                "at": 1767630601000
+              }
+            ],
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a run of zeros longer than the history stays under the floor until a run reports more",
+      "definition": {
+        "name": "import"
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "start",
+          "id": "r1",
+          "at": 1767605400000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r1",
+          "at": 1767605401000,
+          "status": "ok",
+          "metrics": {
+            "rows": 100
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r2",
+          "at": 1767609000000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r2",
+          "at": 1767609001000,
+          "status": "ok",
+          "metrics": {
+            "rows": 100
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r3",
+          "at": 1767612600000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r3",
+          "at": 1767612601000,
+          "status": "ok",
+          "metrics": {
+            "rows": 100
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r4",
+          "at": 1767616200000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r4",
+          "at": 1767616201000,
+          "status": "ok",
+          "metrics": {
+            "rows": 100
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r5",
+          "at": 1767619800000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r5",
+          "at": 1767619801000,
+          "status": "ok",
+          "metrics": {
+            "rows": 100
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r6",
+          "at": 1767623400000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r6",
+          "at": 1767623401000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [
+              {
+                "type": "under_floor",
+                "run": {
+                  "id": "r6",
+                  "job": "import",
+                  "status": "ok",
+                  "startedAt": 1767623400000,
+                  "finishedAt": 1767623401000,
+                  "durationMs": 1000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {
+                    "rows": 0
+                  },
+                  "trigger": "run"
+                },
+                "details": {
+                  "breaches": [
+                    {
+                      "metric": "rows",
+                      "value": 0,
+                      "limit": 100,
+                      "basis": "the last 5 runs all reported more than 0, the lowest 100"
+                    }
+                  ]
+                },
+                "job": "import",
+                "definition": {
+                  "name": "import"
+                },
+                "title": "import fell short",
+                "message": "rows: 0 (the last 5 runs all reported more than 0, the lowest 100).\nStarted 2026-01-05 14:30:00 UTC (now).",
+                "at": 1767623401000
+              }
+            ],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r7",
+          "at": 1767627000000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r7",
+          "at": 1767627001000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r8",
+          "at": 1767630600000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r8",
+          "at": 1767630601000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r9",
+          "at": 1767634200000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r9",
+          "at": 1767634201000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r10",
+          "at": 1767637800000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r10",
+          "at": 1767637801000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r11",
+          "at": 1767641400000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r11",
+          "at": 1767641401000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r12",
+          "at": 1767645000000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r12",
+          "at": 1767645001000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r13",
+          "at": 1767648600000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r13",
+          "at": 1767648601000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r14",
+          "at": 1767652200000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r14",
+          "at": 1767652201000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r15",
+          "at": 1767655800000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r15",
+          "at": 1767655801000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r16",
+          "at": 1767659400000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r16",
+          "at": 1767659401000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r17",
+          "at": 1767663000000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r17",
+          "at": 1767663001000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r18",
+          "at": 1767666600000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r18",
+          "at": 1767666601000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r19",
+          "at": 1767670200000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r19",
+          "at": 1767670201000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r20",
+          "at": 1767673800000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r20",
+          "at": 1767673801000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r21",
+          "at": 1767677400000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r21",
+          "at": 1767677401000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r22",
+          "at": 1767681000000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r22",
+          "at": 1767681001000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r23",
+          "at": 1767684600000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r23",
+          "at": 1767684601000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r24",
+          "at": 1767688200000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r24",
+          "at": 1767688201000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r25",
+          "at": 1767691800000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r25",
+          "at": 1767691801000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r26",
+          "at": 1767695400000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r26",
+          "at": 1767695401000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r27",
+          "at": 1767699000000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r27",
+          "at": 1767699001000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r28",
+          "at": 1767702600000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r28",
+          "at": 1767702601000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r29",
+          "at": 1767706200000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r29",
+          "at": 1767706201000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r30",
+          "at": 1767709800000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r30",
+          "at": 1767709801000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r31",
+          "at": 1767713400000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r31",
+          "at": 1767713401000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r32",
+          "at": 1767717000000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r32",
+          "at": 1767717001000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r33",
+          "at": 1767720600000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r33",
+          "at": 1767720601000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r34",
+          "at": 1767724200000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r34",
+          "at": 1767724201000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r35",
+          "at": 1767727800000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r35",
+          "at": 1767727801000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r36",
+          "at": 1767731400000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r36",
+          "at": 1767731401000,
+          "status": "failed",
+          "error": "Error: boom",
+          "expect": {
+            "alerts": [
+              {
+                "type": "failed",
+                "run": {
+                  "id": "r36",
+                  "job": "import",
+                  "status": "failed",
+                  "startedAt": 1767731400000,
+                  "finishedAt": 1767731401000,
+                  "durationMs": 1000,
+                  "error": "Error: boom",
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "consecutiveFailures": 1,
+                  "threshold": 1
+                },
+                "job": "import",
+                "definition": {
+                  "name": "import"
+                },
+                "title": "import failed",
+                "message": "Started 2026-01-06 20:30:00 UTC (now), ran 1s.\nError: boom",
+                "at": 1767731401000
+              }
+            ],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000,
+                "failed": 1767731401000
+              },
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r37",
+          "at": 1767735000000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000,
+                "failed": 1767731401000
+              },
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r37",
+          "at": 1767735001000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [
+                "failed"
+              ],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r38",
+          "at": 1767738600000,
+          "expect": {
+            "state": {
+              "job": "import",
+              "open": {
+                "under_floor": 1767623401000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [
+                "failed"
+              ],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r38",
+          "at": 1767738601000,
+          "status": "ok",
+          "metrics": {
+            "rows": 1
+          },
+          "expect": {
+            "alerts": [
+              {
+                "type": "recovered",
+                "run": {
+                  "id": "r38",
+                  "job": "import",
+                  "status": "ok",
+                  "startedAt": 1767738600000,
+                  "finishedAt": 1767738601000,
+                  "durationMs": 1000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {
+                    "rows": 1
+                  },
+                  "trigger": "run"
+                },
+                "details": {
+                  "after": [
+                    "failed",
+                    "under_floor"
+                  ]
+                },
+                "job": "import",
+                "definition": {
+                  "name": "import"
+                },
+                "title": "import recovered",
+                "message": "A run 2026-01-06 22:30:00 UTC (now) succeeded after: failed, under floor.\nRan 1s.",
+                "at": 1767738601000
+              }
+            ],
+            "state": {
+              "job": "import",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "four runs are not enough to judge 0, a metric seen at 0 before is not judged, and a floor of 0 is never crossed",
+      "definition": {
+        "name": "j",
+        "floor": {
+          "skipped": 0
+        }
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "start",
+          "id": "r1",
+          "at": 1767605400000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r1",
+          "at": 1767605401000,
+          "status": "ok",
+          "metrics": {
+            "a": 3,
+            "skipped": 2
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r2",
+          "at": 1767609000000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r2",
+          "at": 1767609001000,
+          "status": "ok",
+          "metrics": {
+            "a": 3,
+            "skipped": 2
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r3",
+          "at": 1767612600000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r3",
+          "at": 1767612601000,
+          "status": "ok",
+          "metrics": {
+            "a": 3,
+            "skipped": 2
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r4",
+          "at": 1767616200000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r4",
+          "at": 1767616201000,
+          "status": "ok",
+          "metrics": {
+            "a": 3,
+            "skipped": 2
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r5",
+          "at": 1767619800000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r5",
+          "at": 1767619801000,
+          "status": "ok",
+          "metrics": {
+            "a": 0,
+            "skipped": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r6",
+          "at": 1767623400000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r6",
+          "at": 1767623401000,
+          "status": "ok",
+          "metrics": {
+            "a": 3,
+            "skipped": 2
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r7",
+          "at": 1767627000000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r7",
+          "at": 1767627001000,
+          "status": "ok",
+          "metrics": {
+            "a": 3,
+            "skipped": 2
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r8",
+          "at": 1767630600000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r8",
+          "at": 1767630601000,
+          "status": "ok",
+          "metrics": {
+            "a": 3,
+            "skipped": 2
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r9",
+          "at": 1767634200000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r9",
+          "at": 1767634201000,
+          "status": "ok",
+          "metrics": {
+            "a": 3,
+            "skipped": 2
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r10",
+          "at": 1767637800000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r10",
+          "at": 1767637801000,
+          "status": "ok",
+          "metrics": {
+            "a": 3,
+            "skipped": 2
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r11",
+          "at": 1767641400000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r11",
+          "at": 1767641401000,
+          "status": "ok",
+          "metrics": {
+            "a": 0,
+            "skipped": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r12",
+          "at": 1767645000000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r12",
+          "at": 1767645001000,
+          "status": "ok",
+          "metrics": {
+            "skipped": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "slow, over budget and under a floor in one run, in that order",
+      "definition": {
+        "name": "j",
+        "maxDuration": "1s",
+        "budget": {
+          "cost": 1
+        },
+        "floor": {
+          "rows": 1,
+          "cost": 0.5
+        }
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "start",
+          "id": "r1",
+          "at": 1767605400000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r1",
+          "at": 1767605402000,
+          "status": "ok",
+          "metrics": {
+            "cost": 5,
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [
+              {
+                "type": "slow",
+                "run": {
+                  "id": "r1",
+                  "job": "j",
+                  "status": "ok",
+                  "startedAt": 1767605400000,
+                  "finishedAt": 1767605402000,
+                  "durationMs": 2000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {
+                    "cost": 5,
+                    "rows": 0
+                  },
+                  "trigger": "run"
+                },
+                "details": {
+                  "durationMs": 2000,
+                  "thresholdMs": 1000,
+                  "basis": "maxDuration"
+                },
+                "job": "j",
+                "definition": {
+                  "name": "j",
+                  "maxDuration": "1s",
+                  "budget": {
+                    "cost": 1
+                  },
+                  "floor": {
+                    "rows": 1,
+                    "cost": 0.5
+                  }
+                },
+                "title": "j was slow",
+                "message": "Took 2s; the limit is 1s (maxDuration).\nStarted 2026-01-05 09:30:00 UTC (now).",
+                "at": 1767605402000
+              },
+              {
+                "type": "over_budget",
+                "run": {
+                  "id": "r1",
+                  "job": "j",
+                  "status": "ok",
+                  "startedAt": 1767605400000,
+                  "finishedAt": 1767605402000,
+                  "durationMs": 2000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {
+                    "cost": 5,
+                    "rows": 0
+                  },
+                  "trigger": "run"
+                },
+                "details": {
+                  "breaches": [
+                    {
+                      "metric": "cost",
+                      "value": 5,
+                      "limit": 1,
+                      "basis": "budget"
+                    }
+                  ]
+                },
+                "job": "j",
+                "definition": {
+                  "name": "j",
+                  "maxDuration": "1s",
+                  "budget": {
+                    "cost": 1
+                  },
+                  "floor": {
+                    "rows": 1,
+                    "cost": 0.5
+                  }
+                },
+                "title": "j went over budget",
+                "message": "cost: 5, limit 1 (budget).\nStarted 2026-01-05 09:30:00 UTC (now).",
+                "at": 1767605402000
+              },
+              {
+                "type": "under_floor",
+                "run": {
+                  "id": "r1",
+                  "job": "j",
+                  "status": "ok",
+                  "startedAt": 1767605400000,
+                  "finishedAt": 1767605402000,
+                  "durationMs": 2000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {
+                    "cost": 5,
+                    "rows": 0
+                  },
+                  "trigger": "run"
+                },
+                "details": {
+                  "breaches": [
+                    {
+                      "metric": "rows",
+                      "value": 0,
+                      "limit": 1,
+                      "basis": "floor"
+                    }
+                  ]
+                },
+                "job": "j",
+                "definition": {
+                  "name": "j",
+                  "maxDuration": "1s",
+                  "budget": {
+                    "cost": 1
+                  },
+                  "floor": {
+                    "rows": 1,
+                    "cost": 0.5
+                  }
+                },
+                "title": "j fell short",
+                "message": "rows: 0, below the floor of 1.\nStarted 2026-01-05 09:30:00 UTC (now).",
+                "at": 1767605402000
+              }
+            ],
+            "state": {
+              "job": "j",
+              "open": {
+                "slow": 1767605402000,
+                "over_budget": 1767605402000,
+                "under_floor": 1767605402000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r2",
+          "at": 1767609000000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {
+                "slow": 1767605402000,
+                "over_budget": 1767605402000,
+                "under_floor": 1767605402000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r2",
+          "at": 1767609000500,
+          "status": "ok",
+          "metrics": {
+            "cost": 0.25,
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {
+                "under_floor": 1767605402000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [
+                "slow",
+                "over_budget"
+              ],
+              "undelivered": [],
+              "underFloor": [
+                "cost",
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r3",
+          "at": 1767612600000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {
+                "under_floor": 1767605402000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [
+                "slow",
+                "over_budget"
+              ],
+              "undelivered": [],
+              "underFloor": [
+                "cost",
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r3",
+          "at": 1767612600500,
+          "status": "ok",
+          "metrics": {
+            "cost": 0.75,
+            "rows": 3
+          },
+          "expect": {
+            "alerts": [
+              {
+                "type": "recovered",
+                "run": {
+                  "id": "r3",
+                  "job": "j",
+                  "status": "ok",
+                  "startedAt": 1767612600000,
+                  "finishedAt": 1767612600500,
+                  "durationMs": 500,
+                  "error": null,
+                  "output": null,
+                  "metrics": {
+                    "cost": 0.75,
+                    "rows": 3
+                  },
+                  "trigger": "run"
+                },
+                "details": {
+                  "after": [
+                    "slow",
+                    "over_budget",
+                    "under_floor"
+                  ]
+                },
+                "job": "j",
+                "definition": {
+                  "name": "j",
+                  "maxDuration": "1s",
+                  "budget": {
+                    "cost": 1
+                  },
+                  "floor": {
+                    "rows": 1,
+                    "cost": 0.5
+                  }
+                },
+                "title": "j recovered",
+                "message": "A run 2026-01-05 11:30:00 UTC (now) succeeded after: slow, over budget, under floor.\nRan 500ms.",
+                "at": 1767612600500
+              }
+            ],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a metric under its floor while silenced alerts on the next run under it once the silence ends",
+      "definition": {
+        "name": "j"
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "start",
+          "id": "r1",
+          "at": 1767605400000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r1",
+          "at": 1767605401000,
+          "status": "ok",
+          "metrics": {
+            "rows": 5
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r2",
+          "at": 1767609000000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r2",
+          "at": 1767609001000,
+          "status": "ok",
+          "metrics": {
+            "rows": 5
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r3",
+          "at": 1767612600000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r3",
+          "at": 1767612601000,
+          "status": "ok",
+          "metrics": {
+            "rows": 5
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r4",
+          "at": 1767616200000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r4",
+          "at": 1767616201000,
+          "status": "ok",
+          "metrics": {
+            "rows": 5
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r5",
+          "at": 1767619800000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r5",
+          "at": 1767619801000,
+          "status": "ok",
+          "metrics": {
+            "rows": 5
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "silence",
+          "until": 1767627000000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": 1767627000000,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r6",
+          "at": 1767623400000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": 1767627000000,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r6",
+          "at": 1767623401000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": 1767627000000,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "unsilence",
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r7",
+          "at": 1767627000000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r7",
+          "at": 1767627001000,
+          "status": "ok",
+          "metrics": {
+            "rows": 0
+          },
+          "expect": {
+            "alerts": [
+              {
+                "type": "under_floor",
+                "run": {
+                  "id": "r7",
+                  "job": "j",
+                  "status": "ok",
+                  "startedAt": 1767627000000,
+                  "finishedAt": 1767627001000,
+                  "durationMs": 1000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {
+                    "rows": 0
+                  },
+                  "trigger": "run"
+                },
+                "details": {
+                  "breaches": [
+                    {
+                      "metric": "rows",
+                      "value": 0,
+                      "limit": 0,
+                      "basis": "0 or less on the run before too"
+                    }
+                  ]
+                },
+                "job": "j",
+                "definition": {
+                  "name": "j"
+                },
+                "title": "j fell short",
+                "message": "rows: 0 (0 or less on the run before too).\nStarted 2026-01-05 15:30:00 UTC (now).",
+                "at": 1767627001000
+              }
+            ],
+            "state": {
+              "job": "j",
+              "open": {
+                "under_floor": 1767627001000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r8",
+          "at": 1767630600000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {
+                "under_floor": 1767627001000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": [],
+              "underFloor": [
+                "rows"
+              ]
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r8",
+          "at": 1767630601000,
+          "status": "ok",
+          "metrics": {
+            "rows": 4
+          },
+          "expect": {
+            "alerts": [
+              {
+                "type": "recovered",
+                "run": {
+                  "id": "r8",
+                  "job": "j",
+                  "status": "ok",
+                  "startedAt": 1767630600000,
+                  "finishedAt": 1767630601000,
+                  "durationMs": 1000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {
+                    "rows": 4
+                  },
+                  "trigger": "run"
+                },
+                "details": {
+                  "after": [
+                    "under_floor"
+                  ]
+                },
+                "job": "j",
+                "definition": {
+                  "name": "j"
+                },
+                "title": "j recovered",
+                "message": "A run 2026-01-05 16:30:00 UTC (now) succeeded after: under floor.\nRan 1s.",
+                "at": 1767630601000
+              }
+            ],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "silence swallows alerts and opens nothing, closes still close, and alerts return after",
       "definition": {
         "name": "flaky",

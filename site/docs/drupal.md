@@ -57,7 +57,7 @@ function mymodule_cronwatch_job_options_alter(array &$options, string $name, arr
 }
 ```
 
-The options are the library's (`schedule`, `grace`, `timeout`, `maxDuration`, `budget`, `expect`, `failuresBeforeAlert`, `description`, `tags`; see [PHP](/docs/php/#api)); `$context` says what the job is (`kind` is `cron`, `module`, `queue` or `ultimate_cron`, with `module`, `queue`, or `job` and `module`).
+The options are the library's (`schedule`, `grace`, `timeout`, `maxDuration`, `budget`, `floor`, `expect`, `failuresBeforeAlert`, `description`, `tags`; see [PHP](/docs/php/#api)); `$context` says what the job is (`kind` is `cron`, `module`, `queue` or `ultimate_cron`, with `module`, `queue`, or `job` and `module`).
 
 ## Ultimate Cron
 

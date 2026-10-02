@@ -10,16 +10,17 @@ use crate::types::Definition;
 
 /// The options a job keeps when it is declared again without its schedule,
 /// as the PHP and Go ports keep them.
-const KEPT: [&str; 6] = ["tags", "grace", "timeout", "maxDuration", "budget", "failuresBeforeAlert"];
+const KEPT: [&str; 7] = ["tags", "grace", "timeout", "maxDuration", "budget", "floor", "failuresBeforeAlert"];
 
 /// The fields an option gives, which `options_of` reads through it.
-const KNOWN: [&str; 10] = [
+const KNOWN: [&str; 11] = [
     "schedule",
     "timezone",
     "grace",
     "timeout",
     "maxDuration",
     "budget",
+    "floor",
     "failuresBeforeAlert",
     "description",
     "tags",
@@ -28,8 +29,8 @@ const KNOWN: [&str; 10] = [
 
 /// The options that declare a job again without its schedule: its
 /// description followed by ` (no longer scheduled)` (`A scheduled task`
-/// when it had none), its tags, grace, timeout, maxDuration, budget and
-/// failuresBeforeAlert.
+/// when it had none), its tags, grace, timeout, maxDuration, budget, floor
+/// and failuresBeforeAlert.
 pub fn unscheduled(def: &Definition) -> JobOptions {
     let mut description = def.description().to_string();
     if description.is_empty() {
@@ -48,7 +49,7 @@ pub fn unscheduled(def: &Definition) -> JobOptions {
 }
 
 /// The options that declare a stored definition again, in its order:
-/// schedule, timezone, grace, timeout, maxDuration, budget,
+/// schedule, timezone, grace, timeout, maxDuration, budget, floor,
 /// failuresBeforeAlert, description, tags, and expect (`contains` as
 /// `expect`, a pattern as a matcher of the same source, run by the
 /// JavaScript regular expression engine the redaction uses, and a custom
@@ -82,7 +83,7 @@ pub fn options_of(def: &Definition) -> JobOptions {
 
 /// `options` with one of the fields `unscheduled` keeps, as stored: a
 /// duration's text as text and a number of milliseconds as a number, a
-/// budget in the order its metrics were given.
+/// budget or floor in the order its metrics were given.
 fn with_field(options: JobOptions, def: &Definition, key: &str) -> JobOptions {
     let value = def.get(key);
     let duration = |v: Option<&Value>| match v {
@@ -109,6 +110,13 @@ fn with_field(options: JobOptions, def: &Definition, key: &str) -> JobOptions {
                 .iter()
                 .filter_map(|(metric, v)| v.as_f64().map(|ceiling| (metric, ceiling)))
                 .fold(options, |o, (metric, ceiling)| o.budget(metric, ceiling)),
+            _ => options,
+        },
+        "floor" => match value {
+            Some(Value::Object(floors)) => floors
+                .iter()
+                .filter_map(|(metric, v)| v.as_f64().map(|floor| (metric, floor)))
+                .fold(options, |o, (metric, floor)| o.floor(metric, floor)),
             _ => options,
         },
         "failuresBeforeAlert" => match value.and_then(Value::as_f64) {

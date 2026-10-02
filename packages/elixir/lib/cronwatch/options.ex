@@ -20,6 +20,7 @@ defmodule Cronwatch.Options do
     timeout: "timeout",
     max_duration: "maxDuration",
     budget: "budget",
+    floor: "floor",
     expect: "expect",
     failures_before_alert: "failuresBeforeAlert",
     description: "description",
@@ -124,7 +125,7 @@ defmodule Cronwatch.Options do
     end
   end
 
-  defp json_value(name, :budget, value) do
+  defp json_value(name, key, value) when key in [:budget, :floor] do
     list =
       cond do
         is_list(value) -> value
@@ -133,7 +134,12 @@ defmodule Cronwatch.Options do
       end
 
     if list == :bad or not Enum.all?(list, &match?({k, _} when is_atom(k) or is_binary(k), &1)) do
-      {:error, Error.invalid("job #{JS.quote(to_string(name))}: budget must be an object of { metric: ceiling }")}
+      what =
+        if key == :budget,
+          do: "budget must be an object of { metric: ceiling }",
+          else: "floor must be an object of { metric: floor }"
+
+      {:error, Error.invalid("job #{JS.quote(to_string(name))}: #{what}")}
     else
       {:ok, Object.new(Enum.map(list, fn {k, v} -> {to_string(k), normalize(v)} end))}
     end
@@ -195,7 +201,8 @@ defmodule Cronwatch.Options do
              if ms <= 0, do: invalid.("job #{quoted}: maxDuration must be longer than zero"), else: :ok
            end),
          :ok <- check_failures(quoted, def),
-         :ok <- check_budget(quoted, def) do
+         :ok <- check_budget(quoted, def),
+         :ok <- check_floor(quoted, def) do
       check_tags(quoted, def)
     end
   end
@@ -281,6 +288,39 @@ defmodule Cronwatch.Options do
                 Error.invalid(
                   "job #{quoted}: budget.#{metric} must be a finite number, 0 or more (got #{Format.js_text(v)})"
                 )}}
+        end)
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp check_floor(quoted, def) do
+    budget =
+      case Object.get(def, "budget") do
+        %Object{} = b -> b
+        _ -> Object.new()
+      end
+
+    case Object.get(def, "floor") do
+      %Object{pairs: pairs} ->
+        Enum.reduce_while(pairs, :ok, fn {metric, v}, :ok ->
+          cond do
+            not is_number(v) ->
+              {:halt,
+               {:error,
+                Error.invalid("job #{quoted}: floor.#{metric} must be a finite number (got #{Format.js_text(v)})")}}
+
+            match?({:ok, c} when is_number(c) and v > c, Object.fetch(budget, metric)) ->
+              {:halt,
+               {:error,
+                Error.invalid(
+                  "job #{quoted}: floor.#{metric} (#{Format.js_text(v)}) is above budget.#{metric} (#{Format.js_text(Object.get(budget, metric))}), so every run would alert"
+                )}}
+
+            true ->
+              {:cont, :ok}
+          end
         end)
 
       _ ->

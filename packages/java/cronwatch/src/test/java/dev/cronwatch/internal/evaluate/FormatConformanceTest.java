@@ -23,7 +23,7 @@ class FormatConformanceTest {
     Fixtures.Failures fails = new Fixtures.Failures();
 
     List<JsObject> alerts = Fixtures.objects(f, "alerts");
-    assertEquals(32, alerts.size(), "alerts");
+    assertEquals(35, alerts.size(), "alerts");
     int i = 0;
     for (JsObject c : alerts) {
       var got =

@@ -12,7 +12,7 @@ import (
 
 // OptionsOf are the job options that declare a stored definition again, in
 // its order: schedule, timezone, grace, timeout, maxDuration, budget,
-// failuresBeforeAlert, description, tags, and expect ("contains" as
+// floor, failuresBeforeAlert, description, tags, and expect ("contains" as
 // Expect, a pattern Go wrote as ExpectMatch, a custom function as one that
 // passes every output, since the function is the other process's). Fields
 // no option gives are left out.
@@ -46,6 +46,19 @@ func OptionsOf(def cronwatch.Definition) []cronwatch.JobOption {
 					m, _ := budget.Get(metric)
 					if ceiling, ok := m.(float64); ok {
 						options = append(options, cronwatch.Budget(metric, ceiling))
+					}
+				}
+			}
+		case "floor":
+			if raw == nil {
+				continue
+			}
+			v, _ := raw.Get("floor")
+			if floor, ok := v.(*js.Object); ok {
+				for _, metric := range floor.Keys() {
+					m, _ := floor.Get(metric)
+					if limit, ok := m.(float64); ok {
+						options = append(options, cronwatch.Floor(metric, limit))
 					}
 				}
 			}

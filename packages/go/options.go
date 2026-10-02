@@ -114,6 +114,26 @@ func Budget(metric string, ceiling float64) JobOption {
 	}
 }
 
+// Floor sets a floor for a metric reported with Metric: Floor("rows", 1)
+// alerts when a run reports rows below 1. Give it once per metric. Metrics
+// without a floor alert when a run reports 0 or less and the five to twenty
+// successful runs before it all reported more than 0. Catches the job that
+// ran cleanly and wrote nothing. A floor of 0 lets a metric reach 0 without
+// alerting.
+func Floor(metric string, floor float64) JobOption {
+	return func(c *jobConfig) {
+		if c.fields == nil {
+			c.fields = &js.Object{}
+		}
+		limits, ok := get(c.fields, "floor").(*js.Object)
+		if !ok {
+			limits = &js.Object{}
+		}
+		limits.Set(metric, floor)
+		c.put("floor", limits)
+	}
+}
+
 // Expect makes a successful run fail unless its output contains text.
 // Catches the job that exits cleanly and did nothing.
 func Expect(text string) JobOption {
@@ -224,6 +244,21 @@ func validateDefinition(name string, def Definition) error {
 			ceiling, _ := v.(float64)
 			if math.IsNaN(ceiling) || math.IsInf(ceiling, 0) || ceiling < 0 {
 				return fmt.Errorf("job %s: budget.%s must be a finite number, 0 or more (got %s)", js.Quote(name), metric, js.FormatNumber(ceiling))
+			}
+		}
+	}
+	if limits, ok := get(def.o, "floor").(*js.Object); ok {
+		budget, _ := get(def.o, "budget").(*js.Object)
+		for _, metric := range limits.Keys() {
+			v, _ := limits.Get(metric)
+			floor, _ := v.(float64)
+			if math.IsNaN(floor) || math.IsInf(floor, 0) {
+				return fmt.Errorf("job %s: floor.%s must be a finite number (got %s)", js.Quote(name), metric, js.FormatNumber(floor))
+			}
+			if c, ok := budget.Get(metric); ok {
+				if ceiling, _ := c.(float64); floor > ceiling {
+					return fmt.Errorf("job %s: floor.%s (%s) is above budget.%s (%s), so every run would alert", js.Quote(name), metric, js.FormatNumber(floor), metric, js.FormatNumber(ceiling))
+				}
 			}
 		}
 	}

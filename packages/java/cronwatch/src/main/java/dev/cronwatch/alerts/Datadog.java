@@ -24,6 +24,7 @@ public final class Datadog implements Channel {
           "stuck", "error",
           "slow", "warning",
           "over_budget", "warning",
+          "under_floor", "warning",
           "recovered", "success");
 
   private final DatadogOptions options;

@@ -233,9 +233,10 @@ final class Cronwatch
      * Options, with the SDK's names: schedule (a five or six field cron
      * expression, a nickname such as "@hourly", or "every 5m"), timezone
      * (IANA; default PHP's), grace (default "10m"), timeout (default "1h"),
-     * maxDuration, budget (['metric' => ceiling]), expect (a string the
-     * output must contain, a Pattern it must match, or a callable),
-     * failuresBeforeAlert (default 1), description, tags. Durations are
+     * maxDuration, budget (['metric' => ceiling]), floor (['metric' =>
+     * floor]), expect (a string the output must contain, a Pattern it must
+     * match, or a callable), failuresBeforeAlert (default 1), description,
+     * tags. Durations are
      * strings such as "1h30m", milliseconds, or a DateInterval.
      *
      * @param array<string, mixed> $options
@@ -602,6 +603,21 @@ final class Cronwatch
             foreach ($budget as $metric => $ceiling) {
                 if (!(Js::isFinite($ceiling) && $ceiling >= 0)) {
                     throw new \InvalidArgumentException("job \"{$name}\": budget.{$metric} must be a finite number, 0 or more (got " . Js::string($ceiling) . ')');
+                }
+            }
+        }
+        $floor = $def->get('floor');
+        if ($floor !== null) {
+            if (!is_array($floor)) {
+                throw new \InvalidArgumentException("job \"{$name}\": floor must be an object of { metric: floor }");
+            }
+            foreach ($floor as $metric => $value) {
+                if (!Js::isFinite($value)) {
+                    throw new \InvalidArgumentException("job \"{$name}\": floor.{$metric} must be a finite number (got " . Js::string($value) . ')');
+                }
+                $ceiling = is_array($budget) ? ($budget[$metric] ?? null) : null;
+                if ($ceiling !== null && $value > $ceiling) {
+                    throw new \InvalidArgumentException("job \"{$name}\": floor.{$metric} (" . Js::string($value) . ") is above budget.{$metric} (" . Js::string($ceiling) . '), so every run would alert');
                 }
             }
         }

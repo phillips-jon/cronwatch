@@ -230,7 +230,7 @@ final class PgCronSource implements Source {
 
   /**
    * The options of a declared or stored definition that can be declared again, without its
-   * schedule, in the SDK's order: description, tags, grace, timeout, maxDuration, budget and
+   * schedule, in the SDK's order: description, tags, grace, timeout, maxDuration, budget, floor and
    * failuresBeforeAlert.
    */
   private static JobOptions unscheduled(Definition definition) {
@@ -243,6 +243,7 @@ final class PgCronSource implements Source {
             "timeout",
             "maxDuration",
             "budget",
+            "floor",
             "failuresBeforeAlert")) {
       if (definition.has(key)) {
         out.field(key, definition.get(key));

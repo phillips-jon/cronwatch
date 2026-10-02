@@ -61,7 +61,7 @@ def severity(type_: object) -> str:
     kind = str(type_)
     if kind == "recovered":
         return "info"
-    if kind in ("slow", "over_budget"):
+    if kind in ("slow", "over_budget", "under_floor"):
         return "warning"
     return "error"
 

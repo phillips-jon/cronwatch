@@ -9,7 +9,7 @@ module Cronwatch
     class Slack
       EMOJI = {
         missed: ":hourglass_flowing_sand:", failed: ":x:", stuck: ":no_entry:", slow: ":turtle:",
-        over_budget: ":moneybag:", recovered: ":white_check_mark:",
+        over_budget: ":moneybag:", under_floor: ":chart_with_downwards_trend:", recovered: ":white_check_mark:",
       }.freeze
       private_constant :EMOJI
 

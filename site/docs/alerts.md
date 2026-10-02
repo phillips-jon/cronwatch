@@ -142,7 +142,7 @@ The alert counts as sent when any number took it, so the next check never texts 
 
 ### Error trackers
 
-These report each alert as an event, grouped so that each job's condition is one issue: the fingerprint (or grouping key) is `cronwatch:<job>:<type>`. Failed, stuck and missed are errors, slow and over budget are warnings, and a recovery is informational.
+These report each alert as an event, grouped so that each job's condition is one issue: the fingerprint (or grouping key) is `cronwatch:<job>:<type>`. Failed, stuck and missed are errors, slow, over budget and under floor are warnings, and a recovery is informational.
 
 #### Sentry
 
@@ -227,7 +227,7 @@ What a custom channel is given, and, with `schema` added, what the webhook posts
 
 ```ts
 interface Alert {
-  type: "missed" | "failed" | "stuck" | "slow" | "over_budget" | "recovered";
+  type: "missed" | "failed" | "stuck" | "slow" | "over_budget" | "under_floor" | "recovered";
   job: string;
   definition: StoredJobDefinition;   // name, schedule, grace, timeout, budget...
   run: Run | null;                   // the run that triggered it, with error, output and metrics
@@ -247,6 +247,7 @@ interface Alert {
 | `failed`, `stuck` | `{ consecutiveFailures, threshold }` |
 | `slow` | `{ durationMs, thresholdMs, basis }` |
 | `over_budget` | `{ breaches: { metric, value, limit, basis }[] }` |
+| `under_floor` | `{ breaches: { metric, value, limit, basis }[] }`; `limit` is the floor, or for a metric without one the lowest of the runs it was judged against |
 | `recovered` | `{ after: Condition[], reason?: "unscheduled", since?: number }`; `reason` is set when a check closed missed because the job no longer has a schedule, and `since` is when missed opened |
 
 ```ts

@@ -74,6 +74,12 @@ Cronwatch.AlertDetails.Slow.Equals(Cronwatch.AlertDetails.Slow? other) -> bool
 Cronwatch.AlertDetails.Slow.Slow(long DurationMs, double ThresholdMs, string! Basis) -> void
 Cronwatch.AlertDetails.Slow.ThresholdMs.get -> double
 Cronwatch.AlertDetails.Slow.ThresholdMs.init -> void
+Cronwatch.AlertDetails.UnderFloor
+Cronwatch.AlertDetails.UnderFloor.Breaches.get -> Cronwatch.ValueList<Cronwatch.BudgetBreach!>!
+Cronwatch.AlertDetails.UnderFloor.Breaches.init -> void
+Cronwatch.AlertDetails.UnderFloor.Deconstruct(out Cronwatch.ValueList<Cronwatch.BudgetBreach!>! Breaches) -> void
+Cronwatch.AlertDetails.UnderFloor.Equals(Cronwatch.AlertDetails.UnderFloor? other) -> bool
+Cronwatch.AlertDetails.UnderFloor.UnderFloor(Cronwatch.ValueList<Cronwatch.BudgetBreach!>! Breaches) -> void
 Cronwatch.AlertType
 Cronwatch.AlertType.AlertType() -> void
 Cronwatch.AlertType.AlertType(string! Value) -> void
@@ -623,6 +629,14 @@ Cronwatch.JobOptions.Expect.init -> void
 Cronwatch.JobOptions.FailuresBeforeAlert.get -> int?
 Cronwatch.JobOptions.FailuresBeforeAlert.init -> void
 Cronwatch.JobOptions.Field(string! key, object? value) -> Cronwatch.JobOptions!
+Cronwatch.JobOptions.Floor.get -> Cronwatch.JobOptions.FloorMap!
+Cronwatch.JobOptions.Floor.init -> void
+Cronwatch.JobOptions.FloorMap
+Cronwatch.JobOptions.FloorMap.Add(string! metric, double floor) -> void
+Cronwatch.JobOptions.FloorMap.Count.get -> int
+Cronwatch.JobOptions.FloorMap.GetEnumerator() -> System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<string!, double>>!
+Cronwatch.JobOptions.FloorMap.this[string! metric].get -> double
+Cronwatch.JobOptions.FloorMap.this[string! metric].set -> void
 Cronwatch.JobOptions.Grace.get -> Cronwatch.Duration?
 Cronwatch.JobOptions.Grace.init -> void
 Cronwatch.JobOptions.JobOptions() -> void
@@ -662,6 +676,8 @@ Cronwatch.JobState.ToJson() -> string!
 Cronwatch.JobState.ToValue() -> Cronwatch.JsObject!
 Cronwatch.JobState.Undelivered.get -> Cronwatch.ValueList<Cronwatch.Alert!>?
 Cronwatch.JobState.Undelivered.init -> void
+Cronwatch.JobState.UnderFloor.get -> Cronwatch.ValueList<string!>?
+Cronwatch.JobState.UnderFloor.init -> void
 Cronwatch.JobState.Version.get -> long?
 Cronwatch.JobState.Version.init -> void
 Cronwatch.JobStats
@@ -1123,6 +1139,11 @@ override Cronwatch.AlertDetails.Slow.GetHashCode() -> int
 override Cronwatch.AlertDetails.Slow.ToString() -> string!
 override Cronwatch.AlertDetails.Slow.ToValue() -> Cronwatch.JsObject!
 override Cronwatch.AlertDetails.ToString() -> string!
+override Cronwatch.AlertDetails.UnderFloor.<Clone>$() -> Cronwatch.AlertDetails.UnderFloor!
+override Cronwatch.AlertDetails.UnderFloor.Equals(object? obj) -> bool
+override Cronwatch.AlertDetails.UnderFloor.GetHashCode() -> int
+override Cronwatch.AlertDetails.UnderFloor.ToString() -> string!
+override Cronwatch.AlertDetails.UnderFloor.ToValue() -> Cronwatch.JsObject!
 override Cronwatch.AlertType.GetHashCode() -> int
 override Cronwatch.AlertType.ToString() -> string!
 override Cronwatch.Alerts.BugsnagChannel.ToString() -> string!
@@ -1254,6 +1275,7 @@ override sealed Cronwatch.AlertDetails.Missed.Equals(Cronwatch.AlertDetails? oth
 override sealed Cronwatch.AlertDetails.OverBudget.Equals(Cronwatch.AlertDetails? other) -> bool
 override sealed Cronwatch.AlertDetails.Recovered.Equals(Cronwatch.AlertDetails? other) -> bool
 override sealed Cronwatch.AlertDetails.Slow.Equals(Cronwatch.AlertDetails? other) -> bool
+override sealed Cronwatch.AlertDetails.UnderFloor.Equals(Cronwatch.AlertDetails? other) -> bool
 static Cronwatch.Alert.FromJson(string! text) -> Cronwatch.Alert!
 static Cronwatch.Alert.FromValue(object? v) -> Cronwatch.Alert!
 static Cronwatch.Alert.operator !=(Cronwatch.Alert? left, Cronwatch.Alert? right) -> bool
@@ -1268,6 +1290,8 @@ static Cronwatch.AlertDetails.Recovered.operator !=(Cronwatch.AlertDetails.Recov
 static Cronwatch.AlertDetails.Recovered.operator ==(Cronwatch.AlertDetails.Recovered? left, Cronwatch.AlertDetails.Recovered? right) -> bool
 static Cronwatch.AlertDetails.Slow.operator !=(Cronwatch.AlertDetails.Slow? left, Cronwatch.AlertDetails.Slow? right) -> bool
 static Cronwatch.AlertDetails.Slow.operator ==(Cronwatch.AlertDetails.Slow? left, Cronwatch.AlertDetails.Slow? right) -> bool
+static Cronwatch.AlertDetails.UnderFloor.operator !=(Cronwatch.AlertDetails.UnderFloor? left, Cronwatch.AlertDetails.UnderFloor? right) -> bool
+static Cronwatch.AlertDetails.UnderFloor.operator ==(Cronwatch.AlertDetails.UnderFloor? left, Cronwatch.AlertDetails.UnderFloor? right) -> bool
 static Cronwatch.AlertDetails.operator !=(Cronwatch.AlertDetails? left, Cronwatch.AlertDetails? right) -> bool
 static Cronwatch.AlertDetails.operator ==(Cronwatch.AlertDetails? left, Cronwatch.AlertDetails? right) -> bool
 static Cronwatch.AlertType.Failed.get -> Cronwatch.AlertType
@@ -1277,6 +1301,7 @@ static Cronwatch.AlertType.OverBudget.get -> Cronwatch.AlertType
 static Cronwatch.AlertType.Recovered.get -> Cronwatch.AlertType
 static Cronwatch.AlertType.Slow.get -> Cronwatch.AlertType
 static Cronwatch.AlertType.Stuck.get -> Cronwatch.AlertType
+static Cronwatch.AlertType.UnderFloor.get -> Cronwatch.AlertType
 static Cronwatch.AlertType.implicit operator Cronwatch.AlertType(string! value) -> Cronwatch.AlertType
 static Cronwatch.AlertType.operator !=(Cronwatch.AlertType left, Cronwatch.AlertType right) -> bool
 static Cronwatch.AlertType.operator ==(Cronwatch.AlertType left, Cronwatch.AlertType right) -> bool
@@ -1306,6 +1331,7 @@ static Cronwatch.Condition.Missed.get -> Cronwatch.Condition
 static Cronwatch.Condition.OverBudget.get -> Cronwatch.Condition
 static Cronwatch.Condition.Slow.get -> Cronwatch.Condition
 static Cronwatch.Condition.Stuck.get -> Cronwatch.Condition
+static Cronwatch.Condition.UnderFloor.get -> Cronwatch.Condition
 static Cronwatch.Condition.implicit operator Cronwatch.Condition(string! value) -> Cronwatch.Condition
 static Cronwatch.Condition.operator !=(Cronwatch.Condition left, Cronwatch.Condition right) -> bool
 static Cronwatch.Condition.operator ==(Cronwatch.Condition left, Cronwatch.Condition right) -> bool

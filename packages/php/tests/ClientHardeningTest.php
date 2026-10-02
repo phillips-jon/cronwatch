@@ -241,6 +241,8 @@ final class ClientHardeningTest extends TestCase
         foreach ([
             'failuresBeforeAlert' => [['failuresBeforeAlert' => NAN], ['failuresBeforeAlert' => 0], ['failuresBeforeAlert' => 1.5]],
             'budget.cost' => [['budget' => ['cost' => NAN]], ['budget' => ['cost' => INF]], ['budget' => ['cost' => -1]]],
+            'floor.rows' => [['floor' => ['rows' => NAN]], ['floor' => ['rows' => INF]], ['floor' => ['rows' => '1']]],
+            'floor.cost (3) is above budget.cost (2)' => [['floor' => ['cost' => 3], 'budget' => ['cost' => 2]]],
             'grace' => [['grace' => NAN]],
             'timeout' => [['timeout' => 0]],
             'maxDuration' => [['maxDuration' => '0s']],
@@ -262,6 +264,7 @@ final class ClientHardeningTest extends TestCase
             $this->assertStringContainsString('failuresBeforeAlert', $error->getMessage());
         }
         $cw->job('a', ['budget' => ['errors' => 0], 'failuresBeforeAlert' => 2, 'timeout' => '5m']);
+        $cw->job('c', ['floor' => ['delta' => -5], 'budget' => ['delta' => 5]]);
         // Zones are matched without regard to case, as Intl matches them.
         $this->assertSame('europe/london', $cw->job('b', ['schedule' => '@hourly', 'timezone' => 'europe/london'])->definition->get('timezone'));
     }

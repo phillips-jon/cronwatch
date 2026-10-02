@@ -41,6 +41,7 @@ var datadogAlertType = map[cronwatch.AlertType]string{
 	cronwatch.AlertStuck:      "error",
 	cronwatch.AlertSlow:       "warning",
 	cronwatch.AlertOverBudget: "warning",
+	cronwatch.AlertUnderFloor: "warning",
 	cronwatch.AlertRecovered:  "success",
 }
 

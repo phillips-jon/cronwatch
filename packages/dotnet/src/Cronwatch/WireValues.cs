@@ -29,8 +29,8 @@ public readonly record struct RunStatus(string Value)
 }
 
 /// <summary>
-/// A condition an alert opens: <c>missed</c>, <c>failed</c>, <c>stuck</c>, <c>slow</c> or
-/// <c>over_budget</c>.
+/// A condition an alert opens: <c>missed</c>, <c>failed</c>, <c>stuck</c>, <c>slow</c>,
+/// <c>over_budget</c> or <c>under_floor</c>.
 /// </summary>
 /// <param name="Value">The stored string.</param>
 public readonly record struct Condition(string Value)
@@ -50,8 +50,11 @@ public readonly record struct Condition(string Value)
     /// <summary>A metric over its budget.</summary>
     public static Condition OverBudget { get; } = new("over_budget");
 
+    /// <summary>A metric under its floor.</summary>
+    public static Condition UnderFloor { get; } = new("under_floor");
+
     /// <summary>Every condition, in the SDK's order.</summary>
-    public static System.Collections.Generic.IReadOnlyList<Condition> All { get; } = [Missed, Failed, Stuck, Slow, OverBudget];
+    public static System.Collections.Generic.IReadOnlyList<Condition> All { get; } = [Missed, Failed, Stuck, Slow, OverBudget, UnderFloor];
 
     /// <summary>The condition named by a stored string.</summary>
     public static implicit operator Condition(string value) => new(value ?? throw new ArgumentNullException(nameof(value)));
@@ -78,6 +81,9 @@ public readonly record struct AlertType(string Value)
 
     /// <summary>A metric went over its budget.</summary>
     public static AlertType OverBudget { get; } = new("over_budget");
+
+    /// <summary>A metric fell under its floor.</summary>
+    public static AlertType UnderFloor { get; } = new("under_floor");
 
     /// <summary>Conditions that alerted have closed.</summary>
     public static AlertType Recovered { get; } = new("recovered");

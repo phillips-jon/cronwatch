@@ -219,6 +219,8 @@ defmodule Cronwatch.HardeningTest do
     assert refused.(budget: [cost: :nan]) =~ "budget.cost"
     assert refused.(budget: [cost: :infinity]) =~ "budget.cost"
     assert refused.(budget: [cost: -1]) =~ "budget.cost"
+    assert refused.(floor: [rows: :infinity]) =~ "floor.rows"
+    assert refused.(floor: 5) =~ "floor must be an object of { metric: floor }"
     assert refused.(grace: :nan) =~ "grace"
     assert refused.(timeout: 0) =~ "timeout"
     assert refused.(max_duration: "0s") =~ "maxDuration"

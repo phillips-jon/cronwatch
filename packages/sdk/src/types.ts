@@ -37,6 +37,14 @@ export interface JobOptions {
    */
   budget?: Record<string, number>;
   /**
+   * Floors for metrics reported with job.metric(). { rows: 1 } alerts when a
+   * run reports rows below 1. Metrics without a floor alert when a run
+   * reports 0 or less and the five to twenty successful runs before it all
+   * reported more than 0. Catches the job that ran cleanly and wrote nothing.
+   * A floor of 0 lets a metric reach 0 without alerting.
+   */
+  floor?: Record<string, number>;
+  /**
    * A successful run must produce output that satisfies this, or it counts as
    * failed. A string must appear in the output, a RegExp must match it, and a
    * function must return true for it. Catches the job that exits cleanly and
@@ -92,9 +100,9 @@ export interface Run {
   trigger: string;
 }
 
-export type Condition = "missed" | "failed" | "stuck" | "slow" | "over_budget";
+export type Condition = "missed" | "failed" | "stuck" | "slow" | "over_budget" | "under_floor";
 
-export const CONDITIONS: readonly Condition[] = ["missed", "failed", "stuck", "slow", "over_budget"];
+export const CONDITIONS: readonly Condition[] = ["missed", "failed", "stuck", "slow", "over_budget", "under_floor"];
 
 export interface JobState {
   job: string;
@@ -121,6 +129,12 @@ export interface JobState {
    */
   sending?: SendingAlert[];
   /**
+   * The metrics under their floor at the job's last successful run (see
+   * floorBreaches). Absent when none, and in state written before this field
+   * existed.
+   */
+  underFloor?: string[];
+  /**
    * Goes up by one on every write, so a store can refuse a write made from a
    * stale read (see Store.compareAndSetState). Absent counts as 0.
    */
@@ -143,6 +157,8 @@ export interface AlertDetails {
   stuck: { consecutiveFailures: number; threshold: number };
   slow: { durationMs: number; thresholdMs: number; basis: string };
   over_budget: { breaches: BudgetBreach[] };
+  /** `limit` is the floor, or for a metric without one the lowest of the earlier runs it was judged against. */
+  under_floor: { breaches: BudgetBreach[] };
   /**
    * `after` names the conditions that closed. A recovery with `reason`
    * "unscheduled" closes missed alone because the job no longer has a

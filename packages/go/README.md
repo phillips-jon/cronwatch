@@ -1,6 +1,6 @@
 # cronwatch.dev/go
 
-Cron and scheduled-job monitoring that lives inside your Go app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make.
+Cron and scheduled-job monitoring that lives inside your Go app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make.
 
 This is the Go port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Go process and a Node, Ruby, Python, PHP or Rust process can share one database, and every port reads the tables the others write. It has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook), the memory store, a `database/sql` store for SQLite, Postgres, MySQL and MariaDB, the SDK's alert channels, Claude triage, the pg_cron source, the dashboard with its JSON API, job handlers for platform crons, and integrations for robfig/cron, gocron, River and Asynq ([DESIGN.md](DESIGN.md) has how each part works).
 
@@ -56,7 +56,7 @@ func main() {
 	err = nightly.Run(context.Background(), func(ctx context.Context, job *cronwatch.JobContext) error {
 		path, err := buildReport(ctx) // ctx is cancelled when the job's timeout passes
 		job.Log("Report written:", path) // kept with the run, shown in alerts
-		job.Metric("cost", 1.2)          // watched against budgets and baselines
+		job.Metric("cost", 1.2)          // watched against budgets, floors and baselines
 		return err
 	})
 	if err != nil {

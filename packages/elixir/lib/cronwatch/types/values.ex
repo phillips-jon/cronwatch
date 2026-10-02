@@ -26,12 +26,12 @@ defmodule Cronwatch.Condition do
   @moduledoc """
   Something wrong with a job that opens once, alerts, and closes with a
   recovery, as the SDK writes it, in the SDK's order: `"missed"`, `"failed"`,
-  `"stuck"`, `"slow"` and `"over_budget"`.
+  `"stuck"`, `"slow"`, `"over_budget"` and `"under_floor"`.
   """
 
   @doc "Every condition, in the SDK's order."
   @spec all() :: [String.t()]
-  def all, do: ["missed", "failed", "stuck", "slow", "over_budget"]
+  def all, do: ["missed", "failed", "stuck", "slow", "over_budget", "under_floor"]
 
   @doc ~s("missed")
   @spec missed() :: String.t()
@@ -48,6 +48,9 @@ defmodule Cronwatch.Condition do
   @doc ~s("over_budget")
   @spec over_budget() :: String.t()
   def over_budget, do: "over_budget"
+  @doc ~s("under_floor")
+  @spec under_floor() :: String.t()
+  def under_floor, do: "under_floor"
 end
 
 defmodule Cronwatch.AlertType do

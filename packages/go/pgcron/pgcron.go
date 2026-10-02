@@ -461,12 +461,25 @@ func unscheduled(def cronwatch.Definition) []cronwatch.JobOption {
 		}
 		return nil
 	})
-	if v, ok := def.Get("budget"); ok {
+	// Read from the definition's own object: Get gives a map, which loses
+	// the order the metrics were given in.
+	raw, _ := js.ValueOf(def).(*js.Object)
+	if v, ok := raw.Get("budget"); ok {
 		if budget, ok := v.(*js.Object); ok {
 			for _, metric := range budget.Keys() {
 				ceiling, _ := budget.Get(metric)
 				if n, ok := ceiling.(float64); ok {
 					out = append(out, cronwatch.Budget(metric, n))
+				}
+			}
+		}
+	}
+	if v, ok := raw.Get("floor"); ok {
+		if floor, ok := v.(*js.Object); ok {
+			for _, metric := range floor.Keys() {
+				limit, _ := floor.Get(metric)
+				if n, ok := limit.(float64); ok {
+					out = append(out, cronwatch.Floor(metric, n))
 				}
 			}
 		}

@@ -95,7 +95,7 @@ pub(crate) fn condition_text(c: &Condition) -> String {
 }
 
 /// The job's health, with any open condition it does not already say (over
-/// budget, slow) after it.
+/// budget, under floor, slow) after it.
 fn health_state(job: &JobSummary) -> String {
     let (cls, label) = health_label(&job.health);
     let mut extras = String::new();
@@ -477,6 +477,8 @@ pub(crate) fn job_page(job: &JobSummary, runs: &[Run], now: i64, base: &str, com
         "\n  ",
         &budget_row(d),
         "\n  ",
+        &floor_row(d),
+        "\n  ",
         &definition_row(d, "expect", "Expect"),
         "\n  ",
         &alert_after_row(d),
@@ -528,6 +530,17 @@ fn budget_row(d: &Definition) -> String {
         _ => Vec::new(),
     };
     format!("<dt>Budget</dt><dd>{}</dd>", h(&parts.join(", ")))
+}
+
+fn floor_row(d: &Definition) -> String {
+    let Some(v) = truthy_field(d, "floor") else {
+        return String::new();
+    };
+    let parts: Vec<String> = match v {
+        Value::Object(o) => o.iter().map(|(k, floor)| format!("{k} ≥ {}", js_text(Some(floor)))).collect(),
+        _ => Vec::new(),
+    };
+    format!("<dt>Floor</dt><dd>{}</dd>", h(&parts.join(", ")))
 }
 
 fn alert_after_row(d: &Definition) -> String {

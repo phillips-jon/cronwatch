@@ -7,7 +7,7 @@ group: Ruby
 
 # Ruby
 
-The `cronwatch` gem is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a Ruby process can share one database with a Node, Python, PHP, Go, Rust, Elixir, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. For a Rails app, start with [Ruby on Rails](/docs/rails/); this page covers plain Ruby and the API underneath.
+The `cronwatch` gem is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow, over budget and under floor by the same rules, sends the same alert text, and writes the same rows, so a Ruby process can share one database with a Node, Python, PHP, Go, Rust, Elixir, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. For a Rails app, start with [Ruby on Rails](/docs/rails/); this page covers plain Ruby and the API underneath.
 
 ```ruby
 # Gemfile
@@ -68,7 +68,7 @@ end
 
 Logged output, a returned string and an error's message are stored as UTF-8: bytes that are not valid UTF-8 (binary output, a C extension's message) become the replacement character `�`, as they would in a JavaScript string.
 
-Option names are snake_case (`max_duration`, `failures_before_alert`); conditions and alert types are symbols (`:missed`, `:over_budget`, `:recovered`). Durations are strings such as `"15m"` or `"1h30m"`, or milliseconds as an Integer. A duration string is at most 64 characters; a longer one raises `ArgumentError`. Anything that leaves the process (store rows, the JSON API, webhook bodies) uses the SDK's camelCase field names and string values.
+Option names are snake_case (`max_duration`, `failures_before_alert`); conditions and alert types are symbols (`:missed`, `:over_budget`, `:under_floor`, `:recovered`). Durations are strings such as `"15m"` or `"1h30m"`, or milliseconds as an Integer. A duration string is at most 64 characters; a longer one raises `ArgumentError`. Anything that leaves the process (store rows, the JSON API, webhook bodies) uses the SDK's camelCase field names and string values.
 
 ## Run the check
 
@@ -372,7 +372,7 @@ A triage of your own is any callable that takes the context (`alert`, `recent_ru
 | `on_error` | `Rails.logger`, or a warning on standard error | `->(error, where) { ... }` for failures outside jobs: the store, a channel, triage |
 | `now` | the system clock | a callable returning epoch milliseconds; for tests |
 
-`client.job(name, **options)` takes `schedule`, `timezone`, `grace`, `timeout`, `max_duration`, `budget`, `expect` (a string, a Regexp or a callable; a Regexp that takes longer than one second to match counts as not matching, see [expect rules](/docs/conditions/#expect-rules)), `failures_before_alert`, `description` and `tags`, with the defaults and rules in the [API reference](/docs/api/). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`. Bad options raise `ArgumentError` when the job is declared. It returns a handle whose `run(trigger: "run") { |job| ... }` runs the block, and whose `start` and `resume` handle a run that spans calls (see [Runs that span calls](#runs-that-span-calls)).
+`client.job(name, **options)` takes `schedule`, `timezone`, `grace`, `timeout`, `max_duration`, `budget`, `floor`, `expect` (a string, a Regexp or a callable; a Regexp that takes longer than one second to match counts as not matching, see [expect rules](/docs/conditions/#expect-rules)), `failures_before_alert`, `description` and `tags`, with the defaults and rules in the [API reference](/docs/api/). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`. Bad options raise `ArgumentError` when the job is declared. It returns a handle whose `run(trigger: "run") { |job| ... }` runs the block, and whose `start` and `resume` handle a run that spans calls (see [Runs that span calls](#runs-that-span-calls)).
 
 `timeout` and `max_duration` both measure a run's length. `timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure) and the job is stuck. `max_duration` is for a run that finished: one that succeeded but took longer is slow, and stays a success. Set `timeout` well above `max_duration`: `max_duration: "10m", timeout: "1h"`.
 

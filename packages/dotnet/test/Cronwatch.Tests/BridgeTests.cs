@@ -247,12 +247,12 @@ public class BridgeTests
     {
         await using var m = Make();
         var w = new Watch(m.Cw, "gocron", "billing", "gocron");
-        var nightly = new Entry("nightly", "entry 1", "0 2 * * *", "UTC", null, new JobOptions { Grace = "5m" }, new JobOptions { Budget = { ["cost"] = 2 }, Tags = ["reports"] });
+        var nightly = new Entry("nightly", "entry 1", "0 2 * * *", "UTC", null, new JobOptions { Grace = "5m" }, new JobOptions { Budget = { ["cost"] = 2 }, Floor = { ["rows"] = 1 }, Tags = ["reports"] });
         var odd = new Entry("odd", "entry 4", "", "", "cronwatch: entry 4 cannot be read");
         w.Declare([nightly, E("twice", "entry 2", "0 3 * * *"), E("twice", "entry 3", "0 4 * * *"), odd]);
         await m.Cw.CheckAsync();
         Assert.Equal(
-            "{\"grace\":\"5m\",\"schedule\":\"0 2 * * *\",\"timezone\":\"UTC\",\"budget\":{\"cost\":2},\"tags\":[\"reports\",\"gocron\",\"gocron:billing\"],\"name\":\"nightly\"}",
+            "{\"grace\":\"5m\",\"schedule\":\"0 2 * * *\",\"timezone\":\"UTC\",\"budget\":{\"cost\":2},\"floor\":{\"rows\":1},\"tags\":[\"reports\",\"gocron\",\"gocron:billing\"],\"name\":\"nightly\"}",
             await Stored(m.Store, "nightly"));
         Assert.Equal("{\"tags\":[\"gocron\",\"gocron:billing\"],\"name\":\"twice\"}", await Stored(m.Store, "twice"));
         Assert.Equal("{\"tags\":[\"gocron\",\"gocron:billing\"],\"name\":\"odd\"}", await Stored(m.Store, "odd"));
@@ -271,7 +271,7 @@ public class BridgeTests
         Assert.True(await w.SettleAsync(Settle));
         await m.Cw.CheckAsync();
         Assert.Equal(
-            "{\"description\":\"A scheduled task (no longer scheduled)\",\"tags\":[\"reports\",\"gocron\",\"gocron:billing\"],\"grace\":\"5m\",\"budget\":{\"cost\":2},\"name\":\"nightly\"}",
+            "{\"description\":\"A scheduled task (no longer scheduled)\",\"tags\":[\"reports\",\"gocron\",\"gocron:billing\"],\"grace\":\"5m\",\"budget\":{\"cost\":2},\"floor\":{\"rows\":1},\"name\":\"nightly\"}",
             await Stored(m.Store, "nightly"));
     }
 
@@ -338,6 +338,7 @@ public class BridgeTests
                 Timeout = 7_200_000,
                 MaxDuration = "30m",
                 Budget = { ["cost"] = 2, ["rows"] = 10 },
+                Floor = { ["rows"] = 1 },
                 FailuresBeforeAlert = 2,
                 Description = "Nightly",
                 Tags = ["river", "river:billing"],

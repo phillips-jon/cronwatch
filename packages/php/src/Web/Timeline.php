@@ -234,7 +234,7 @@ final class Timeline
             return 'timeout';
         }
         $latest = $job->lastRun?->id === $run->id;
-        return $latest && (self::isOpen($job, 'over_budget') || self::isOpen($job, 'slow')) ? 'warn' : 'ok';
+        return $latest && (self::isOpen($job, 'over_budget') || self::isOpen($job, 'under_floor') || self::isOpen($job, 'slow')) ? 'warn' : 'ok';
     }
 
     private static function timeoutText(JobSummary $job): string
@@ -253,7 +253,7 @@ final class Timeline
             return "running since {$at}, past its " . self::timeoutText($job) . ' timeout';
         }
         $took = $run->durationMs !== null ? ', took ' . Duration::format($run->durationMs) : '';
-        $extra = $tone === 'warn' ? (self::isOpen($job, 'over_budget') ? ', over budget' : ', slow') : '';
+        $extra = $tone === 'warn' ? (self::isOpen($job, 'over_budget') ? ', over budget' : (self::isOpen($job, 'under_floor') ? ', under floor' : ', slow')) : '';
         return "{$run->status} at {$at}{$took}{$extra}";
     }
 
@@ -269,6 +269,21 @@ final class Timeline
             }
         }
         return $over;
+    }
+
+    /** @return list<string> the metrics of the job's last run under their floors, or at 0 or less without one */
+    private static function underFloors(JobSummary $job): array
+    {
+        $floors = $job->definition->get('floor');
+        $floors = is_array($floors) ? $floors : [];
+        $under = [];
+        foreach (Text::entries($job->lastRun?->metrics ?? []) as [$key, $value]) {
+            $floor = $floors[$key] ?? null;
+            if (Js::isNumber($value) && ($floor !== null ? $value < $floor : $value <= 0)) {
+                $under[] = $key;
+            }
+        }
+        return $under;
     }
 
     /** What is worth saying about the job in a few words, or null when all is well. */
@@ -299,6 +314,10 @@ final class Timeline
         if (self::isOpen($job, 'over_budget') && $last !== null) {
             $over = self::overCeilings($job);
             return 'went over budget' . ($over !== [] ? ' on ' . implode(' and ', $over) : '') . ' at ' . self::when($last->startedAt, $now);
+        }
+        if (self::isOpen($job, 'under_floor') && $last !== null) {
+            $under = self::underFloors($job);
+            return 'fell short' . ($under !== [] ? ' on ' . implode(' and ', $under) : '') . ' at ' . self::when($last->startedAt, $now);
         }
         if (self::isOpen($job, 'slow') && $last?->durationMs !== null) {
             return 'slow: took ' . Duration::format($last->durationMs);
@@ -495,7 +514,7 @@ final class Timeline
             [$box('run ok'), 'ran'],
             [$box('run bad'), 'failed'],
             [$box('run timeout'), 'timed out'],
-            [$box('run warn'), 'over budget or slow'],
+            [$box('run warn'), 'over budget, under floor or slow'],
             [$box('run running'), 'running'],
             [$box('missed'), 'missed'],
         ];

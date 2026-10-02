@@ -287,6 +287,58 @@ public class ClientTests
     }
 
     [Fact]
+    public async Task An_under_floor_alert_names_the_metric_and_what_it_was_judged_against()
+    {
+        await using var m = Make();
+        var job = m.Cw.Job("import", new JobOptions { Floor = { ["files"] = 1 } });
+        Task Body(double rows, double files) => job.RunAsync((j, ct) =>
+        {
+            m.Clock.Advance(1000);
+            j.Metric("rows", rows);
+            j.Metric("files", files);
+            return Task.CompletedTask;
+        });
+        for (int i = 0; i < 5; i++)
+        {
+            await Body(4812 + i, 2);
+            m.Clock.Advance(Hour);
+        }
+        await Body(0, 0);
+        Assert.Equal(["under_floor"], m.Alerts.Types());
+        Alert alert = m.Alerts.List()[0];
+        Assert.Equal("import fell short", alert.Title);
+        Assert.Contains("rows: 0 (the last 5 runs all reported more than 0, the lowest 4,812)", alert.Message, StringComparison.Ordinal);
+        Assert.Contains("files: 0, below the floor of 1.", alert.Message, StringComparison.Ordinal);
+        m.Clock.Advance(Hour);
+        await Body(0, 0);
+        Assert.Equal(["under_floor"], m.Alerts.Types());
+        m.Clock.Advance(Hour);
+        await Body(10, 1);
+        Assert.Equal(["under_floor", "recovered"], m.Alerts.Types());
+    }
+
+    [Fact]
+    public async Task A_floor_must_be_a_finite_number_and_no_higher_than_its_ceiling()
+    {
+        await using var m = Make();
+        Assert.Contains(
+            "floor.rows must be a finite number (got NaN)",
+            Assert.Throws<CronwatchException>(() => m.Cw.Job("a", new JobOptions { Floor = { ["rows"] = double.NaN } })).Message,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "floor.cost (3) is above budget.cost (2), so every run would alert",
+            Assert.Throws<CronwatchException>(() => m.Cw.Job("b", new JobOptions { Floor = { ["cost"] = 3 }, Budget = { ["cost"] = 2 } })).Message,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "floor must be an object of { metric: floor }",
+            Assert.Throws<CronwatchException>(() => m.Cw.Job("c", new JobOptions().Field("floor", 1))).Message,
+            StringComparison.Ordinal);
+        Assert.Equal(
+            "{\"floor\":{\"delta\":-5},\"budget\":{\"delta\":5},\"name\":\"d\"}",
+            m.Cw.Job("d", new JobOptions { Floor = { ["delta"] = -5 }, Budget = { ["delta"] = 5 } }).Definition.ToJson());
+    }
+
+    [Fact]
     public async Task Silence_swallows_alerts_and_nothing_opens_underneath()
     {
         await using var m = Make();

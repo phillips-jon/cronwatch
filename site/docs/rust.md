@@ -7,7 +7,7 @@ group: Rust
 
 # Rust
 
-The `cronwatch` crate is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a Rust process can share one database with a Node, Ruby, Python, PHP, Go, Elixir, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers the crate itself: a `main` a crontab runs, an axum or other tower service, a Lambda function. tokio-cron-scheduler and apalis have a page of their own: [Rust schedulers](/docs/rust-schedulers/).
+The `cronwatch` crate is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow, over budget and under floor by the same rules, sends the same alert text, and writes the same rows, so a Rust process can share one database with a Node, Ruby, Python, PHP, Go, Elixir, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers the crate itself: a `main` a crontab runs, an axum or other tower service, a Lambda function. tokio-cron-scheduler and apalis have a page of their own: [Rust schedulers](/docs/rust-schedulers/).
 
 ```bash
 cargo add cronwatch --features alerts
@@ -401,7 +401,7 @@ There is no Anthropic crate to add: the Messages API is one POST, and it sends t
 | `on_error(f)` | standard error | `Fn(&cronwatch::Error, &str)` for failures outside jobs: the store, a channel, triage |
 | `clock(f)` | the system clock | a function returning epoch milliseconds; for tests |
 
-`JobOptions::new()` takes `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the process's zone, from `$TZ` or `/etc/localtime`, by default), `grace` (`"10m"`), `timeout` (`"1h"`), `max_duration`, `budget(metric, ceiling)`, `expect(text)` (the output must contain it), `expect_match(m)` (a `regex::Regex` with the `regex` feature, or anything implementing `cronwatch::Matcher`; stored as `matches /source/`), `expect_fn(|output| bool)` (a panic in it fails the run), `failures_before_alert` (1), `description` and `tags`, with the rules in the [TypeScript API reference](/docs/api/).
+`JobOptions::new()` takes `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the process's zone, from `$TZ` or `/etc/localtime`, by default), `grace` (`"10m"`), `timeout` (`"1h"`), `max_duration`, `budget(metric, ceiling)`, `floor(metric, floor)`, `expect(text)` (the output must contain it), `expect_match(m)` (a `regex::Regex` with the `regex` feature, or anything implementing `cronwatch::Matcher`; stored as `matches /source/`), `expect_fn(|output| bool)` (a panic in it fails the run), `failures_before_alert` (1), `description` and `tags`, with the rules in the [TypeScript API reference](/docs/api/).
 
 `timeout` and `max_duration` both measure a run's length. `timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure) and the job is stuck. `max_duration` is for a run that finished: one that succeeded but took longer is slow, and stays a success. So set `timeout` well above `max_duration`: `.max_duration("10m").timeout("1h")` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
 

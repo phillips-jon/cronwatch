@@ -8,8 +8,10 @@ defmodule Cronwatch.Alert do
     * `"missed"`: `due_at`, `deadline`, `grace_ms`, `last_run_at`
     * `"failed"` and `"stuck"`: `consecutive_failures`, `threshold`
     * `"slow"`: `duration_ms`, `threshold_ms`, `basis`
-    * `"over_budget"`: `breaches`, each a map of `metric`, `value`, `limit`
-      and `basis`
+    * `"over_budget"` and `"under_floor"`: `breaches`, each a map of
+      `metric`, `value`, `limit` and `basis` (for `"under_floor"`, `limit`
+      is the floor, or for a metric without one the lowest of the earlier
+      runs it was judged against)
     * `"recovered"`: `after` (the conditions that closed), `reason` (`nil`, or
       `"unscheduled"` when missed closed because the job lost its schedule)
       and `since` (when missed opened, for that reason)
@@ -134,7 +136,7 @@ defmodule Cronwatch.Alert do
     %Object{pairs: [{"durationMs", d.duration_ms}, {"thresholdMs", d.threshold_ms}, {"basis", d.basis}]}
   end
 
-  defp known_details_value("over_budget", d) do
+  defp known_details_value(type, d) when type in ["over_budget", "under_floor"] do
     breaches =
       Enum.map(d.breaches, fn b ->
         put_extra(
@@ -176,7 +178,7 @@ defmodule Cronwatch.Alert do
         }
         |> with_extra(o, ~w(durationMs thresholdMs basis))
 
-      "over_budget" ->
+      t when t in ["over_budget", "under_floor"] ->
         breaches =
           case Object.get(o, "breaches") do
             list when is_list(list) ->

@@ -290,7 +290,7 @@ module Cronwatch
         %(<p class="brand">#{home}<span class="slash" aria-hidden="true">/</span><span class="crumb">#{name_html(crumb)}</span></p>)
       end
 
-      # The job's health, with any open condition it does not already say (over budget, slow) after it.
+      # The job's health, with any open condition it does not already say (over budget, under floor, slow) after it.
       def health_state(job)
         cls, label = HEALTH.fetch(job.health.to_sym)
         extras = job.open.map(&:to_sym).reject { |c| SHOWN_BY_HEALTH.include?(c) }
@@ -495,6 +495,7 @@ module Cronwatch
             %(<span class="muted">none</span>)
           end
         budget = truthy?(d.budget) ? entries(d.budget).map { |k, v| "#{k} ≤ #{text(v)}" }.join(", ") : nil
+        floor = truthy?(d.floor) ? entries(d.floor).map { |k, v| "#{k} ≥ #{text(v)}" }.join(", ") : nil
         tags = d.tags
         failures = d.failures_before_alert
         open = job.open.map do |c|
@@ -554,6 +555,7 @@ module Cronwatch
             <dt>Timeout</dt><dd>#{h(d.timeout.nil? ? "1h" : d.timeout)}</dd>
             #{truthy?(d.max_duration) ? %(<dt>Max duration</dt><dd>#{h(d.max_duration)}</dd>) : ""}
             #{budget ? %(<dt>Budget</dt><dd>#{h(budget)}</dd>) : ""}
+            #{floor ? %(<dt>Floor</dt><dd>#{h(floor)}</dd>) : ""}
             #{truthy?(d.expect) ? %(<dt>Expect</dt><dd>#{h(d.expect)}</dd>) : ""}
             #{truthy?(failures) && failures > 1 ? %(<dt>Alert after</dt><dd>#{h(failures)} consecutive failures</dd>) : ""}
             #{tags.is_a?(Array) && tags.any? ? %(<dt>Tags</dt><dd>#{tags.map { |t| h(t) }.join(", ")}</dd>) : ""}

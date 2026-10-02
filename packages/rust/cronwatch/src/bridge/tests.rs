@@ -144,7 +144,7 @@ async fn a_watch_declares_entries_and_unschedules_the_gone() {
     let nightly = Entry {
         timezone: "UTC".into(),
         defaults: JobOptions::new().grace("5m"),
-        options: JobOptions::new().budget("cost", 2.0).tags(["reports"]),
+        options: JobOptions::new().budget("cost", 2.0).floor("rows", 1.0).tags(["reports"]),
         ..entry("nightly", "entry 1", "0 2 * * *")
     };
     let odd = Entry { problem: Some("cronwatch: entry 4 cannot be read".into()), ..entry("odd", "entry 4", "") };
@@ -152,7 +152,7 @@ async fn a_watch_declares_entries_and_unschedules_the_gone() {
     cw.check().await.unwrap();
     assert_eq!(
         stored(&*store, "nightly").await,
-        r#"{"grace":"5m","schedule":"0 2 * * *","timezone":"UTC","budget":{"cost":2},"tags":["reports","gocron","gocron:billing"],"name":"nightly"}"#
+        r#"{"grace":"5m","schedule":"0 2 * * *","timezone":"UTC","budget":{"cost":2},"floor":{"rows":1},"tags":["reports","gocron","gocron:billing"],"name":"nightly"}"#
     );
     assert_eq!(stored(&*store, "twice").await, r#"{"tags":["gocron","gocron:billing"],"name":"twice"}"#);
     assert_eq!(stored(&*store, "odd").await, r#"{"tags":["gocron","gocron:billing"],"name":"odd"}"#);
@@ -172,7 +172,7 @@ async fn a_watch_declares_entries_and_unschedules_the_gone() {
     cw.check().await.unwrap();
     assert_eq!(
         stored(&*store, "nightly").await,
-        r#"{"description":"A scheduled task (no longer scheduled)","tags":["reports","gocron","gocron:billing"],"grace":"5m","budget":{"cost":2},"name":"nightly"}"#
+        r#"{"description":"A scheduled task (no longer scheduled)","tags":["reports","gocron","gocron:billing"],"grace":"5m","budget":{"cost":2},"floor":{"rows":1},"name":"nightly"}"#
     );
 }
 
@@ -219,6 +219,7 @@ async fn a_fallback_keeps_the_stored_definition() {
                 .max_duration("30m")
                 .budget("cost", 2.0)
                 .budget("rows", 10.0)
+                .floor("rows", 1.0)
                 .failures_before_alert(2)
                 .description("Nightly")
                 .tags(["river", "river:billing"])

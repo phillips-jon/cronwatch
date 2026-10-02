@@ -7,6 +7,7 @@ var (
 	ScheduleOf     = scheduleOf
 	DefaultJobName = defaultJobName
 	RunOfRow       = runOf
+	Unscheduled    = unscheduled
 )
 
 const HoldFor = hold

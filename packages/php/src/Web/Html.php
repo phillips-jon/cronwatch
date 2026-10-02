@@ -248,7 +248,7 @@ CSS;
             : "<p class=\"brand\">{$home}<span class=\"slash\" aria-hidden=\"true\">/</span><span class=\"crumb\">" . Text::name($crumb) . '</span></p>';
     }
 
-    /** The job's health, with any open condition it does not already say (over budget, slow) after it. */
+    /** The job's health, with any open condition it does not already say (over budget, under floor, slow) after it. */
     private static function healthState(JobSummary $job): string
     {
         [$cls, $label] = self::HEALTH[$job->health];
@@ -465,6 +465,11 @@ CSS;
             $limits = array_map(fn (array $entry) => "{$entry[0]} \u{2264} " . Text::text($entry[1]), Text::entries($d->get('budget')));
             $budget = '<dt>Budget</dt><dd>' . Text::h(implode(', ', $limits)) . '</dd>';
         }
+        $floor = '';
+        if (Text::truthy($d->get('floor'))) {
+            $limits = array_map(fn (array $entry) => "{$entry[0]} \u{2265} " . Text::text($entry[1]), Text::entries($d->get('floor')));
+            $floor = '<dt>Floor</dt><dd>' . Text::h(implode(', ', $limits)) . '</dd>';
+        }
         $failures = $d->get('failuresBeforeAlert');
         $alertAfter = Text::truthy($failures) && Js::isNumber($failures) && $failures > 1 ? '<dt>Alert after</dt><dd>' . Text::h($failures) . ' consecutive failures</dd>' : '';
         $tags = $d->get('tags');
@@ -532,6 +537,7 @@ CSS;
             . '  <dt>Timeout</dt><dd>' . Text::h($d->get('timeout') ?? '1h') . "</dd>\n"
             . "  {$maxDuration}\n"
             . "  {$budget}\n"
+            . "  {$floor}\n"
             . "  {$expect}\n"
             . "  {$alertAfter}\n"
             . "  {$tagList}\n"

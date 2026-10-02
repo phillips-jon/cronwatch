@@ -207,6 +207,25 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
                     }
                 }
             }
+            if (def.Has("floor"))
+            {
+                if (def.Get("floor") is not JsObject floors)
+                {
+                    throw CronwatchException.Invalid("job " + quoted + ": floor must be an object of { metric: floor }");
+                }
+                var ceilings = def.Get("budget") as JsObject;
+                foreach (var e in floors)
+                {
+                    if (!JsonText.TryNumber(e.Value, out double floor) || !double.IsFinite(floor))
+                    {
+                        throw CronwatchException.Invalid("job " + quoted + ": floor." + e.Key + " must be a finite number (got " + AlertFormat.JsText(e.Value) + ")");
+                    }
+                    if (ceilings != null && ceilings.Has(e.Key) && JsonText.TryNumber(ceilings.Get(e.Key), out double ceiling) && floor > ceiling)
+                    {
+                        throw CronwatchException.Invalid("job " + quoted + ": floor." + e.Key + " (" + Js.FormatNumber(floor) + ") is above budget." + e.Key + " (" + Js.FormatNumber(ceiling) + "), so every run would alert");
+                    }
+                }
+            }
         }
         catch (ArgumentException e)
         {

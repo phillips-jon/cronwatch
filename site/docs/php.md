@@ -7,7 +7,7 @@ group: PHP
 
 # PHP
 
-`cronwatch/cronwatch` is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a PHP process can share one database with a Node, Ruby, Python, Go, Rust, Elixir, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers plain PHP (crontab scripts, a bare `public/` script, any PSR-15 stack) and the API underneath. The frameworks have pages of their own: [Laravel](/docs/laravel/), [Symfony](/docs/symfony/), [WordPress](/docs/wordpress/), [Drupal](/docs/drupal/) and [Craft CMS](/docs/craft/).
+`cronwatch/cronwatch` is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow, over budget and under floor by the same rules, sends the same alert text, and writes the same rows, so a PHP process can share one database with a Node, Ruby, Python, Go, Rust, Elixir, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers plain PHP (crontab scripts, a bare `public/` script, any PSR-15 stack) and the API underneath. The frameworks have pages of their own: [Laravel](/docs/laravel/), [Symfony](/docs/symfony/), [WordPress](/docs/wordpress/), [Drupal](/docs/drupal/) and [Craft CMS](/docs/craft/).
 
 ```bash
 composer require cronwatch/cronwatch
@@ -383,7 +383,7 @@ A triage of your own is any callable that takes a `Cronwatch\TriageContext` (`al
 | `onError` | PHP's error log | `fn (Throwable $error, string $where) => ...` for failures outside jobs: the store, a channel, triage |
 | `now` | the system clock | a callable returning epoch milliseconds; for tests |
 
-`$cw->job($name, $options)` takes `schedule` (five or six field cron, a nickname such as `'@hourly'`, or `'every 5m'`), `timezone` (IANA; PHP's default zone, `date.timezone`, when left out), `grace` (`'10m'`), `timeout` (`'1h'`: a run still going after it is given up on, recorded as a failed `timeout`, and the job is stuck), `maxDuration` (a run that finished ok but took longer flags the job slow, and stays ok; set `timeout` well above it), `budget` (`['metric' => ceiling]`), `expect` (a string, a `Pattern` or a callable), `failuresBeforeAlert` (1), `description` and `tags`, with the rules in the [API reference](/docs/api/). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit. Bad options throw `InvalidArgumentException` when the job is declared.
+`$cw->job($name, $options)` takes `schedule` (five or six field cron, a nickname such as `'@hourly'`, or `'every 5m'`), `timezone` (IANA; PHP's default zone, `date.timezone`, when left out), `grace` (`'10m'`), `timeout` (`'1h'`: a run still going after it is given up on, recorded as a failed `timeout`, and the job is stuck), `maxDuration` (a run that finished ok but took longer flags the job slow, and stays ok; set `timeout` well above it), `budget` (`['metric' => ceiling]`), `floor` (`['metric' => floor]`), `expect` (a string, a `Pattern` or a callable), `failuresBeforeAlert` (1), `description` and `tags`, with the rules in the [API reference](/docs/api/). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit. Bad options throw `InvalidArgumentException` when the job is declared.
 
 The client:
 

@@ -650,7 +650,7 @@ class Cronwatch:
         """Declare a job. Call it once, when the module loads, and keep the handle.
 
         Options: schedule, timezone, grace, timeout, max_duration, budget,
-        expect, failures_before_alert, description, tags."""
+        floor, expect, failures_before_alert, description, tags."""
         if not isinstance(name, str) or not NAME_RE.fullmatch(name):
             raise ValueError(f'job name "{name}" must be 1 to 120 characters of letters, digits, ".", "_", ":" or "-"')
         definition = self._build_definition(name, options)
@@ -979,7 +979,7 @@ class Cronwatch:
         for key, value in self.defaults.items():
             fields[JobDefinition.FIELDS[key]] = value
         for key, value in options.items():
-            fields[JobDefinition.FIELDS[key]] = {str(k): v for k, v in value.items()} if key == "budget" and isinstance(value, Mapping) else value
+            fields[JobDefinition.FIELDS[key]] = {str(k): v for k, v in value.items()} if key in ("budget", "floor") and isinstance(value, Mapping) else value
         fields["name"] = name
         return JobDefinition(fields)
 
@@ -1007,6 +1007,18 @@ class Cronwatch:
             for metric, ceiling in definition.budget.items():
                 if not (_js.is_finite(ceiling) and ceiling >= 0):
                     raise ValueError(f'job "{name}": budget.{metric} must be a finite number, 0 or more (got {_js_string(ceiling)})')
+        if definition.floor is not None:
+            if not isinstance(definition.floor, Mapping):
+                raise ValueError(f'job "{name}": floor must be an object of {{ metric: floor }}')
+            budget = definition.budget or {}
+            for metric, floor in definition.floor.items():
+                if not _js.is_finite(floor):
+                    raise ValueError(f'job "{name}": floor.{metric} must be a finite number (got {_js_string(floor)})')
+                ceiling = budget.get(metric)
+                if ceiling is not None and floor > ceiling:
+                    raise ValueError(
+                        f'job "{name}": floor.{metric} ({_js_string(floor)}) is above budget.{metric} ({_js_string(ceiling)}), so every run would alert'
+                    )
         expect = definition.expect
         if expect is not None and not isinstance(expect, (str, re.Pattern)) and not callable(expect):
             raise ValueError(f'job "{name}": expect must be a string, a RegExp or a function')

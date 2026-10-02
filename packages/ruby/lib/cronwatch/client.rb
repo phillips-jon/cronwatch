@@ -659,7 +659,7 @@ module Cronwatch
       fields = {}
       @defaults.each { |k, v| fields[k] = v }
       options.each do |k, v|
-        fields[k.to_sym] = v.is_a?(Hash) && k.to_sym == :budget ? v.transform_keys(&:to_s) : v
+        fields[k.to_sym] = v.is_a?(Hash) && %i[budget floor].include?(k.to_sym) ? v.transform_keys(&:to_s) : v
       end
       fields[:name] = name
       JobDefinition.new(fields)
@@ -698,6 +698,21 @@ module Cronwatch
           next if ceiling.is_a?(Numeric) && ceiling.real? && JS.finite?(ceiling) && ceiling >= 0
 
           raise ArgumentError, "job \"#{name}\": budget.#{metric} must be a finite number, 0 or more (got #{js_string(ceiling)})"
+        end
+      end
+      unless definition.floor.nil?
+        raise ArgumentError, "job \"#{name}\": floor must be an object of { metric: floor }" unless definition.floor.is_a?(Hash)
+
+        definition.floor.each do |metric, floor|
+          unless floor.is_a?(Numeric) && floor.real? && JS.finite?(floor)
+            raise ArgumentError, "job \"#{name}\": floor.#{metric} must be a finite number (got #{js_string(floor)})"
+          end
+
+          ceiling = definition.budget.is_a?(Hash) ? definition.budget[metric.to_s] : nil
+          next if ceiling.nil? || floor <= ceiling
+
+          raise ArgumentError,
+                "job \"#{name}\": floor.#{metric} (#{js_string(floor)}) is above budget.#{metric} (#{js_string(ceiling)}), so every run would alert"
         end
       end
       expect = definition.expect

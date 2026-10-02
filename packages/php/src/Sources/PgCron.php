@@ -79,7 +79,7 @@ final class PgCron implements Source
     public const NEWEST_SQL = 'SELECT ' . self::COLUMNS . ' FROM cron.job_run_details d WHERE d.jobid = $1 ORDER BY d.runid DESC LIMIT ' . self::BACKFILL;
 
     /** The options of a definition that are declared again, without its schedule, for a name no longer in use. */
-    private const UNSCHEDULED = ['description', 'tags', 'grace', 'timeout', 'maxDuration', 'budget', 'failuresBeforeAlert'];
+    private const UNSCHEDULED = ['description', 'tags', 'grace', 'timeout', 'maxDuration', 'budget', 'floor', 'failuresBeforeAlert'];
 
     private readonly object $db;
     private readonly string $prefix;

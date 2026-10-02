@@ -303,11 +303,11 @@ func (w *Watch) declare(name, where string, options []cronwatch.JobOption, curre
 
 // kept are the options a job keeps when it is declared again without its
 // schedule, as the PHP port keeps them.
-var kept = []string{"tags", "grace", "timeout", "maxDuration", "budget", "failuresBeforeAlert"}
+var kept = []string{"tags", "grace", "timeout", "maxDuration", "budget", "floor", "failuresBeforeAlert"}
 
 // Unscheduled is the options that declare a job again without its
 // schedule: its description with " (no longer scheduled)", its tags,
-// grace, timeout, maxDuration, budget and failuresBeforeAlert.
+// grace, timeout, maxDuration, budget, floor and failuresBeforeAlert.
 func Unscheduled(def cronwatch.Definition) []cronwatch.JobOption {
 	description := def.Description()
 	if description == "" {
@@ -340,6 +340,16 @@ func Unscheduled(def cronwatch.Definition) []cronwatch.JobOption {
 					v, _ := budget.Get(metric)
 					if ceiling, ok := v.(float64); ok {
 						options = append(options, cronwatch.Budget(metric, ceiling))
+					}
+				}
+			}
+		case "floor":
+			raw, _ := js.ValueOf(def).(*js.Object).Get("floor")
+			if floor, ok := raw.(*js.Object); ok {
+				for _, metric := range floor.Keys() {
+					v, _ := floor.Get(metric)
+					if limit, ok := v.(float64); ok {
+						options = append(options, cronwatch.Floor(metric, limit))
 					}
 				}
 			}

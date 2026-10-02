@@ -48,6 +48,7 @@ public sealed class DatadogChannel : IChannel
         ["stuck"] = "error",
         ["slow"] = "warning",
         ["over_budget"] = "warning",
+        ["under_floor"] = "warning",
         ["recovered"] = "success",
     };
 

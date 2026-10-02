@@ -283,7 +283,7 @@ public class HangfireTests
     [Fact]
     public void Default_options_merge_as_the_sdk_spreads_them()
     {
-        JobOptions merged = CronwatchHangfire.Merge(new JobOptions { Grace = "5m", Budget = { ["cost"] = 2 } }, new JobOptions { Timeout = "1h", Grace = "10m", Expect = "done" });
-        Assert.Equal("{\"grace\":\"10m\",\"budget\":{\"cost\":2},\"timeout\":\"1h\",\"name\":\"x\",\"expect\":\"contains \\\"done\\\"\"}", merged.Describe("x").ToJson());
+        JobOptions merged = CronwatchHangfire.Merge(new JobOptions { Grace = "5m", Budget = { ["cost"] = 2 }, Floor = { ["rows"] = 1 } }, new JobOptions { Timeout = "1h", Grace = "10m", Expect = "done" });
+        Assert.Equal("{\"grace\":\"10m\",\"budget\":{\"cost\":2},\"floor\":{\"rows\":1},\"timeout\":\"1h\",\"name\":\"x\",\"expect\":\"contains \\\"done\\\"\"}", merged.Describe("x").ToJson());
     }
 }

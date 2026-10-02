@@ -105,10 +105,11 @@ test("every alert type, with triage, sent through the channel, validates", async
     { type: "stuck", run: { ...run, status: "timeout" }, details: { consecutiveFailures: 1, threshold: 1 } },
     { type: "slow", run: { ...run, status: "ok" }, details: { durationMs: 1_500, thresholdMs: 1_000, basis: "maxDuration" } },
     { type: "over_budget", run: { ...run, status: "ok" }, details: { breaches: [{ metric: "cost", value: 3, limit: 2, basis: "budget" }] } },
+    { type: "under_floor", run: { ...run, status: "ok" }, details: { breaches: [{ metric: "rows", value: 0, limit: 1, basis: "floor" }] } },
     { type: "recovered", run: { ...run, status: "ok" }, details: { after: ["failed", "slow"] } },
     { type: "recovered", run: null, details: { after: ["missed"], reason: "unscheduled", since: 1_000 } },
   ];
-  const definition = { name: "j", schedule: "0 2 * * *", timezone: "UTC", grace: "10m", timeout: 60_000, maxDuration: "1s", budget: { cost: 2 }, expect: "done", failuresBeforeAlert: 2, description: "d", tags: ["t"] };
+  const definition = { name: "j", schedule: "0 2 * * *", timezone: "UTC", grace: "10m", timeout: 60_000, maxDuration: "1s", budget: { cost: 2 }, floor: { rows: 1 }, expect: "done", failuresBeforeAlert: 2, description: "d", tags: ["t"] };
   const sent: string[] = [];
   const realFetch = globalThis.fetch;
   globalThis.fetch = (async (_url: string, init: RequestInit) => {

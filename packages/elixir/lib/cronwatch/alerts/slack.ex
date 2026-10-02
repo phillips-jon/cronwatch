@@ -84,6 +84,7 @@ defmodule Cronwatch.Alerts.Slack do
   defp emoji("stuck"), do: ":no_entry:"
   defp emoji("slow"), do: ":turtle:"
   defp emoji("over_budget"), do: ":moneybag:"
+  defp emoji("under_floor"), do: ":chart_with_downwards_trend:"
   defp emoji("recovered"), do: ":white_check_mark:"
   defp emoji(_), do: ""
 

@@ -273,7 +273,9 @@ public final class Timeline {
     Run last = job.lastRun();
     boolean latest = last != null && last.id().equals(run.id());
     if (latest
-        && (job.open().contains(Condition.OVER_BUDGET) || job.open().contains(Condition.SLOW))) {
+        && (job.open().contains(Condition.OVER_BUDGET)
+            || job.open().contains(Condition.UNDER_FLOOR)
+            || job.open().contains(Condition.SLOW))) {
       return "warn";
     }
     return "ok";
@@ -307,7 +309,10 @@ public final class Timeline {
         run.durationMs() == null ? "" : ", took " + Durations.format((double) run.durationMs());
     String extra = "";
     if (tone.equals("warn")) {
-      extra = job.open().contains(Condition.OVER_BUDGET) ? ", over budget" : ", slow";
+      extra =
+          job.open().contains(Condition.OVER_BUDGET)
+              ? ", over budget"
+              : job.open().contains(Condition.UNDER_FLOOR) ? ", under floor" : ", slow";
     }
     return run.status().value() + " at " + at + took + extra;
   }
@@ -323,6 +328,23 @@ public final class Timeline {
       Double v = last == null ? null : last.metrics().get(e.getKey());
       double value = v == null ? Double.NEGATIVE_INFINITY : v;
       if (value > Evaluate.jsNumber(e.getValue())) {
+        out.add(e.getKey());
+      }
+    }
+    return out;
+  }
+
+  /** The metrics of the job's last run under their floors, or at 0 or less without one. */
+  private static List<String> underFloors(JobSummary job) {
+    List<String> out = new ArrayList<>();
+    Run last = job.lastRun();
+    if (last == null) {
+      return out;
+    }
+    JsObject floors = job.definition().get("floor") instanceof JsObject f ? f : new JsObject();
+    for (Map.Entry<String, Double> e : last.metrics().asMap().entrySet()) {
+      double v = e.getValue();
+      if (floors.has(e.getKey()) ? v < Evaluate.jsNumber(floors.get(e.getKey())) : v <= 0) {
         out.add(e.getKey());
       }
     }
@@ -370,6 +392,14 @@ public final class Timeline {
       List<String> over = overCeilings(job);
       if (!over.isEmpty()) {
         text += " on " + String.join(" and ", over);
+      }
+      return text + " at " + when(last.startedAt(), now);
+    }
+    if (open.contains(Condition.UNDER_FLOOR) && last != null) {
+      String text = "fell short";
+      List<String> under = underFloors(job);
+      if (!under.isEmpty()) {
+        text += " on " + String.join(" and ", under);
       }
       return text + " at " + when(last.startedAt(), now);
     }
@@ -751,7 +781,7 @@ public final class Timeline {
       {boxed("run ok"), "ran"},
       {boxed("run bad"), "failed"},
       {boxed("run timeout"), "timed out"},
-      {boxed("run warn"), "over budget or slow"},
+      {boxed("run warn"), "over budget, under floor or slow"},
       {boxed("run running"), "running"},
       {boxed("missed"), "missed"},
     };

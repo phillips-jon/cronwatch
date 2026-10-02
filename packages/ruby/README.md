@@ -1,6 +1,6 @@
 # cronwatch
 
-Cron and scheduled-job monitoring that lives inside your Ruby or Rails app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make.
+Cron and scheduled-job monitoring that lives inside your Ruby or Rails app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make.
 
 This is the Ruby port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Ruby process can share one database with a Node, Python, PHP, Go or Rust process, and [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) works against any of them.
 
@@ -39,12 +39,13 @@ CW = Cronwatch.new(
 
 NIGHTLY = CW.job("nightly-report",
   schedule: "0 2 * * *", timezone: "UTC", grace: "15m", timeout: "30m",
-  expect: "Report written", budget: { cost: 2 })
+  expect: "Report written", budget: { cost: 2 }, floor: { pages: 1 })
 
 NIGHTLY.run do |job|
   path = build_report
   job.log("Report written:", path)   # kept with the run, shown in alerts
-  job.metric(:cost, 1.2)             # watched against budgets and baselines
+  job.metric(:cost, 1.2)             # watched against budgets, floors and baselines
+  job.metric(:pages, 12)             # fewer than 1 page is under the floor
 end
 
 CW.start_checking # checks for missed and stuck runs every minute, in a background thread

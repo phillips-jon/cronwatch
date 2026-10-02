@@ -114,6 +114,7 @@ final class BridgeTest extends TestCase
         $this->assertNotNull($watch, 'read from the nearest parent');
         $this->assertSame('annotated', $watch->name);
         $this->assertSame(['schedule' => '0 * * * *', 'grace' => '5m', 'budget' => ['cost' => 2], 'tags' => ['team']], $watch->options());
+        $this->assertSame(['budget' => ['cost' => 2], 'floor' => ['rows' => 1]], (new Watch(floor: ['rows' => 1], budget: ['cost' => 2]))->options());
         $this->assertFalse(Watch::of(new NotWatched())->enabled);
         $this->assertNull(Watch::of(self::class));
         $this->assertNull(Watch::of('No\Such\ClassName'));

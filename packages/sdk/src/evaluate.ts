@@ -96,8 +96,8 @@ export function isObject(value: unknown): value is Record<string, unknown> {
 
 /**
  * A stored state with every field present, or a fresh one. State written by
- * an older version lacks the newer fields. `sending` is the exception: it is
- * there only while it holds an alert (see holdAlerts).
+ * an older version lacks the newer fields. `sending` and `underFloor` are the
+ * exceptions: each is there only while it holds something.
  *
  * Read leniently, since a foreign, hand-edited or damaged row must affect
  * only its own job, and the next write puts it right: a state that is not
@@ -105,11 +105,12 @@ export function isObject(value: unknown): value is Record<string, unknown> {
  * number (anything but an object reads as {}); `silencedUntil` and
  * `lastAlertAt` that are not numbers read as null; `pendingRecovery` keeps
  * only its strings, and `undelivered` only its entries that are objects (a
- * list of neither shape reads as []). Unknown fields are kept as written.
+ * list of neither shape reads as []), and `underFloor` only its strings
+ * (absent when none). Unknown fields are kept as written.
  */
 export function normalizeState(state: JobState | null, job: string): JobState {
   if (!isObject(state)) return emptyState(job);
-  const { sending, ...rest } = state;
+  const { sending, underFloor, ...rest } = state;
   const open = isObject(state.open)
     ? Object.fromEntries(Object.entries(state.open).filter(([, at]) => typeof at === "number"))
     : {};
@@ -125,6 +126,7 @@ export function normalizeState(state: JobState | null, job: string): JobState {
     pendingRecovery: list(state.pendingRecovery).filter((c): c is Condition => typeof c === "string"),
     undelivered: list(state.undelivered).filter((alert): alert is Alert => isObject(alert)),
     ...(Array.isArray(sending) && sending.length > 0 ? { sending: [...sending] } : {}),
+    ...(Array.isArray(underFloor) && underFloor.some((m) => typeof m === "string") ? { underFloor: underFloor.filter((m): m is string => typeof m === "string") } : {}),
   };
 }
 
@@ -289,6 +291,40 @@ export function budgetBreaches(def: Pick<JobDefinition, "budget">, run: Run, his
   return breaches;
 }
 
+/**
+ * The metrics of a successful run that fell below their floor. A metric
+ * with a floor breaches when it reports less than that floor. One without
+ * breaches when it reports 0 or less and either it did so on the job's last
+ * successful run too (`previous`, the metrics under their floor then), or
+ * the earlier successful runs that reported it (at least five, the newest
+ * twenty) all reported more than 0. So a job that keeps writing nothing stays
+ * under its floor however long it goes on, and a metric that is always 0
+ * never alerts.
+ */
+export function floorBreaches(def: Pick<JobDefinition, "floor">, run: Run, history: Run[], previous: readonly string[] = []): BudgetBreach[] {
+  const breaches: BudgetBreach[] = [];
+  for (const [metric, value] of Object.entries(run.metrics)) {
+    const floor = def.floor?.[metric];
+    if (floor !== undefined) {
+      if (value < floor) breaches.push({ metric, value, limit: floor, basis: "floor" });
+      continue;
+    }
+    if (value > 0) continue;
+    if (previous.includes(metric)) {
+      breaches.push({ metric, value, limit: 0, basis: "0 or less on the run before too" });
+      continue;
+    }
+    const past = history
+      .filter((r) => r.status === "ok" && typeof r.metrics[metric] === "number")
+      .slice(0, BASELINE_WINDOW)
+      .map((r) => r.metrics[metric]!);
+    if (past.length < BASELINE_MIN_RUNS || !past.every((v) => v > 0)) continue;
+    const lowest = Math.min(...past);
+    breaches.push({ metric, value, limit: lowest, basis: `the last ${past.length} runs all reported more than 0, the lowest ${formatNumber(lowest)}` });
+  }
+  return breaches;
+}
+
 /** Whether `history` (newest first) holds a full baseline window of successful runs. */
 export function hasFullBaseline(history: Run[]): boolean {
   return history.filter((r) => r.status === "ok").length >= BASELINE_WINDOW;
@@ -347,6 +383,17 @@ export function onRunFinish(
       }
     } else {
       closeCondition(next, "over_budget");
+    }
+
+    const short = floorBreaches(def, run, history, next.underFloor);
+    if (short.length > 0) {
+      next.underFloor = short.map((b) => b.metric);
+      if (openCondition(next, "under_floor", now)) {
+        alerts.push({ type: "under_floor", run, details: { breaches: short } });
+      }
+    } else {
+      delete next.underFloor;
+      closeCondition(next, "under_floor");
     }
 
     const pending = next.pendingRecovery ?? [];

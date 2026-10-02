@@ -28,7 +28,7 @@ func severity(t cronwatch.AlertType) string {
 	switch t {
 	case cronwatch.AlertRecovered:
 		return "info"
-	case cronwatch.AlertSlow, cronwatch.AlertOverBudget:
+	case cronwatch.AlertSlow, cronwatch.AlertOverBudget, cronwatch.AlertUnderFloor:
 		return "warning"
 	}
 	return "error"

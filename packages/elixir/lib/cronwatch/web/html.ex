@@ -97,7 +97,7 @@ defmodule Cronwatch.Web.HTML do
   def condition_text(c), do: String.replace(c, "_", " ", global: false)
 
   # The job's health, with any open condition it does not already say (over
-  # budget, slow) after it.
+  # budget, under floor, slow) after it.
   defp health_state(job) do
     {cls, label} = health_label(job.health)
 
@@ -481,7 +481,9 @@ defmodule Cronwatch.Web.HTML do
         "</dd>\n  ",
         definition_row(d, "maxDuration", "Max duration"),
         "\n  ",
-        budget_row(d),
+        limits_row(d, "budget", "Budget", "≤"),
+        "\n  ",
+        limits_row(d, "floor", "Floor", "≥"),
         "\n  ",
         definition_row(d, "expect", "Expect"),
         "\n  ",
@@ -528,19 +530,19 @@ defmodule Cronwatch.Web.HTML do
     end
   end
 
-  defp budget_row(d) do
-    case truthy_field(d, "budget") do
+  defp limits_row(d, key, label, sign) do
+    case truthy_field(d, key) do
       nil ->
         ""
 
       v ->
         parts =
           case v do
-            %Object{} = o -> Enum.map(Object.to_list(o), fn {k, limit} -> "#{k} ≤ #{Format.js_text(limit)}" end)
+            %Object{} = o -> Enum.map(Object.to_list(o), fn {k, limit} -> "#{k} #{sign} #{Format.js_text(limit)}" end)
             _ -> []
           end
 
-        "<dt>Budget</dt><dd>#{h(Enum.join(parts, ", "))}</dd>"
+        "<dt>#{label}</dt><dd>#{h(Enum.join(parts, ", "))}</dd>"
     end
   end
 

@@ -43,8 +43,8 @@ pub(crate) fn empty_state(job: &str) -> JobState {
 }
 
 /// A stored state with every field present, or a fresh one. State written
-/// by an older version lacks the newer fields. `sending` is the exception:
-/// it is there only while it holds an alert (see `hold_alerts`).
+/// by an older version lacks the newer fields. `sending` and `under_floor`
+/// are the exceptions: each is there only while it holds something.
 pub(crate) fn normalize_state(state: Option<&JobState>, job: &str) -> JobState {
     let Some(state) = state else {
         return empty_state(job);
@@ -58,6 +58,9 @@ pub(crate) fn normalize_state(state: Option<&JobState>, job: &str) -> JobState {
     s.undelivered.get_or_insert_with(Vec::new);
     if s.sending.as_ref().is_some_and(Vec::is_empty) {
         s.sending = None;
+    }
+    if s.under_floor.as_ref().is_some_and(Vec::is_empty) {
+        s.under_floor = None;
     }
     s
 }
@@ -303,6 +306,60 @@ fn budget_breaches(def: &Definition, run: &Run, history: &[Run]) -> Vec<BudgetBr
     breaches
 }
 
+/// The metrics of a successful run that fell below their floor. A metric
+/// with a floor breaches when it reports less than that floor. One without
+/// breaches when it reports 0 or less and either it did so on the job's last
+/// successful run too (`previous`, the metrics under their floor then), or
+/// the earlier successful runs that reported it (at least five, the newest
+/// twenty) all reported more than 0. So a job that keeps writing nothing
+/// stays under its floor however long it goes on, and a metric that is
+/// always 0 never alerts.
+fn floor_breaches(def: &Definition, run: &Run, history: &[Run], previous: &[String]) -> Vec<BudgetBreach> {
+    let mut breaches = Vec::new();
+    let floors = def.get("floor").and_then(Value::as_object);
+    for (name, value) in run.metrics.iter() {
+        if let Some(v) = floors.and_then(|f| f.get(name)) {
+            if value < js_number(v) {
+                breaches.push(BudgetBreach { metric: name.into(), value, limit: js_number(v), basis: "floor".into() });
+            }
+            continue;
+        }
+        if value > 0.0 {
+            continue;
+        }
+        if previous.iter().any(|m| m == name) {
+            breaches.push(BudgetBreach {
+                metric: name.into(),
+                value,
+                limit: 0.0,
+                basis: "0 or less on the run before too".into(),
+            });
+            continue;
+        }
+        let past: Vec<f64> = history
+            .iter()
+            .filter(|r| r.status == RunStatus::Ok)
+            .filter_map(|r| r.metrics.get(name))
+            .take(BASELINE_WINDOW)
+            .collect();
+        if past.len() < BASELINE_MIN_RUNS || !past.iter().all(|v| *v > 0.0) {
+            continue;
+        }
+        let lowest = past.iter().copied().fold(f64::INFINITY, f64::min);
+        breaches.push(BudgetBreach {
+            metric: name.into(),
+            value,
+            limit: lowest,
+            basis: format!(
+                "the last {} runs all reported more than 0, the lowest {}",
+                past.len(),
+                format_number(lowest)
+            ),
+        });
+    }
+    breaches
+}
+
 /// JavaScript's `Number(v)` for a JSON value, as a comparison with `>`
 /// coerces one.
 pub(crate) fn js_number(v: &Value) -> f64 {
@@ -420,6 +477,22 @@ pub(crate) fn on_run_finish(
             }
         } else {
             close_condition(&mut next, Condition::OverBudget);
+        }
+
+        let previous = next.under_floor.clone().unwrap_or_default();
+        let short = floor_breaches(def, run, history, &previous);
+        if !short.is_empty() {
+            next.under_floor = Some(short.iter().map(|b| b.metric.clone()).collect());
+            if open_condition(&mut next, Condition::UnderFloor, now) {
+                alerts.push(AlertDraft {
+                    alert_type: AlertType::UnderFloor,
+                    run: Some(run.clone()),
+                    details: AlertDetails::UnderFloor { breaches: short },
+                });
+            }
+        } else {
+            next.under_floor = None;
+            close_condition(&mut next, Condition::UnderFloor);
         }
 
         if !pending(&mut next).is_empty() && next.open.is_empty() {
@@ -706,5 +779,96 @@ fn summary(
             p50_ms: percentile(&ok_durations, 50.0).map(js::to_i64),
             p95_ms: percentile(&ok_durations, 95.0).map(js::to_i64),
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::Metrics;
+
+    const T0: i64 = 1_767_607_200_000;
+    const HOUR: i64 = 3_600_000;
+
+    fn def(json: &str) -> Definition {
+        Definition::from_json(json).unwrap()
+    }
+
+    fn ok(started_at: i64, metrics: &[(&str, f64)]) -> Run {
+        let mut run = Run::new(format!("r{started_at}"), "j", RunStatus::Ok, started_at);
+        run.finished_at = Some(started_at + 1000);
+        run.duration_ms = Some(1000);
+        run.metrics = metrics.iter().copied().collect::<Metrics>();
+        run
+    }
+
+    fn finish(def: &Definition, run: &Run, state: &JobState, history: &[Run]) -> Evaluation {
+        on_run_finish(def, run, state, history, run.started_at).unwrap()
+    }
+
+    fn types(e: &Evaluation) -> Vec<&str> {
+        e.alerts.iter().map(|a| a.alert_type.as_str()).collect()
+    }
+
+    fn breaches(e: &Evaluation) -> Vec<BudgetBreach> {
+        match &e.alerts[0].details {
+            AlertDetails::UnderFloor { breaches } => breaches.clone(),
+            other => panic!("not under_floor: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn floors_a_floor_or_0_after_five_runs_that_all_reported_more() {
+        let floored = def(r#"{"name":"j","floor":{"rows":10}}"#);
+        let short = finish(&floored, &ok(T0, &[("rows", 9.0)]), &empty_state("j"), &[]);
+        assert_eq!(types(&short), ["under_floor"]);
+        assert_eq!(breaches(&short), [BudgetBreach::new("rows", 9.0, 10.0, "floor")]);
+        let back = finish(&floored, &ok(T0 + HOUR, &[("rows", 10.0)]), &short.state, &[]);
+        assert_eq!(types(&back), ["recovered"]);
+        assert_eq!(back.state.under_floor, None);
+
+        let bare = def(r#"{"name":"j"}"#);
+        let history: Vec<Run> =
+            (1..=5).map(|i| ok(T0 - i * HOUR, &[("rows", 100.0 * i as f64), ("errors", 0.0)])).collect();
+        let four = finish(&bare, &ok(T0, &[("rows", 0.0)]), &empty_state("j"), &history[1..]);
+        assert!(four.alerts.is_empty(), "four runs are not a baseline");
+        let always = finish(&bare, &ok(T0, &[("rows", 1.0), ("errors", 0.0)]), &empty_state("j"), &history);
+        assert!(always.alerts.is_empty(), "an always-0 metric never alerts");
+        let zero = finish(&bare, &ok(T0, &[("rows", 0.0), ("errors", 0.0)]), &empty_state("j"), &history);
+        assert_eq!(
+            breaches(&zero),
+            [BudgetBreach::new("rows", 0.0, 100.0, "the last 5 runs all reported more than 0, the lowest 100")]
+        );
+        assert_eq!(zero.state.under_floor, Some(vec!["rows".to_string()]));
+
+        // A job that keeps writing nothing stays open, past the point where
+        // its zeros are all the history there is.
+        let mut state = zero.state;
+        let mut runs = history.clone();
+        for i in 1..=30 {
+            runs.insert(0, ok(T0 + (i - 1) * HOUR, &[("rows", 0.0), ("errors", 0.0)]));
+            let next = finish(
+                &bare,
+                &ok(T0 + i * HOUR, &[("rows", 0.0), ("errors", 0.0)]),
+                &state,
+                &runs[..runs.len().min(25)],
+            );
+            assert!(next.alerts.is_empty());
+            assert_eq!(next.state.open_at(&Condition::UnderFloor), Some(T0));
+            state = next.state;
+        }
+        let recovered = finish(&bare, &ok(T0 + 31 * HOUR, &[("rows", 5.0), ("errors", 0.0)]), &state, &runs[..25]);
+        assert_eq!(types(&recovered), ["recovered"]);
+        assert!(
+            matches!(&recovered.alerts[0].details, AlertDetails::Recovered { after, .. } if after == &[Condition::UnderFloor])
+        );
+
+        // A metric that has reported 0 before is judged as usual for it, and
+        // a floor of 0 turns the check off.
+        let mut mixed = history[..4].to_vec();
+        mixed.push(ok(T0 - 6 * HOUR, &[("rows", 0.0)]));
+        assert!(finish(&bare, &ok(T0, &[("rows", 0.0)]), &empty_state("j"), &mixed).alerts.is_empty());
+        let off = def(r#"{"name":"j","floor":{"rows":0}}"#);
+        assert!(finish(&off, &ok(T0, &[("rows", 0.0)]), &empty_state("j"), &history).alerts.is_empty());
     }
 }

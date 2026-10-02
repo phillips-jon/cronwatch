@@ -245,6 +245,57 @@ async fn slow_and_over_budget_from_the_jobs_baseline() {
 }
 
 #[tokio::test]
+async fn an_under_floor_alert_names_the_metric_and_what_it_was_judged_against() {
+    let k = Kit::new();
+    let job = k.cw.job("import", JobOptions::new().floor("files", 1.0)).unwrap();
+    let run = |rows: f64, files: f64| {
+        let job = job.clone();
+        let k = &k;
+        async move {
+            job.run(|j| {
+                k.advance(1000);
+                let metrics: Metrics = [("rows", rows), ("files", files)].into_iter().collect();
+                std::future::ready(j.metrics(&metrics))
+            })
+            .await
+            .unwrap();
+        }
+    };
+    for i in 0..5 {
+        run(4812.0 + f64::from(i), 2.0).await;
+        k.advance(HOUR);
+    }
+    run(0.0, 0.0).await;
+    assert_eq!(k.types(), ["under_floor"]);
+    let alert = &k.alert_list()[0];
+    assert_eq!(alert.title, "import fell short");
+    assert!(
+        alert.message.contains("rows: 0 (the last 5 runs all reported more than 0, the lowest 4,812)"),
+        "{}",
+        alert.message
+    );
+    assert!(alert.message.contains("files: 0, below the floor of 1."), "{}", alert.message);
+    k.advance(HOUR);
+    run(0.0, 0.0).await;
+    assert_eq!(k.types(), ["under_floor"]);
+    k.advance(HOUR);
+    run(10.0, 1.0).await;
+    assert_eq!(k.types(), ["under_floor", "recovered"]);
+}
+
+#[tokio::test]
+async fn a_floor_must_be_a_finite_number_and_no_higher_than_its_ceiling() {
+    let k = Kit::new();
+    let err = k.cw.job("a", JobOptions::new().floor("rows", f64::NAN)).unwrap_err().to_string();
+    assert_eq!(err, r#"job "a": floor.rows must be a finite number (got NaN)"#);
+    let err = k.cw.job("b", JobOptions::new().floor("cost", 3.0).budget("cost", 2.0)).unwrap_err().to_string();
+    assert_eq!(err, r#"job "b": floor.cost (3) is above budget.cost (2), so every run would alert"#);
+    let err = k.cw.job("c", JobOptions::new().field("floor", 1.0)).unwrap_err().to_string();
+    assert_eq!(err, r#"job "c": floor must be an object of { metric: floor }"#);
+    k.cw.job("d", JobOptions::new().floor("delta", -5.0).budget("delta", 5.0)).unwrap();
+}
+
+#[tokio::test]
 async fn silence_swallows_alerts_and_unsilence_alerts_again() {
     let k = Kit::new();
     let job = k.cw.job("flaky", JobOptions::new()).unwrap();

@@ -243,6 +243,77 @@ class ClientTest {
   }
 
   @Test
+  void anUnderFloorAlertNamesTheMetricAndWhatItWasJudgedAgainst() {
+    Made m = Support.make();
+    Job job = m.cw().job("import", JobOptions.builder().floor("files", 1));
+    for (int i = 0; i < 5; i++) {
+      int rows = 4812 + i;
+      job.run(
+          j -> {
+            m.clock().advance(1000);
+            j.metric("rows", rows);
+            j.metric("files", 2);
+          });
+      m.clock().advance(HOUR);
+    }
+    job.run(
+        j -> {
+          m.clock().advance(1000);
+          j.metric("rows", 0);
+          j.metric("files", 0);
+        });
+    assertEquals(List.of("under_floor"), m.alerts().types());
+    Alert alert = m.alerts().alerts.get(0);
+    assertEquals("import fell short", alert.title());
+    assertTrue(
+        alert
+            .message()
+            .contains("rows: 0 (the last 5 runs all reported more than 0, the lowest 4,812)"),
+        alert.message());
+    assertTrue(alert.message().contains("files: 0, below the floor of 1."), alert.message());
+    m.clock().advance(HOUR);
+    job.run(
+        j -> {
+          m.clock().advance(1000);
+          j.metric("rows", 0);
+          j.metric("files", 0);
+        });
+    assertEquals(List.of("under_floor"), m.alerts().types());
+    m.clock().advance(HOUR);
+    job.run(
+        j -> {
+          m.clock().advance(1000);
+          j.metric("rows", 10);
+          j.metric("files", 1);
+        });
+    assertEquals(List.of("under_floor", "recovered"), m.alerts().types());
+  }
+
+  @Test
+  void aFloorMustBeAFiniteNumberAndNoHigherThanItsCeiling() {
+    Made m = Support.make();
+    assertTrue(
+        assertThrows(
+                CronwatchException.class,
+                () -> m.cw().job("a", JobOptions.builder().floor("rows", Double.NaN)))
+            .getMessage()
+            .contains("floor.rows must be a finite number"));
+    assertTrue(
+        assertThrows(
+                CronwatchException.class,
+                () -> m.cw().job("b", JobOptions.builder().floor("cost", 3).budget("cost", 2)))
+            .getMessage()
+            .contains("floor.cost (3) is above budget.cost (2), so every run would alert"));
+    assertTrue(
+        assertThrows(
+                CronwatchException.class,
+                () -> m.cw().job("c", JobOptions.builder().field("floor", "rows")))
+            .getMessage()
+            .contains("floor must be an object of { metric: floor }"));
+    m.cw().job("d", JobOptions.builder().floor("delta", -5).budget("delta", 5));
+  }
+
+  @Test
   void silenceSwallowsAlertsAndNothingOpensUnderneath() {
     Made m = Support.make();
     Job job = m.cw().job("flaky");

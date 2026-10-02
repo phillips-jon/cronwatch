@@ -26,7 +26,7 @@ pub(crate) fn invalid(message: impl Into<String>) -> Error {
 pub(crate) fn severity(t: &AlertType) -> &'static str {
     match t {
         AlertType::Recovered => "info",
-        AlertType::Slow | AlertType::OverBudget => "warning",
+        AlertType::Slow | AlertType::OverBudget | AlertType::UnderFloor => "warning",
         _ => "error",
     }
 }

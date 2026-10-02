@@ -20,6 +20,7 @@ _COLOR = {
     "stuck": 0xC62828,
     "slow": 0xB7791F,
     "over_budget": 0xB7791F,
+    "under_floor": 0xB7791F,
     "recovered": 0x1F8A4C,
 }
 

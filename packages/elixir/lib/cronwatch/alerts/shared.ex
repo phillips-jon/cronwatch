@@ -47,7 +47,7 @@ defmodule Cronwatch.Alerts.Shared do
 
   @doc "The level for trackers that have levels. Recovered is informational."
   def severity("recovered"), do: "info"
-  def severity(t) when t in ["slow", "over_budget"], do: "warning"
+  def severity(t) when t in ["slow", "over_budget", "under_floor"], do: "warning"
   def severity(_), do: "error"
 
   @doc "Lowercase hex."

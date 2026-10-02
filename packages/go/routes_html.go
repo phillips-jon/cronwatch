@@ -83,7 +83,7 @@ func healthLabel(h JobHealth) (cls, label string) {
 func conditionText(c Condition) string { return strings.Replace(string(c), "_", " ", 1) }
 
 // healthState is the job's health, with any open condition it does not
-// already say (over budget, slow) after it.
+// already say (over budget, under floor, slow) after it.
 func healthState(job JobSummary) string {
 	cls, label := healthLabel(job.Health)
 	var extras strings.Builder
@@ -441,6 +441,7 @@ func jobPage(job JobSummary, runs []Run, now int64, base string, complete bool) 
   <dt>Timeout</dt><dd>` + orDefault(d, "timeout", "1h") + `</dd>
   ` + definitionRow(d, "maxDuration", "Max duration") + `
   ` + budgetRow(d) + `
+  ` + floorRow(d) + `
   ` + definitionRow(d, "expect", "Expect") + `
   ` + alertAfterRow(d) + `
   ` + tagsRow(d) + `
@@ -481,8 +482,13 @@ func definitionRow(d Definition, key, label string) string {
 	return `<dt>` + label + `</dt><dd>` + escapeValue(v) + `</dd>`
 }
 
-func budgetRow(d Definition) string {
-	v, ok := defValue(d, "budget")
+func budgetRow(d Definition) string { return limitsRow(d, "budget", "Budget", " ≤ ") }
+
+func floorRow(d Definition) string { return limitsRow(d, "floor", "Floor", " ≥ ") }
+
+// limitsRow is a budget or floor as "k ≤ v" (or "k ≥ v") pairs.
+func limitsRow(d Definition, key, label, sign string) string {
+	v, ok := defValue(d, key)
 	if !ok {
 		return ""
 	}
@@ -490,10 +496,10 @@ func budgetRow(d Definition) string {
 	if o, isObject := v.(*js.Object); isObject {
 		for _, k := range o.Keys() {
 			limit, _ := o.Get(k)
-			parts = append(parts, k+" ≤ "+jsText(limit, true))
+			parts = append(parts, k+sign+jsText(limit, true))
 		}
 	}
-	return `<dt>Budget</dt><dd>` + escapeHTML(strings.Join(parts, ", ")) + `</dd>`
+	return `<dt>` + label + `</dt><dd>` + escapeHTML(strings.Join(parts, ", ")) + `</dd>`
 }
 
 func alertAfterRow(d Definition) string {

@@ -284,7 +284,7 @@ internal static class Timeline
         }
         Run? last = job.LastRun;
         bool latest = last != null && string.Equals(last.Id, run.Id, StringComparison.Ordinal);
-        if (latest && (job.Open.Contains(Condition.OverBudget) || job.Open.Contains(Condition.Slow)))
+        if (latest && (job.Open.Contains(Condition.OverBudget) || job.Open.Contains(Condition.UnderFloor) || job.Open.Contains(Condition.Slow)))
         {
             return "warn";
         }
@@ -318,7 +318,7 @@ internal static class Timeline
         string extra = "";
         if (tone == "warn")
         {
-            extra = job.Open.Contains(Condition.OverBudget) ? ", over budget" : ", slow";
+            extra = job.Open.Contains(Condition.OverBudget) ? ", over budget" : job.Open.Contains(Condition.UnderFloor) ? ", under floor" : ", slow";
         }
         return run.Status.Value + " at " + at + took + extra;
     }
@@ -336,6 +336,26 @@ internal static class Timeline
         {
             double value = last != null && last.Metrics.TryGetValue(e.Key, out double v) ? v : double.NegativeInfinity;
             if (value > Evaluate.JsNumber(e.Value))
+            {
+                output.Add(e.Key);
+            }
+        }
+        return output;
+    }
+
+    /// <summary>The metrics of the job's last run under their floors, or at 0 or less without one.</summary>
+    private static List<string> UnderFloors(JobSummary job)
+    {
+        var output = new List<string>();
+        if (job.LastRun is not Run last)
+        {
+            return output;
+        }
+        var floors = job.Definition.Get("floor") as JsObject;
+        foreach (var e in last.Metrics)
+        {
+            bool under = floors != null && floors.Has(e.Key) ? e.Value < Evaluate.JsNumber(floors.Get(e.Key)) : e.Value <= 0;
+            if (under)
             {
                 output.Add(e.Key);
             }
@@ -391,6 +411,16 @@ internal static class Timeline
             if (over.Count > 0)
             {
                 text += " on " + string.Join(" and ", over);
+            }
+            return text + " at " + When(last.StartedAt, now);
+        }
+        if (open.Contains(Condition.UnderFloor) && last != null)
+        {
+            string text = "fell short";
+            var under = UnderFloors(job);
+            if (under.Count > 0)
+            {
+                text += " on " + string.Join(" and ", under);
             }
             return text + " at " + When(last.StartedAt, now);
         }
@@ -688,7 +718,7 @@ internal static class Timeline
             (Boxed("run ok"), "ran"),
             (Boxed("run bad"), "failed"),
             (Boxed("run timeout"), "timed out"),
-            (Boxed("run warn"), "over budget or slow"),
+            (Boxed("run warn"), "over budget, under floor or slow"),
             (Boxed("run running"), "running"),
             (Boxed("missed"), "missed"),
         ];

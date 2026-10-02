@@ -28,7 +28,7 @@ class WebGoldenTest < Minitest::Test
 
     nightly = cw.job("nightly-report",
                      schedule: "0 2 * * *", timezone: "UTC", grace: "15m", max_duration: "10m", budget: { cost: 2 },
-                     expect: "Report written", failures_before_alert: 2, description: "Builds the <b>PDF</b>",
+                     floor: { rows: 40 }, expect: "Report written", failures_before_alert: 2, description: "Builds the <b>PDF</b>",
                      tags: ["reports", "<t>"])
     durations = [2000, 2500, 90_000, 3100, 1800]
     durations.each_with_index do |duration, i|
@@ -41,6 +41,16 @@ class WebGoldenTest < Minitest::Test
           job.metric("2", 0.123456)
           clock.advance(duration)
         end
+      end
+    end
+
+    # Five runs that wrote rows, then one that wrote none: under its floor.
+    importer = cw.job("import", schedule: "0 * * * *")
+    6.times do |i|
+      clock.now = T0 - ((6 - i) * HOUR) - (30 * MIN)
+      importer.run do |job|
+        job.metric("rows", i == 5 ? 0 : 120 + i)
+        clock.advance(800)
       end
     end
 

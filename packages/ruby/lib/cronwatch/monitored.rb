@@ -192,7 +192,7 @@ module Cronwatch
     # The class side: `cronwatch` and what it declares.
     module ClassMethods
       # Monitor this job. Takes the options of Cronwatch::Client#job (schedule,
-      # timezone, grace, timeout, max_duration, budget, expect,
+      # timezone, grace, timeout, max_duration, budget, floor, expect,
       # failures_before_alert, description, tags) and name:, which defaults to
       # the class name without "Job", dasherized. schedule: :from_scheduler
       # takes the schedule (and its timezone) from the class's entry in Solid

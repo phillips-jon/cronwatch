@@ -421,6 +421,13 @@ fn unscheduled(def: &Definition) -> JobOptions {
             }
         }
     }
+    if let Some(Value::Object(floors)) = def.get("floor") {
+        for (metric, floor) in floors.iter() {
+            if let Some(n) = floor.as_f64() {
+                out = out.floor(metric, n);
+            }
+        }
+    }
     if let Some(n) = def.get("failuresBeforeAlert").and_then(Value::as_f64) {
         out = out.failures_before_alert(n as u32);
     }

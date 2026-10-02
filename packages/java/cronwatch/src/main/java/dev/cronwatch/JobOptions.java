@@ -146,6 +146,28 @@ public final class JobOptions {
   }
 
   /**
+   * A floor for a metric reported with {@link JobContext#metric}: {@code floor("rows", 1)} alerts
+   * when a run reports rows below 1. Give it once per metric; the floors keep the order given.
+   * Metrics without a floor alert when a run reports 0 or less and the five to twenty successful
+   * runs before it all reported more than 0. Catches the job that ran cleanly and wrote nothing. A
+   * floor of 0 lets a metric reach 0 without alerting.
+   */
+  public JobOptions floor(String metric, double floor) {
+    JsObject floors = fields.get("floor") instanceof JsObject f ? f : new JsObject();
+    floors.set(metric, floor);
+    return put("floor", floors);
+  }
+
+  /** Every floor at once, in the map's iteration order, replacing any given before. */
+  public JobOptions floor(Map<String, ? extends Number> floors) {
+    JsObject floor = new JsObject();
+    for (Map.Entry<String, ? extends Number> e : floors.entrySet()) {
+      floor.set(e.getKey(), e.getValue().doubleValue());
+    }
+    return put("floor", floor);
+  }
+
+  /**
    * Makes a successful run fail unless its output contains {@code text}. Catches the job that exits
    * cleanly and did nothing. Stored as {@code contains "text"}.
    */

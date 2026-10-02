@@ -54,6 +54,7 @@ fn class(t: &AlertType) -> String {
         AlertType::Stuck => "CronWatch::Stuck".into(),
         AlertType::Slow => "CronWatch::Slow".into(),
         AlertType::OverBudget => "CronWatch::OverBudget".into(),
+        AlertType::UnderFloor => "CronWatch::UnderFloor".into(),
         AlertType::Recovered => "CronWatch::Recovered".into(),
         AlertType::Other(s) => format!("CronWatch::{s}"),
     }

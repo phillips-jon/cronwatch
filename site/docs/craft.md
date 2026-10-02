@@ -38,7 +38,7 @@ return [
 ];
 ```
 
-The options are `name` and a job's (`schedule`, `timezone`, `grace`, `timeout`, `maxDuration`, `budget`, `expect`, `failuresBeforeAlert`, `description`, `tags`; see [PHP](/docs/php/#api)), or `true` for none.
+The options are `name` and a job's (`schedule`, `timezone`, `grace`, `timeout`, `maxDuration`, `budget`, `floor`, `expect`, `failuresBeforeAlert`, `description`, `tags`; see [PHP](/docs/php/#api)), or `true` for none.
 
 ### Commands
 

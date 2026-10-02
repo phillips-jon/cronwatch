@@ -177,7 +177,7 @@ public class HealthConformanceTests
             fails.Same("silenceEnd " + i++, Evaluate.SilenceEnd(Fixtures.Integer(c, "now"), ms), c.Get("silencedUntil"));
         }
         cases += Delivery(Fixtures.Object(f, "delivery"), fails);
-        Assert.Equal(227, cases);
+        Assert.Equal(231, cases);
         fails.Check("health");
     }
 

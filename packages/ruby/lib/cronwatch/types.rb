@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Cronwatch
-  CONDITIONS = %i[missed failed stuck slow over_budget].freeze
+  CONDITIONS = %i[missed failed stuck slow over_budget under_floor].freeze
   RUN_STATUSES = %i[running ok failed timeout].freeze
 
   # Ruby names are snake_case symbols; everything that leaves the process
@@ -74,7 +74,7 @@ module Cronwatch
 
     FIELDS = {
       name: "name", schedule: "schedule", timezone: "timezone", grace: "grace", timeout: "timeout",
-      max_duration: "maxDuration", budget: "budget", expect: "expect",
+      max_duration: "maxDuration", budget: "budget", floor: "floor", expect: "expect",
       failures_before_alert: "failuresBeforeAlert", description: "description", tags: "tags",
     }.freeze
     OPTIONS = (FIELDS.keys - [:name]).freeze
@@ -386,7 +386,7 @@ module Cronwatch
   # when there are none. An open condition this version does not know stays
   # in `open` the same way, under its own name.
   JobState = Struct.new(:job, :open, :consecutive_failures, :silenced_until, :last_alert_at, :pending_recovery,
-                        :undelivered, :version, :sending, :extra, keyword_init: true) do
+                        :undelivered, :version, :sending, :under_floor, :extra, keyword_init: true) do
     include Serializable
 
     def self.from_h(hash)
@@ -397,6 +397,7 @@ module Cronwatch
       pending = Naming.fetch(hash, "pendingRecovery")
       undelivered = Naming.fetch(hash, "undelivered")
       sending = Naming.fetch(hash, "sending")
+      under_floor = Naming.fetch(hash, "underFloor")
       extra = hash.each_with_object({}) { |(k, v), out| out[k.to_s] = v unless JobState::KNOWN.include?(k.to_s) }
       new(
         extra: extra.empty? ? nil : extra,
@@ -409,6 +410,7 @@ module Cronwatch
         undelivered: undelivered.is_a?(Array) ? undelivered.map { |a| a.is_a?(Hash) ? Alert.from_h(a) : a } : undelivered,
         version: Naming.fetch(hash, "version"),
         sending: sending.is_a?(Array) ? sending.map { |entry| JobState.sending_entry(entry) } : sending,
+        under_floor: under_floor,
       )
     end
 
@@ -434,8 +436,8 @@ module Cronwatch
 
     # pendingRecovery, undelivered and version are left out when unset, as in
     # state written before they existed. The version comes after them, where
-    # the SDK's spread of a normalized state puts it, and `sending` last, and
-    # only while it holds an entry.
+    # the SDK's spread of a normalized state puts it, then `sending` and
+    # `underFloor`, each only while it holds an entry.
     def to_h
       out = {
         "job" => job, "open" => open.is_a?(Hash) ? open.transform_keys(&:to_s) : (open || {}),
@@ -454,6 +456,7 @@ module Cronwatch
           entry.is_a?(Hash) ? entry.transform_values { |v| v.is_a?(Alert) ? v.to_h : v } : entry
         end
       end
+      out["underFloor"] = under_floor.dup if under_floor.is_a?(Array) && !under_floor.empty?
       extra&.each { |key, value| out[key] = value unless out.key?(key) || JobState::KNOWN.include?(key) }
       out
     end
@@ -461,7 +464,7 @@ module Cronwatch
 
   # The fields this version reads from a stored state; the rest are kept in `extra`.
   # @api private
-  JobState::KNOWN = %w[job open consecutiveFailures silencedUntil lastAlertAt pendingRecovery undelivered version sending].freeze
+  JobState::KNOWN = %w[job open consecutiveFailures silencedUntil lastAlertAt pendingRecovery undelivered version sending underFloor].freeze
 
   JobStats = Struct.new(:runs, :ok_rate, :p50_ms, :p95_ms, keyword_init: true) do
     include Serializable

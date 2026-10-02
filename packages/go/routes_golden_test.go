@@ -98,7 +98,7 @@ func seedGolden(t *testing.T) *cronwatch.Client {
 	}
 	nightly := must[*cronwatch.Job](t)(cw.Job("nightly-report",
 		cronwatch.Schedule("0 2 * * *"), cronwatch.Timezone("UTC"), cronwatch.Grace("15m"), cronwatch.MaxDuration("10m"),
-		cronwatch.Budget("cost", 2), cronwatch.Expect("Report written"), cronwatch.FailuresBeforeAlert(2),
+		cronwatch.Budget("cost", 2), cronwatch.Floor("rows", 40), cronwatch.Expect("Report written"), cronwatch.FailuresBeforeAlert(2),
 		cronwatch.Description("Builds the <b>PDF</b>"), cronwatch.Tags("reports", "<t>")))
 	durations := []int64{2000, 2500, 90_000, 3100, 1800}
 	for i, d := range durations {
@@ -117,6 +117,20 @@ func seedGolden(t *testing.T) *cronwatch.Client {
 			_ = job.Metric("rows", float64(40+i))
 			_ = job.Metric("2", 0.123456)
 			clock.Advance(d)
+			return nil
+		})
+	}
+	// Five runs that wrote rows, then one that wrote none: under its floor.
+	importer := must[*cronwatch.Job](t)(cw.Job("import", cronwatch.Schedule("0 * * * *")))
+	for i := range 6 {
+		clock.Set(T0 - int64(6-i)*HOUR - 30*MIN)
+		_ = importer.Run(bg, func(ctx context.Context, job *cronwatch.JobContext) error {
+			rows := float64(120 + i)
+			if i == 5 {
+				rows = 0
+			}
+			_ = job.Metric("rows", rows)
+			clock.Advance(800)
 			return nil
 		})
 	}

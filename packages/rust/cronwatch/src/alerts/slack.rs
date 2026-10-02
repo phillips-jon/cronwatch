@@ -38,6 +38,7 @@ fn emoji(t: &AlertType) -> &'static str {
         AlertType::Stuck => ":no_entry:",
         AlertType::Slow => ":turtle:",
         AlertType::OverBudget => ":moneybag:",
+        AlertType::UnderFloor => ":chart_with_downwards_trend:",
         AlertType::Recovered => ":white_check_mark:",
         AlertType::Other(_) => "",
     }

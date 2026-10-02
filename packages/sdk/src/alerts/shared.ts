@@ -13,7 +13,7 @@ export type Severity = "error" | "warning" | "info";
 
 export function severity(type: Alert["type"]): Severity {
   if (type === "recovered") return "info";
-  if (type === "slow" || type === "over_budget") return "warning";
+  if (type === "slow" || type === "over_budget" || type === "under_floor") return "warning";
   return "error";
 }
 

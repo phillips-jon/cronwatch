@@ -8,8 +8,8 @@ namespace Cronwatch;
  * An alert before it has a title and message. See Format::composeAlert().
  * `details` has the SDK's camelCase keys: missed {dueAt, deadline, graceMs,
  * lastRunAt}, failed and stuck {consecutiveFailures, threshold}, slow
- * {durationMs, thresholdMs, basis}, over_budget {breaches: [{metric, value,
- * limit, basis}]}, recovered {after, reason?, since?}.
+ * {durationMs, thresholdMs, basis}, over_budget and under_floor {breaches:
+ * [{metric, value, limit, basis}]}, recovered {after, reason?, since?}.
  *
  * @internal
  */

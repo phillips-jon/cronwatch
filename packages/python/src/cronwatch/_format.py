@@ -99,6 +99,15 @@ def compose_alert(draft: AlertDraft, definition: JobDefinition, now: int) -> Ale
             lines.append(f"{b['metric']}: {format_number(b['value'])}, limit {format_number(b['limit'])} ({b['basis']}).")
         if run:
             lines.append(f"Started {_when(run.started_at, now)}.")
+    elif draft.type == AlertType.UNDER_FLOOR:
+        title = f"{name} fell short"
+        for b in details["breaches"]:
+            if b["basis"] == "floor":
+                lines.append(f"{b['metric']}: {format_number(b['value'])}, below the floor of {format_number(b['limit'])}.")
+            else:
+                lines.append(f"{b['metric']}: {format_number(b['value'])} ({b['basis']}).")
+        if run:
+            lines.append(f"Started {_when(run.started_at, now)}.")
     elif draft.type == AlertType.RECOVERED:
         if details.get("reason") == "unscheduled":
             title = f"{name} is no longer scheduled"

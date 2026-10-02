@@ -3,10 +3,10 @@
 //! The same library as `@cronwatch/sdk`, the library behind
 //! [cronwatch.dev](https://cronwatch.dev): it
 //! records each run of a job in a store the app already has, judges it
-//! (failed, stuck, slow, over budget, missed its schedule), and sends one
-//! alert when a condition opens and one recovery when it closes. A Rust
-//! process shares a store with Node, Ruby, Python, PHP and Go processes byte
-//! for byte.
+//! (failed, stuck, slow, over budget, under floor, missed its schedule), and
+//! sends one alert when a condition opens and one recovery when it closes. A
+//! Rust process shares a store with Node, Ruby, Python, PHP and Go processes
+//! byte for byte.
 //!
 //! ```no_run
 //! use cronwatch::{Client, JobOptions};

@@ -83,8 +83,8 @@ module Cronwatch
     end
 
     # A stored state with every field present, or a fresh one. State written
-    # by an older version lacks the newer fields. `sending` is the exception:
-    # it is there only while it holds an alert (see hold_alerts).
+    # by an older version lacks the newer fields. `sending` and `under_floor`
+    # are the exceptions: each is there only while it holds something.
     #
     # Read leniently, since a foreign, hand-edited or damaged row must affect
     # only its own job, and the next write puts it right: a state that is not
@@ -92,13 +92,15 @@ module Cronwatch
     # number (anything but an object reads as {}); `silenced_until` and
     # `last_alert_at` that are not numbers read as nil; `pending_recovery`
     # keeps only its conditions (strings as stored), and `undelivered` only
-    # its entries that are objects (a list of neither shape reads as []).
-    # Unknown fields are kept as written.
+    # its entries that are objects (a list of neither shape reads as []),
+    # and `under_floor` only its strings (absent when none). Unknown fields
+    # are kept as written.
     def normalize_state(state, job)
       state = JobState.from_h(state)
       return empty_state(job) if state.nil?
 
       sending = state.sending
+      under_floor = state.under_floor.is_a?(Array) ? state.under_floor.grep(String) : []
       open = state.open.is_a?(Hash) ? state.open.select { |_, at| json_number?(at) } : {}
       pending = state.pending_recovery.is_a?(Array) ? state.pending_recovery.grep(Symbol) : []
       undelivered = state.undelivered.is_a?(Array) ? state.undelivered.grep(Alert) : []
@@ -112,6 +114,7 @@ module Cronwatch
         undelivered: undelivered,
         version: state.version,
         sending: sending.is_a?(Array) && !sending.empty? ? sending.dup : nil,
+        under_floor: under_floor.empty? ? nil : under_floor,
         # Fields a newer release wrote, carried through every write.
         extra: state.extra,
       )
@@ -283,6 +286,42 @@ module Cronwatch
       breaches
     end
 
+    # The metrics of a successful run that fell below their floor. A metric
+    # with a floor breaches when it reports less than that floor. One without
+    # breaches when it reports 0 or less and either it did so on the job's
+    # last successful run too (`previous`, the metrics under their floor
+    # then), or the earlier successful runs that reported it (at least five,
+    # the newest twenty) all reported more than 0. So a job that keeps writing
+    # nothing stays under its floor however long it goes on, and a metric that
+    # is always 0 never alerts.
+    def floor_breaches(definition, run, history, previous = [])
+      breaches = []
+      floor = definition.floor
+      metrics = run.metrics || {}
+      JS.object_keys(metrics).each do |metric|
+        value = metrics[metric]
+        limit = floor&.[](metric.to_s)
+        unless limit.nil?
+          breaches << { metric: metric.to_s, value: value, limit: limit, basis: "floor" } if value < limit
+          next
+        end
+        next if value.positive?
+
+        if previous.include?(metric.to_s)
+          breaches << { metric: metric.to_s, value: value, limit: 0, basis: "0 or less on the run before too" }
+          next
+        end
+        past = history.select { |r| r.status == :ok && (r.metrics || {})[metric].is_a?(Numeric) }
+                      .first(BASELINE_WINDOW).map { |r| r.metrics[metric] }
+        next if past.length < BASELINE_MIN_RUNS || !past.all?(&:positive?)
+
+        lowest = past.min
+        breaches << { metric: metric.to_s, value: value, limit: lowest,
+                      basis: "the last #{past.length} runs all reported more than 0, the lowest #{format_number(lowest)}" }
+      end
+      breaches
+    end
+
     # Whether `history` (newest first) holds a full baseline window of successful runs.
     def full_baseline?(history)
       history.count { |r| r.status == :ok } >= BASELINE_WINDOW
@@ -362,6 +401,15 @@ module Cronwatch
           alerts << AlertDraft.new(type: :over_budget, run: run, details: { breaches: breaches }) if open_condition(next_state, :over_budget, now)
         else
           close_condition(next_state, :over_budget)
+        end
+
+        short = floor_breaches(definition, run, history, next_state.under_floor || [])
+        if short.any?
+          next_state.under_floor = short.map { |b| b[:metric] }
+          alerts << AlertDraft.new(type: :under_floor, run: run, details: { breaches: short }) if open_condition(next_state, :under_floor, now)
+        else
+          next_state.under_floor = nil
+          close_condition(next_state, :under_floor)
         end
 
         pending = next_state.pending_recovery || []

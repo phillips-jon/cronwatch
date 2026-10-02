@@ -317,6 +317,45 @@
       }
     },
     {
+      "name": "under a floor",
+      "alert": {
+        "type": "under_floor",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {
+            "rows": 0
+          },
+          "trigger": "run"
+        },
+        "details": {
+          "breaches": [
+            {
+              "metric": "rows",
+              "value": 0,
+              "limit": 4812,
+              "basis": "the last 20 runs all reported more than 0, the lowest 4,812"
+            }
+          ]
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly fell short",
+        "message": "rows: 0 (the last 20 runs all reported more than 0, the lowest 4,812).\nStarted 2026-01-05 09:30:00 UTC (now).",
+        "at": 1767605400000
+      }
+    },
+    {
       "name": "slow",
       "alert": {
         "type": "slow",
@@ -622,6 +661,21 @@
       "options": {
         "webhookUrl": "https://hooks.slack.example/T/B/secret"
       },
+      "alert": "under a floor",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 425,
+        "sha256": "1152e429b25a010acc0f81d916e8669f16e5e5a9dbf96b90bbc534275e1d904f"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
       "alert": "slow",
       "url": "https://hooks.slack.example/T/B/secret",
       "headers": {
@@ -855,6 +909,22 @@
         "webhookUrl": "https://hooks.slack.example/T/B/secret",
         "link": true
       },
+      "alert": "under a floor",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 477,
+        "sha256": "1c3623f031af441b7b073a56fa5f954170da3cc2e5cddf851f90f533a23c60ea"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
       "alert": "slow",
       "url": "https://hooks.slack.example/T/B/secret",
       "headers": {
@@ -1071,6 +1141,20 @@
       "body": {
         "length": 1316,
         "sha256": "bc2471f98e14eb8c8558139f459b910897e61525230eecc59f07851c816dd848"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "alert": "under a floor",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"content\":\"nightly fell short\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly fell short\",\"description\":\"```\\nrows: 0 (the last 20 runs all reported more than 0, the lowest 4,812).\\nStarted 2026-01-05 09:30:00 UTC (now).\\n```\",\"color\":12024095,\"timestamp\":\"2026-01-05T09:30:00.000Z\"}]}"
       }
     },
     {
@@ -1309,6 +1393,21 @@
         "webhookUrl": "https://discord.example/api/webhooks/1/x",
         "link": true
       },
+      "alert": "under a floor",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"content\":\"nightly fell short\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly fell short\",\"url\":\"https://app.example/cronwatch/jobs/nightly\",\"description\":\"```\\nrows: 0 (the last 20 runs all reported more than 0, the lowest 4,812).\\nStarted 2026-01-05 09:30:00 UTC (now).\\n```\",\"color\":12024095,\"timestamp\":\"2026-01-05T09:30:00.000Z\"}]}"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
       "alert": "slow",
       "url": "https://discord.example/api/webhooks/1/x",
       "headers": {
@@ -1537,6 +1636,22 @@
       "body": {
         "length": 1782,
         "sha256": "89c3b8eacd1197c96919742364b1f45a8513b886d97d31f3430e441e93aa7578"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "alert": "under a floor",
+      "url": "https://hooks.example.com/cronwatch?key=secret",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch"
+      },
+      "body": {
+        "length": 608,
+        "sha256": "45d4bef6ed3a12d94420020347630bc73f6f44463dfa8ce517e730168e663294"
       }
     },
     {
@@ -1836,6 +1951,28 @@
       "body": {
         "length": 1782,
         "sha256": "89c3b8eacd1197c96919742364b1f45a8513b886d97d31f3430e441e93aa7578"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "alert": "under a floor",
+      "url": "https://hooks.example.com:8443/in",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch",
+        "authorization": "Bearer abc",
+        "x-cronwatch-signature": "sha256=49bad8b46a26c1d3c1e4917e801fa6e276fc7c757834483193fb4cd2aa6c7bb2"
+      },
+      "body": {
+        "length": 608,
+        "sha256": "45d4bef6ed3a12d94420020347630bc73f6f44463dfa8ce517e730168e663294"
       }
     },
     {
@@ -2192,6 +2329,12 @@
       "signature": "sha256=d365a63ed5c55ccb38c8b095da5c387b7e104410dc95ac30887593507c4d4a9b"
     },
     {
+      "alert": "under a floor",
+      "secret": "s3cret",
+      "body": "{\"schema\":1,\"type\":\"under_floor\",\"run\":{\"id\":\"r1\",\"job\":\"nightly\",\"status\":\"ok\",\"startedAt\":1767605400000,\"finishedAt\":1767605401500,\"durationMs\":1500,\"error\":null,\"output\":null,\"metrics\":{\"rows\":0},\"trigger\":\"run\"},\"details\":{\"breaches\":[{\"metric\":\"rows\",\"value\":0,\"limit\":4812,\"basis\":\"the last 20 runs all reported more than 0, the lowest 4,812\"}]},\"job\":\"nightly\",\"definition\":{\"name\":\"nightly\",\"schedule\":\"0 2 * * *\",\"grace\":\"15m\"},\"title\":\"nightly fell short\",\"message\":\"rows: 0 (the last 20 runs all reported more than 0, the lowest 4,812).\\nStarted 2026-01-05 09:30:00 UTC (now).\",\"at\":1767605400000}",
+      "signature": "sha256=49bad8b46a26c1d3c1e4917e801fa6e276fc7c757834483193fb4cd2aa6c7bb2"
+    },
+    {
       "alert": "slow",
       "secret": "s3cret",
       "body": "{\"schema\":1,\"type\":\"slow\",\"run\":{\"id\":\"r1\",\"job\":\"nightly\",\"status\":\"ok\",\"startedAt\":1767605400000,\"finishedAt\":1767605401500,\"durationMs\":15000,\"error\":null,\"output\":null,\"metrics\":{},\"trigger\":\"run\"},\"details\":{\"durationMs\":15000,\"thresholdMs\":10000,\"basis\":\"maxDuration\"},\"job\":\"nightly\",\"definition\":{\"name\":\"nightly\",\"schedule\":\"0 2 * * *\",\"grace\":\"15m\"},\"title\":\"nightly was slow\",\"message\":\"Took 15s; the limit is 10s (maxDuration).\\nStarted 2026-01-05 09:30:00 UTC (now).\",\"at\":1767605400000}",
@@ -2499,6 +2642,34 @@
           "body": {
             "length": 3414,
             "sha256": "f085dd523806e27ea64527154212e388c7d8620c3e8773d2831ea0d45f12c591"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": "re_secret",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "ops@example.com",
+          "dev@example.com"
+        ],
+        "subjectPrefix": "[prod]",
+        "link": true
+      },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-8eac8d9a2cf70678a4d1aa1f72256cc8"
+          },
+          "body": {
+            "length": 910,
+            "sha256": "1acdeb5971b5e3a16ec5dd92f8e795e4a1d4d3cbff037ce3a530951a9a9f6e98"
           }
         }
       ]
@@ -2869,6 +3040,29 @@
           "body": {
             "length": 3226,
             "sha256": "42c61206f865c47954d5bafac79ecd3aa1a07ca2ca7c39cd3221ced4f7486270"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": "re_secret",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-8eac8d9a2cf70678a4d1aa1f72256cc8"
+          },
+          "body": {
+            "length": 722,
+            "sha256": "61271bd56bf9faca13077bf37fd298de32f379718be5c3ddd0aef9b225fc3206"
           }
         }
       ]
@@ -3269,6 +3463,33 @@
         ],
         "link": true
       },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.postmarkapp.com/email",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "x-postmark-server-token": "pm-secret"
+          },
+          "body": {
+            "length": 953,
+            "sha256": "5ffb603ed1297667fe282c9cad49bb7567ade49f40d261a829e4a84787dcbf5d"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "postmark",
+      "options": {
+        "serverToken": "pm-secret",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "ops@example.com",
+          "dev@example.com"
+        ],
+        "link": true
+      },
       "alert": "slow",
       "requests": [
         {
@@ -3639,6 +3860,31 @@
           "body": {
             "length": 3282,
             "sha256": "3688f08541bfb158a6e4ef9782bc8a5ffff14a84206224792d4a85a2d3f6175b"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "postmark",
+      "options": {
+        "serverToken": "pm-secret",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "messageStream": "alerts",
+        "subjectPrefix": "[prod]"
+      },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.postmarkapp.com/email",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "x-postmark-server-token": "pm-secret"
+          },
+          "body": {
+            "length": 778,
+            "sha256": "76c8f660a0a02abb401c5bcf3d96dbcb45fd75130dcbc2db541dc7fe62310546"
           }
         }
       ]
@@ -4039,6 +4285,32 @@
         ],
         "link": true
       },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.sendgrid.com/v3/mail/send",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer SG.secret"
+          },
+          "body": {
+            "length": 1060,
+            "sha256": "b2bae9a0374a8dc160376927d22cf575ec371b150914738ec73e4f9711b697ca"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sendgrid",
+      "options": {
+        "apiKey": "SG.secret",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "Ops <ops@example.com>",
+          "dev@example.com"
+        ],
+        "link": true
+      },
       "alert": "slow",
       "requests": [
         {
@@ -4384,6 +4656,29 @@
           "body": {
             "length": 3353,
             "sha256": "a0a6a7ea8aa0d8c4cc57e70bcfa5b9a76e94a27a0afd010c30fd9f33bdaee260"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sendgrid",
+      "options": {
+        "apiKey": "SG.secret",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "region": "eu"
+      },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.eu.sendgrid.com/v3/mail/send",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer SG.secret"
+          },
+          "body": {
+            "length": 849,
+            "sha256": "3dcba4bf87b88142bbd8ed66cff8de6c94181aea5a924c98422f0b52c45a8209"
           }
         }
       ]
@@ -4785,6 +5080,33 @@
         ],
         "link": true
       },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.mailgun.net/v3/mg.example.com/messages",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic YXBpOmtleS1zZWNyZXQ="
+          },
+          "body": {
+            "length": 1139,
+            "sha256": "c5645d052e2c9b557ef18cf7ca151f9a3f8df9c397e3f6282ba5f559a120b563"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "mailgun",
+      "options": {
+        "apiKey": "key-secret",
+        "domain": "mg.example.com",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "ops@example.com",
+          "dev@example.com"
+        ],
+        "link": true
+      },
       "alert": "slow",
       "requests": [
         {
@@ -5144,6 +5466,30 @@
           "body": {
             "length": 3475,
             "sha256": "c4e5e70e9e21dca755a3401a89751c6c8d341d5b7b9bb73868fba87a3a42951b"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "mailgun",
+      "options": {
+        "apiKey": "key-secret",
+        "domain": "mg.example.com",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "region": "eu"
+      },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.eu.mailgun.net/v3/mg.example.com/messages",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic YXBpOmtleS1zZWNyZXQ="
+          },
+          "body": {
+            "length": 892,
+            "sha256": "e274b3d145ece5b3574d49275f934c9fbedb7a570f1fe0e070b4ffd10570ab20"
           }
         }
       ]
@@ -5564,6 +5910,36 @@
           "body": {
             "length": 3609,
             "sha256": "e516e6ff57ec601e421374fe9766985774f7dafb36223ba2f20119a43bf9c64b"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": "AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "ops@example.com",
+          "dev@example.com"
+        ],
+        "now": 1767605400000,
+        "link": true
+      },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date, Signature=98da22150925920495528d3ea2f3d78cdb9142be59e68cd178eb8fdf139a2c0e"
+          },
+          "body": {
+            "length": 1105,
+            "sha256": "b0035c38b5ddc2f993aa2c5be8974d09afad2ce81f5171b82d072be986ef7b0e"
           }
         }
       ]
@@ -6004,6 +6380,35 @@
           "body": {
             "length": 3460,
             "sha256": "88685cad01992ebd80746e023e99d9b544099849258f957c717bbc29ff4afbd5"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "eu-west-1",
+        "accessKeyId": "AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+        "sessionToken": "session-token",
+        "configurationSetName": "alerts",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767609000000
+      },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://email.eu-west-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T103000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/eu-west-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=89b0124d38b5854dbb274e8004dbe2a1524679b15c1b8474d66eb302f300bc25"
+          },
+          "body": {
+            "length": 956,
+            "sha256": "35a43fdd36a5704cddef8c5f3042e775f2d5d0d8e23cf1d2721c3b43f5bb2586"
           }
         }
       ]
@@ -6529,6 +6934,42 @@
         ],
         "link": true
       },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&From=%2B15005550006&Body=nightly+fell+short%0Arows%3A+0+%28the+last+20+runs+all+reported+more+than+0%2C+the+lowest+4%2C812%29.%0AStarted+2026-01-05+09%3A30%3A00+UTC+%28now%29.%0Ahttps%3A%2F%2Fapp.example%2Fcronwatch%2Fjobs%2Fnightly"
+          }
+        },
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15552220000&From=%2B15005550006&Body=nightly+fell+short%0Arows%3A+0+%28the+last+20+runs+all+reported+more+than+0%2C+the+lowest+4%2C812%29.%0AStarted+2026-01-05+09%3A30%3A00+UTC+%28now%29.%0Ahttps%3A%2F%2Fapp.example%2Fcronwatch%2Fjobs%2Fnightly"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": "AC00000000000000000000000000000000",
+        "authToken": "tw-secret",
+        "from": "+15005550006",
+        "to": [
+          "+15551110000",
+          "+15552220000"
+        ],
+        "link": true
+      },
       "alert": "slow",
       "requests": [
         {
@@ -6917,6 +7358,31 @@
         "recovered": true,
         "segments": 1
       },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic U0swMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDpzay1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&MessagingServiceSid=MG00000000000000000000000000000000&Body=nightly+fell+short%0Arows%3A+0+%28the+last+20+runs+all+reported+more+than+0%2C+the+lowest+4%2C812%29.%0AStarted+2026-01-05+09%3A30%3A00+UTC+%28now%29."
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": "AC00000000000000000000000000000000",
+        "apiKeySid": "SK00000000000000000000000000000000",
+        "apiKeySecret": "sk-secret",
+        "messagingServiceSid": "MG00000000000000000000000000000000",
+        "to": "+15551110000",
+        "recovered": true,
+        "segments": 1
+      },
       "alert": "slow",
       "requests": [
         {
@@ -7237,6 +7703,27 @@
           "body": {
             "length": 2026,
             "sha256": "9f09f2a21f7d1bbee810e5d440e4217f08084ef38181cdc13aeb9c0bf0a72bd7"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": "https://pubkey@o1.ingest.sentry.io/42",
+        "link": true
+      },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 853,
+            "sha256": "00b9f37bffc12815aa37d74ccb7bbbfbaf27e0143eb883a56c70866477d3e510"
           }
         }
       ]
@@ -7584,6 +8071,29 @@
         "release": "app@1.2.3",
         "recovered": false
       },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://sentry.example.com/prefix/api/7/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 820,
+            "sha256": "9cb8ff0f0d1babf21cc2f3a77efc3dce40654b97fb273a93aa54945fc0e46054"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": "https://pubkey@sentry.example.com/prefix/7",
+        "environment": "staging",
+        "release": "app@1.2.3",
+        "recovered": false
+      },
       "alert": "slow",
       "requests": [
         {
@@ -7883,6 +8393,28 @@
           "body": {
             "length": 2019,
             "sha256": "ecd0398f32afe769b83135a1fa5616f8887e26a284e031bf4a90a7751cc39401"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "honeybadger",
+      "options": {
+        "apiKey": "hb-secret",
+        "link": true
+      },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.honeybadger.io/v1/notices",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "x-api-key": "hb-secret"
+          },
+          "body": {
+            "length": 847,
+            "sha256": "fd38d04d00b0f6789be62b5a1bde0efaeed6e66e9426e0743ced90e9772566b5"
           }
         }
       ]
@@ -8207,6 +8739,30 @@
           "body": {
             "length": 1965,
             "sha256": "b97d5e0e5ad74596757c2339634c0cc3e6e1e3b70f8e6e7801f3feaded7a9002"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "honeybadger",
+      "options": {
+        "apiKey": "hb-secret",
+        "environment": "staging",
+        "endpoint": "https://eu-api.honeybadger.io",
+        "recovered": true
+      },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://eu-api.honeybadger.io/v1/notices",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "x-api-key": "hb-secret"
+          },
+          "body": {
+            "length": 793,
+            "sha256": "76c811f704891dff743a04f7245fb3bf263cd521dd85baf2de146fdf391d91c3"
           }
         }
       ]
@@ -8546,6 +9102,27 @@
           "body": {
             "length": 1631,
             "sha256": "10eb7e0f8def25bf9f994009c9d6daf406acb1c076b0961fd2d474cce4698179"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "datadog",
+      "options": {
+        "apiKey": "dd-secret",
+        "link": true
+      },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.datadoghq.com/api/v1/events",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "dd-api-key": "dd-secret"
+          },
+          "body": {
+            "text": "{\"title\":\"nightly fell short\",\"text\":\"nightly fell short\\n\\nrows: 0 (the last 20 runs all reported more than 0, the lowest 4,812).\\nStarted 2026-01-05 09:30:00 UTC (now).\\n\\nOpen: https://app.example/cronwatch/jobs/nightly\",\"alert_type\":\"warning\",\"aggregation_key\":\"cronwatch:nightly:under_floor\",\"date_happened\":1767605400,\"priority\":\"normal\",\"tags\":[\"cronwatch\",\"job:nightly\",\"alert:under_floor\"]}"
           }
         }
       ]
@@ -8926,6 +9503,31 @@
         ],
         "host": "worker-1"
       },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.datadoghq.eu/api/v1/events",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "dd-api-key": "dd-secret"
+          },
+          "body": {
+            "text": "{\"title\":\"nightly fell short\",\"text\":\"nightly fell short\\n\\nrows: 0 (the last 20 runs all reported more than 0, the lowest 4,812).\\nStarted 2026-01-05 09:30:00 UTC (now).\",\"alert_type\":\"warning\",\"aggregation_key\":\"cronwatch:nightly:under_floor\",\"date_happened\":1767605400,\"priority\":\"normal\",\"tags\":[\"cronwatch\",\"job:nightly\",\"alert:under_floor\",\"env:prod\"],\"host\":\"worker-1\"}"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "datadog",
+      "options": {
+        "apiKey": "dd-secret",
+        "site": "datadoghq.eu",
+        "tags": [
+          "env:prod"
+        ],
+        "host": "worker-1"
+      },
       "alert": "slow",
       "requests": [
         {
@@ -9249,6 +9851,27 @@
           "body": {
             "length": 1885,
             "sha256": "a918458bb724877e1fad4874459f12cc1ddc04ae1cace21e9ec97d1888337aa7"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "rollbar",
+      "options": {
+        "accessToken": "rb-secret",
+        "link": true
+      },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.rollbar.com/api/1/item/",
+          "headers": {
+            "content-type": "application/json",
+            "x-rollbar-access-token": "rb-secret"
+          },
+          "body": {
+            "length": 713,
+            "sha256": "63083a69d5dcdcdcc7d686dc5162f4b4215cac2dfa62fa09ad57d4acaa3bd506"
           }
         }
       ]
@@ -9585,6 +10208,28 @@
         "environment": "staging",
         "recovered": false
       },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.rollbar.com/api/1/item/",
+          "headers": {
+            "content-type": "application/json",
+            "x-rollbar-access-token": "rb-secret"
+          },
+          "body": {
+            "length": 658,
+            "sha256": "9e9296ba88006c93e88621e898c3045620fd14aa9f42dd440d578aec6122e39c"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "rollbar",
+      "options": {
+        "accessToken": "rb-secret",
+        "environment": "staging",
+        "recovered": false
+      },
       "alert": "slow",
       "requests": [
         {
@@ -9900,6 +10545,30 @@
           "body": {
             "length": 2126,
             "sha256": "38c736afbf73a7f70b666946d385db53520f1fbc3571aaebb6654a495e234e9f"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "bs-secret",
+        "now": 1767605400000,
+        "link": true
+      },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 954,
+            "sha256": "4245018ef6f24a57025b8ade107e4c14e56e7abf97f0af643b0473a8fbe6c339"
           }
         }
       ]
@@ -10265,6 +10934,32 @@
         "recovered": true,
         "now": 1767605400000
       },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.example.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 899,
+            "sha256": "b4c5a545060d313215a085c3f8412b044122611ca7dd1af4479bb85840a5f3e1"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "bs-secret",
+        "releaseStage": "staging",
+        "endpoint": "https://notify.bugsnag.example.com/",
+        "recovered": true,
+        "now": 1767605400000
+      },
       "alert": "slow",
       "requests": [
         {
@@ -10611,6 +11306,27 @@
         "apiKey": "nr-secret",
         "link": true
       },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://insights-collector.newrelic.com/v1/accounts/12345/events",
+          "headers": {
+            "content-type": "application/json",
+            "api-key": "nr-secret"
+          },
+          "body": {
+            "text": "[{\"eventType\":\"CronWatchAlert\",\"timestamp\":1767605400000,\"job\":\"nightly\",\"alertType\":\"under_floor\",\"severity\":\"warning\",\"title\":\"nightly fell short\",\"message\":\"rows: 0 (the last 20 runs all reported more than 0, the lowest 4,812).\\nStarted 2026-01-05 09:30:00 UTC (now).\",\"link\":\"https://app.example/cronwatch/jobs/nightly\",\"runId\":\"r1\",\"runStatus\":\"ok\",\"durationMs\":1500}]"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "newrelic",
+      "options": {
+        "accountId": "12345",
+        "apiKey": "nr-secret",
+        "link": true
+      },
       "alert": "slow",
       "requests": [
         {
@@ -10932,6 +11648,28 @@
           "body": {
             "length": 1545,
             "sha256": "27d67e7d50bc262f5e24fa8f1e248595a0caad81c824c8c38bc3f9045f811dc8"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "newrelic",
+      "options": {
+        "accountId": 12345,
+        "apiKey": "nr-secret",
+        "region": "eu",
+        "eventType": "CronJobAlert"
+      },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://insights-collector.eu01.nr-data.net/v1/accounts/12345/events",
+          "headers": {
+            "content-type": "application/json",
+            "api-key": "nr-secret"
+          },
+          "body": {
+            "text": "[{\"eventType\":\"CronJobAlert\",\"timestamp\":1767605400000,\"job\":\"nightly\",\"alertType\":\"under_floor\",\"severity\":\"warning\",\"title\":\"nightly fell short\",\"message\":\"rows: 0 (the last 20 runs all reported more than 0, the lowest 4,812).\\nStarted 2026-01-05 09:30:00 UTC (now).\",\"runId\":\"r1\",\"runStatus\":\"ok\",\"durationMs\":1500}]"
           }
         }
       ]
@@ -11273,6 +12011,29 @@
           "body": {
             "length": 3226,
             "sha256": "42c61206f865c47954d5bafac79ecd3aa1a07ca2ca7c39cd3221ced4f7486270"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-8eac8d9a2cf70678a4d1aa1f72256cc8"
+          },
+          "body": {
+            "length": 722,
+            "sha256": "61271bd56bf9faca13077bf37fd298de32f379718be5c3ddd0aef9b225fc3206"
           }
         }
       ]
@@ -11683,6 +12444,34 @@
         "to": "ops@example.com",
         "now": 1767605400000
       },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=7a73f5620e02dbd98cac1ae29dc26fa8bd91d6940f51737b48233fd288c39040"
+          },
+          "body": {
+            "length": 924,
+            "sha256": "0784a2b18076994df320674897d00eca206b349b43d00e7b81c3e4c01fa6f5a9"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
       "alert": "slow",
       "requests": [
         {
@@ -12042,6 +12831,28 @@
         "from": "+15005550006",
         "to": "+15551110000"
       },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&From=%2B15005550006&Body=nightly+fell+short%0Arows%3A+0+%28the+last+20+runs+all+reported+more+than+0%2C+the+lowest+4%2C812%29.%0AStarted+2026-01-05+09%3A30%3A00+UTC+%28now%29."
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
       "alert": "slow",
       "requests": [
         {
@@ -12358,6 +13169,29 @@
         "apiKey": "\tbs-secret ",
         "now": 1767605400000
       },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 902,
+            "sha256": "ebc80070715353d8f06f1f935f554dea46de9562f157ec1ec9b28b8f51a4d8e2"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
       "alert": "slow",
       "requests": [
         {
@@ -12635,6 +13469,26 @@
           "body": {
             "length": 1974,
             "sha256": "6117663edb5ca0294102bcda8d51428eaf3d77da655f6b3f059dac44dddbd54f"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "alert": "under a floor",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 801,
+            "sha256": "9dcb08d0c5b1385ca965bac4393b74195598dace931f17ccffdf2b93048e3d20"
           }
         }
       ]

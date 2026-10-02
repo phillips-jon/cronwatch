@@ -1,9 +1,9 @@
 // Package cronwatch is cron and scheduled-job monitoring that lives inside
 // a Go app: wrap a job once, and every run is recorded in a database the app
 // already has, and alerts go out when a run is missed, fails, gets stuck,
-// runs slow or goes over budget. It is the Go port of @cronwatch/sdk, with
-// the same rules, alert text and stored rows, so a Go process can share a
-// database with the SDK and its other ports.
+// runs slow, goes over budget or quietly does nothing. It is the Go port of
+// @cronwatch/sdk, with the same rules, alert text and stored rows, so a Go
+// process can share a database with the SDK and its other ports.
 //
 // A client is made once, jobs are declared on it, and each run of a job is
 // its function called through Run:

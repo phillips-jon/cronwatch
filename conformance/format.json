@@ -824,6 +824,142 @@
     },
     {
       "draft": {
+        "type": "under_floor",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "breaches": [
+            {
+              "metric": "files",
+              "value": 0,
+              "limit": 1,
+              "basis": "floor"
+            },
+            {
+              "metric": "rows",
+              "value": 0,
+              "limit": 4812,
+              "basis": "the last 20 runs all reported more than 0, the lowest 4,812"
+            }
+          ]
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "under_floor",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "breaches": [
+            {
+              "metric": "files",
+              "value": 0,
+              "limit": 1,
+              "basis": "floor"
+            },
+            {
+              "metric": "rows",
+              "value": 0,
+              "limit": 4812,
+              "basis": "the last 20 runs all reported more than 0, the lowest 4,812"
+            }
+          ]
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly fell short",
+        "message": "files: 0, below the floor of 1.\nrows: 0 (the last 20 runs all reported more than 0, the lowest 4,812).\nStarted 2026-01-05 09:30:00 UTC (now).",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "under_floor",
+        "run": null,
+        "details": {
+          "breaches": [
+            {
+              "metric": "rows",
+              "value": -0.5,
+              "limit": 0,
+              "basis": "0 or less on the run before too"
+            },
+            {
+              "metric": "neg",
+              "value": -1234.5,
+              "limit": -1000,
+              "basis": "floor"
+            }
+          ]
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "under_floor",
+        "run": null,
+        "details": {
+          "breaches": [
+            {
+              "metric": "rows",
+              "value": -0.5,
+              "limit": 0,
+              "basis": "0 or less on the run before too"
+            },
+            {
+              "metric": "neg",
+              "value": -1234.5,
+              "limit": -1000,
+              "basis": "floor"
+            }
+          ]
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly fell short",
+        "message": "rows: -0.5 (0 or less on the run before too).\nneg: -1,234.5, below the floor of -1,000.",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
         "type": "recovered",
         "run": {
           "id": "r1",
@@ -880,6 +1016,65 @@
         },
         "title": "nightly recovered",
         "message": "A run 2026-01-05 09:30:00 UTC (2m ago) succeeded after: missed, over budget, failed.\nRan 2s.",
+        "at": 1767605520000
+      }
+    },
+    {
+      "draft": {
+        "type": "recovered",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "after": [
+            "under_floor",
+            "slow"
+          ]
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605520000,
+      "alert": {
+        "type": "recovered",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "after": [
+            "under_floor",
+            "slow"
+          ]
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly recovered",
+        "message": "A run 2026-01-05 09:30:00 UTC (2m ago) succeeded after: under floor, slow.\nRan 2s.",
         "at": 1767605520000
       }
     },

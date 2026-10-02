@@ -84,6 +84,7 @@ defmodule Cronwatch.Web.GoldenTest do
           grace: "15m",
           max_duration: "10m",
           budget: [cost: 2],
+          floor: [rows: 40],
           expect: "Report written",
           failures_before_alert: 2,
           description: "Builds the <b>PDF</b>",
@@ -105,6 +106,19 @@ defmodule Cronwatch.Web.GoldenTest do
         :ok
       end)
     end)
+
+    # Five runs that wrote rows, then one that wrote none: under its floor.
+    importer = Cronwatch.job!("import", [schedule: "0 * * * *"] ++ inst)
+
+    for i <- 0..5 do
+      Clock.set(clock, @t0 - (6 - i) * @hour - 30 * @min)
+
+      Cronwatch.run(importer, fn job ->
+        Cronwatch.metric(job, "rows", if(i == 5, do: 0, else: 120 + i))
+        Clock.advance(clock, 800)
+        :ok
+      end)
+    end
 
     broken = Cronwatch.job!("broken", [expect: "done"] ++ inst)
     Clock.set(clock, @t0 - 2 * @hour)

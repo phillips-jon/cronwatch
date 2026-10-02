@@ -245,6 +245,38 @@ final class ClientTest extends TestCase
         $this->assertSame(['slow', 'over_budget', 'recovered'], $this->capture->types());
     }
 
+    public function testAnUnderFloorAlertNamesTheMetricAndWhatItWasJudgedAgainst(): void
+    {
+        $cw = $this->make();
+        $job = $cw->job('import', ['floor' => ['files' => 1]]);
+        for ($i = 0; $i < 5; $i++) {
+            $job->run(function (JobContext $j) use ($i) {
+                $this->clock->advance(1000);
+                $j->metrics(['rows' => 4812 + $i, 'files' => 2]);
+            });
+            $this->clock->advance(self::HOUR);
+        }
+        $empty = function (JobContext $j) {
+            $this->clock->advance(1000);
+            $j->metrics(['rows' => 0, 'files' => 0]);
+        };
+        $job->run($empty);
+        $this->assertSame(['under_floor'], $this->capture->types());
+        $alert = $this->capture->alerts[0];
+        $this->assertSame('import fell short', $alert->title);
+        $this->assertStringContainsString('rows: 0 (the last 5 runs all reported more than 0, the lowest 4,812)', $alert->message);
+        $this->assertStringContainsString('files: 0, below the floor of 1.', $alert->message);
+        $this->clock->advance(self::HOUR);
+        $job->run($empty);
+        $this->assertSame(['under_floor'], $this->capture->types());
+        $this->clock->advance(self::HOUR);
+        $job->run(function (JobContext $j) {
+            $this->clock->advance(1000);
+            $j->metrics(['rows' => 10, 'files' => 1]);
+        });
+        $this->assertSame(['under_floor', 'recovered'], $this->capture->types());
+    }
+
     public function testSilenceSwallowsAlertsAndNothingOpensUnderneathUnsilenceAlertsAgain(): void
     {
         $cw = $this->make();

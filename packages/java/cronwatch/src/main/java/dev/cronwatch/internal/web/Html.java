@@ -121,7 +121,10 @@ public final class Html {
     return Text.replaceFirst(c.value(), "_", " ");
   }
 
-  /** The job's health, with any open condition it does not already say (over budget, slow). */
+  /**
+   * The job's health, with any open condition it does not already say (over budget, under floor,
+   * slow).
+   */
   private static String healthState(JobSummary job) {
     String[] hl = healthLabel(job.health());
     StringBuilder extras = new StringBuilder();
@@ -592,6 +595,8 @@ public final class Html {
             + "\n  "
             + budgetRow(d)
             + "\n  "
+            + floorRow(d)
+            + "\n  "
             + definitionRow(d, "expect", "Expect")
             + "\n  "
             + alertAfterRow(d)
@@ -650,6 +655,20 @@ public final class Html {
       }
     }
     return "<dt>Budget</dt><dd>" + escapeHtml(String.join(", ", parts)) + "</dd>";
+  }
+
+  private static String floorRow(Definition d) {
+    Object v = truthyField(d, "floor");
+    if (v == null) {
+      return "";
+    }
+    List<String> parts = new ArrayList<>();
+    if (v instanceof JsObject o) {
+      for (Map.Entry<String, @Nullable Object> e : o.entries()) {
+        parts.add(e.getKey() + " ≥ " + Format.jsText(e.getValue()));
+      }
+    }
+    return "<dt>Floor</dt><dd>" + escapeHtml(String.join(", ", parts)) + "</dd>";
   }
 
   private static String alertAfterRow(Definition d) {

@@ -31,6 +31,7 @@ var slackEmoji = map[cronwatch.AlertType]string{
 	cronwatch.AlertStuck:      ":no_entry:",
 	cronwatch.AlertSlow:       ":turtle:",
 	cronwatch.AlertOverBudget: ":moneybag:",
+	cronwatch.AlertUnderFloor: ":chart_with_downwards_trend:",
 	cronwatch.AlertRecovered:  ":white_check_mark:",
 }
 

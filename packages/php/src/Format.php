@@ -115,6 +115,17 @@ final class Format
                     $lines[] = 'Started ' . self::when($run->startedAt, $now) . '.';
                 }
                 break;
+            case AlertType::UNDER_FLOOR:
+                $title = "{$name} fell short";
+                foreach ($d['breaches'] ?? [] as $b) {
+                    $lines[] = $b['basis'] === 'floor'
+                        ? "{$b['metric']}: " . Evaluate::formatNumber($b['value']) . ', below the floor of ' . Evaluate::formatNumber($b['limit']) . '.'
+                        : "{$b['metric']}: " . Evaluate::formatNumber($b['value']) . " ({$b['basis']}).";
+                }
+                if ($run !== null) {
+                    $lines[] = 'Started ' . self::when($run->startedAt, $now) . '.';
+                }
+                break;
             case AlertType::RECOVERED:
                 if (($d['reason'] ?? null) === 'unscheduled') {
                     $title = "{$name} is no longer scheduled";

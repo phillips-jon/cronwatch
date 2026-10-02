@@ -24,6 +24,7 @@ const CLASS: Record<Alert["type"], string> = {
   stuck: "CronWatch::Stuck",
   slow: "CronWatch::Slow",
   over_budget: "CronWatch::OverBudget",
+  under_floor: "CronWatch::UnderFloor",
   recovered: "CronWatch::Recovered",
 };
 

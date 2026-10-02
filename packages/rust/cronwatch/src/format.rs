@@ -256,6 +256,19 @@ pub(crate) fn compose_alert(draft: AlertDraft, def: &Definition, now: i64) -> Al
             }
             format!("{name} went over budget")
         }
+        (AlertType::UnderFloor, AlertDetails::UnderFloor { breaches }) => {
+            for b in breaches {
+                lines.push(if b.basis == "floor" {
+                    format!("{}: {}, below the floor of {}.", b.metric, format_number(b.value), format_number(b.limit))
+                } else {
+                    format!("{}: {} ({}).", b.metric, format_number(b.value), b.basis)
+                });
+            }
+            if let Some(run) = run {
+                lines.push(format!("Started {}.", when_int(run.started_at, now)));
+            }
+            format!("{name} fell short")
+        }
         (AlertType::Recovered, AlertDetails::Recovered { reason, since, .. })
             if reason.as_deref() == Some("unscheduled") =>
         {

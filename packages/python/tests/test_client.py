@@ -3,10 +3,14 @@ fetch-style handler() tests belong to the web phase."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
 
 import cronwatch
+from cronwatch import _evaluate
 from cronwatch._js import date_utc
+from cronwatch.types import JobDefinition, Run
 
 from helpers import HOUR, MIN, T0, Errors, boom, make
 
@@ -219,6 +223,90 @@ def test_slow_and_over_budget_alerts_come_from_the_jobs_own_baseline() -> None:
     c.advance(HOUR)
     job.run(usual)
     assert alerts.types() == ["slow", "over_budget", "recovered"]
+
+
+def test_an_under_floor_alert_names_the_metric_and_what_it_was_judged_against() -> None:
+    cw, c, alerts = make()
+    job = cw.job("import", floor={"files": 1})
+
+    def reporting(rows: int, files: int) -> Callable[[cronwatch.JobContext], None]:
+        def work(ctx: cronwatch.JobContext) -> None:
+            c.advance(1000)
+            ctx.metrics(rows=rows, files=files)
+
+        return work
+
+    for i in range(5):
+        job.run(reporting(4812 + i, 2))
+        c.advance(HOUR)
+    job.run(reporting(0, 0))
+    assert alerts.types() == ["under_floor"]
+    alert = alerts.alerts[0]
+    assert alert.title == "import fell short"
+    assert "rows: 0 (the last 5 runs all reported more than 0, the lowest 4,812)" in alert.message
+    assert "files: 0, below the floor of 1." in alert.message
+    c.advance(HOUR)
+    job.run(reporting(0, 0))
+    assert alerts.types() == ["under_floor"]
+    c.advance(HOUR)
+    job.run(reporting(10, 1))
+    assert alerts.types() == ["under_floor", "recovered"]
+
+
+def test_a_floor_must_be_a_finite_number_and_no_higher_than_its_ceiling() -> None:
+    cw, _, _ = make()
+    with pytest.raises(ValueError, match=r"floor\.rows must be a finite number \(got NaN\)"):
+        cw.job("a", floor={"rows": float("nan")})
+    with pytest.raises(ValueError, match=r"floor must be an object"):
+        cw.job("a", floor=[1])
+    with pytest.raises(ValueError, match=r"floor\.cost \(3\) is above budget\.cost \(2\), so every run would alert"):
+        cw.job("b", floor={"cost": 3}, budget={"cost": 2})
+    cw.job("c", floor={"delta": -5}, budget={"delta": 5})
+
+
+def _ok(at: int, metrics: dict[str, float]) -> Run:
+    return Run(id=f"r{at}", job="j", status="ok", started_at=at, finished_at=at + 1000, duration_ms=1000, metrics=metrics)
+
+
+def test_floors_a_floor_or_0_after_five_runs_that_all_reported_more() -> None:
+    def finish(definition: JobDefinition, run: Run, state: cronwatch.JobState, history: list[Run], now: int) -> _evaluate.Evaluation:
+        return _evaluate.on_run_finish(definition, run, state, history, now)
+
+    floored = JobDefinition({"name": "j", "floor": {"rows": 10}})
+    short = finish(floored, _ok(T0, {"rows": 9}), _evaluate.empty_state("j"), [], T0 + 1000)
+    assert [a.type for a in short.alerts] == ["under_floor"]
+    assert short.alerts[0].details["breaches"] == [{"metric": "rows", "value": 9, "limit": 10, "basis": "floor"}]
+    back = finish(floored, _ok(T0 + HOUR, {"rows": 10}), short.state, [], T0 + HOUR + 1000)
+    assert [a.type for a in back.alerts] == ["recovered"]
+    assert back.state.under_floor is None
+
+    bare = JobDefinition({"name": "j"})
+    history = [_ok(T0 - i * HOUR, {"rows": 100 * i, "errors": 0}) for i in range(1, 6)]
+    assert finish(bare, _ok(T0, {"rows": 0}), _evaluate.empty_state("j"), history[1:], T0).alerts == [], "four runs are not a baseline"
+    assert finish(bare, _ok(T0, {"rows": 1, "errors": 0}), _evaluate.empty_state("j"), history, T0).alerts == [], "an always-0 metric never alerts"
+    zero = finish(bare, _ok(T0, {"rows": 0, "errors": 0}), _evaluate.empty_state("j"), history, T0)
+    assert zero.alerts[0].details["breaches"] == [
+        {"metric": "rows", "value": 0, "limit": 100, "basis": "the last 5 runs all reported more than 0, the lowest 100"}
+    ]
+    assert zero.state.under_floor == ["rows"]
+
+    # A job that keeps writing nothing stays open, past the point where its zeros are all the history there is.
+    state = zero.state
+    runs = list(history)
+    for i in range(1, 31):
+        runs.insert(0, _ok(T0 + (i - 1) * HOUR, {"rows": 0, "errors": 0}))
+        following = finish(bare, _ok(T0 + i * HOUR, {"rows": 0, "errors": 0}), state, runs[:25], T0 + i * HOUR)
+        assert following.alerts == []
+        assert following.state.open["under_floor"] == T0
+        state = following.state
+    recovered = finish(bare, _ok(T0 + 31 * HOUR, {"rows": 5, "errors": 0}), state, runs[:25], T0 + 31 * HOUR)
+    assert [a.type for a in recovered.alerts] == ["recovered"]
+    assert recovered.alerts[0].details["after"] == ["under_floor"]
+
+    # A metric that has reported 0 before is judged as usual for it, and a floor of 0 turns the check off.
+    mixed = [*history[:4], _ok(T0 - 6 * HOUR, {"rows": 0})]
+    assert finish(bare, _ok(T0, {"rows": 0}), _evaluate.empty_state("j"), mixed, T0).alerts == []
+    assert finish(JobDefinition({"name": "j", "floor": {"rows": 0}}), _ok(T0, {"rows": 0}), _evaluate.empty_state("j"), history, T0).alerts == []
 
 
 def test_silence_swallows_alerts_and_nothing_opens_underneath_unsilence_alerts_again() -> None:

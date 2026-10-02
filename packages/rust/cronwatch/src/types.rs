@@ -73,6 +73,7 @@ string_enum!(
         Stuck = "stuck",
         Slow = "slow",
         OverBudget = "over_budget",
+        UnderFloor = "under_floor",
     }
 );
 
@@ -84,6 +85,7 @@ string_enum!(
         Stuck = "stuck",
         Slow = "slow",
         OverBudget = "over_budget",
+        UnderFloor = "under_floor",
         Recovered = "recovered",
     }
 );
@@ -588,6 +590,10 @@ pub struct JobState {
     /// next check. `None` when empty, and in state written before the field
     /// existed: it is never written as `[]`.
     pub sending: Option<Vec<SendingAlert>>,
+    /// The metrics under their floor at the job's last successful run.
+    /// `None` when none, and in state written before the field existed: it
+    /// is never written as `[]`.
+    pub under_floor: Option<Vec<String>>,
     /// Goes up by one on every write (see `Store::compare_and_set_state`).
     /// `None` is a state written before versions, which counts as 0.
     pub version: Option<i64>,
@@ -597,8 +603,17 @@ pub struct JobState {
     pub(crate) tail: Vec<(String, Value)>,
 }
 
-const STATE_KEYS: [&str; 8] =
-    ["job", "open", "consecutiveFailures", "silencedUntil", "lastAlertAt", "pendingRecovery", "undelivered", "sending"];
+const STATE_KEYS: [&str; 9] = [
+    "job",
+    "open",
+    "consecutiveFailures",
+    "silencedUntil",
+    "lastAlertAt",
+    "pendingRecovery",
+    "undelivered",
+    "sending",
+    "underFloor",
+];
 
 /// An alert in [`JobState::sending`]. Read leniently, as the SDK's
 /// `releaseSending` treats an entry: one with no numeric `until` has run out,
@@ -745,6 +760,9 @@ impl JobState {
         if let Some(list) = self.sending.as_ref().filter(|l| !l.is_empty()) {
             o.set("sending", list.iter().map(SendingAlert::to_value).collect::<Vec<_>>());
         }
+        if let Some(list) = self.under_floor.as_ref().filter(|l| !l.is_empty()) {
+            o.set("underFloor", list.iter().map(|m| Value::from(m.as_str())).collect::<Vec<_>>());
+        }
         Value::Object(o)
     }
 
@@ -811,6 +829,11 @@ impl JobState {
                 s.sending = Some(list.iter().map(SendingAlert::from_value).collect());
             }
         }
+        if let Some(Value::Array(list)) = o.get("underFloor") {
+            // Only its strings, and absent when it has none.
+            let metrics: Vec<String> = list.iter().filter_map(|m| m.as_str().map(str::to_string)).collect();
+            s.under_floor = (!metrics.is_empty()).then_some(metrics);
+        }
         for (k, v) in o.iter() {
             if STATE_KEYS.contains(&k) {
                 continue;
@@ -830,14 +853,14 @@ impl JobState {
     }
 }
 
-/// One metric over its ceiling or its baseline.
+/// One metric over its ceiling or its baseline, or under its floor.
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct BudgetBreach {
     pub metric: String,
     pub value: f64,
     pub limit: f64,
-    /// `budget`, or how the baseline was worked out.
+    /// `budget` or `floor`, or how the baseline was worked out.
     pub basis: String,
 }
 
@@ -879,6 +902,11 @@ pub enum AlertDetails {
     /// The metrics over their limits.
     #[non_exhaustive]
     OverBudget { breaches: Vec<BudgetBreach> },
+    /// The metrics under their floors. `limit` is the floor, or for a
+    /// metric without one the lowest of the earlier runs it was judged
+    /// against.
+    #[non_exhaustive]
+    UnderFloor { breaches: Vec<BudgetBreach> },
     /// The conditions that closed. Reason `unscheduled` closes missed alone
     /// because the job no longer has a schedule; `since` is when missed
     /// opened.
@@ -907,6 +935,11 @@ impl AlertDetails {
         AlertDetails::OverBudget { breaches }
     }
 
+    /// [`AlertDetails::UnderFloor`].
+    pub fn under_floor(breaches: Vec<BudgetBreach>) -> AlertDetails {
+        AlertDetails::UnderFloor { breaches }
+    }
+
     /// [`AlertDetails::Recovered`].
     pub fn recovered(after: Vec<Condition>, reason: Option<String>, since: Option<i64>) -> AlertDetails {
         AlertDetails::Recovered { after, reason, since }
@@ -926,7 +959,7 @@ impl AlertDetails {
                 .with("durationMs", *duration_ms)
                 .with("thresholdMs", *threshold_ms)
                 .with("basis", basis.as_str()),
-            AlertDetails::OverBudget { breaches } => {
+            AlertDetails::OverBudget { breaches } | AlertDetails::UnderFloor { breaches } => {
                 Object::new().with("breaches", breaches.iter().map(BudgetBreach::to_value).collect::<Vec<_>>())
             }
             AlertDetails::Recovered { after, reason, since } => {
@@ -957,7 +990,7 @@ impl AlertDetails {
                 threshold_ms: float_of(o, "thresholdMs"),
                 basis: str_of(o, "basis"),
             },
-            AlertType::OverBudget => {
+            AlertType::OverBudget | AlertType::UnderFloor => {
                 let empty = Object::new();
                 let breaches = match o.get("breaches") {
                     Some(Value::Array(list)) => list
@@ -974,7 +1007,11 @@ impl AlertDetails {
                         .collect(),
                     _ => Vec::new(),
                 };
-                AlertDetails::OverBudget { breaches }
+                if *t == AlertType::UnderFloor {
+                    AlertDetails::UnderFloor { breaches }
+                } else {
+                    AlertDetails::OverBudget { breaches }
+                }
             }
             AlertType::Recovered => AlertDetails::Recovered {
                 after: match o.get("after") {
@@ -1051,7 +1088,7 @@ fn detail_keys(t: &AlertType) -> Option<&'static [&'static str]> {
         AlertType::Missed => Some(&["dueAt", "deadline", "graceMs", "lastRunAt"]),
         AlertType::Failed | AlertType::Stuck => Some(&["consecutiveFailures", "threshold"]),
         AlertType::Slow => Some(&["durationMs", "thresholdMs", "basis"]),
-        AlertType::OverBudget => Some(&["breaches"]),
+        AlertType::OverBudget | AlertType::UnderFloor => Some(&["breaches"]),
         AlertType::Recovered => Some(&["after", "reason", "since"]),
         AlertType::Other(_) => None,
     }

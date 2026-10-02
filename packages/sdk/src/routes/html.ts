@@ -231,7 +231,7 @@ const HEALTH: Record<JobSummary["health"], [string, string]> = {
   never_ran: ["muted", "never ran"],
 };
 
-/** The job's health, with any open condition it does not already say (over budget, slow) after it. */
+/** The job's health, with any open condition it does not already say (over budget, under floor, slow) after it. */
 function healthState(job: JobSummary): string {
   const [cls, label] = HEALTH[job.health];
   const extras = job.open.filter((c) => !["missed", "failed", "stuck"].includes(c)).map((c) => `<span class="state warn">${h(c.replace("_", " "))}</span>`).join("");
@@ -415,6 +415,7 @@ export function jobPage(job: JobSummary, runs: Run[], now: number, base: string,
   <dt>Timeout</dt><dd>${h(d.timeout ?? "1h")}</dd>
   ${d.maxDuration ? `<dt>Max duration</dt><dd>${h(d.maxDuration)}</dd>` : ""}
   ${d.budget ? `<dt>Budget</dt><dd>${h(Object.entries(d.budget).map(([k, v]) => `${k} ≤ ${v}`).join(", "))}</dd>` : ""}
+  ${d.floor ? `<dt>Floor</dt><dd>${h(Object.entries(d.floor).map(([k, v]) => `${k} ≥ ${v}`).join(", "))}</dd>` : ""}
   ${d.expect ? `<dt>Expect</dt><dd>${h(d.expect)}</dd>` : ""}
   ${d.failuresBeforeAlert && d.failuresBeforeAlert > 1 ? `<dt>Alert after</dt><dd>${h(d.failuresBeforeAlert)} consecutive failures</dd>` : ""}
   ${d.tags?.length ? `<dt>Tags</dt><dd>${d.tags.map((t) => h(t)).join(", ")}</dd>` : ""}

@@ -1,6 +1,6 @@
 ---
 title: What it catches
-description: The conditions CronWatch reports, how each is decided, baselines, expect rules, budgets and silence.
+description: The conditions CronWatch reports, how each is decided, baselines, expect rules, budgets, floors and silence.
 order: 5
 group: Reference
 ---
@@ -47,6 +47,27 @@ A metric reported with `job.metric(name, value)` went above its limit. The limit
 
 All breaching metrics are listed in one alert. Closes when a run's metrics are all within limits again.
 
+## under_floor
+
+A successful run reported a metric below its floor: the job ran cleanly but did less than it should, or nothing at all. A permission that changed, a source that came back empty, a query whose filter stopped matching. The floor is:
+
+- `floor[name]`, if the job sets one (any finite number; `floor: { rows: 1 }` alerts on a run that wrote no rows), or
+- for a metric without one, more than 0: a run that reports 0 or less breaches when the last twenty successful runs that reported it (at least five) all reported more than 0.
+
+```ts
+cw.job("import", { floor: { files: 1 } });           // fewer than one file is under the floor
+
+await job.run(async (j) => {
+  const rows = await importRows();
+  j.metric("rows", rows);                            // 0 after a week of thousands: under the floor
+  j.metric("files", files.length);
+});
+```
+
+A metric that has reported 0 or less in any of those runs is not judged without a floor, so a job that often has nothing to do (a reminder sender with nobody to remind) does not alert, and neither does a metric that is always 0, such as an error count. `floor: { name: 0 }` turns the check off for one metric that should be allowed to reach 0. A floor may not be above the same metric's `budget`; `cw.job()` throws if it is.
+
+A job that keeps reporting 0 stays under its floor for as long as it does, however long that is: the metrics under their floor are kept in the job's state, so a run of zeros never becomes the baseline it is judged against. All breaching metrics are listed in one alert. Closes when a run's metrics are all at or above their floors again. Only metrics a run reported are judged; one it did not report at all is not a breach.
+
 ## recovered
 
 A run succeeded and no condition remains open. The message names everything that alerted and has cleared since the last recovery, for example "after: missed, failed". A condition that closed while another stayed open waits for this message, so every alert is answered by a recovery once the job is healthy again.
@@ -59,7 +80,7 @@ Missed since 2026-01-05 03:15:00 UTC (6h ago). It has no schedule now, so nothin
 ```
 
 - Its details are `{ after: ["missed"], reason: "unscheduled", since }`, where `since` is when missed opened.
-- It answers missed alone. Failed, stuck, slow and over budget stay open until a successful run closes them, and that run's recovery names them but not missed again.
+- It answers missed alone. Failed, stuck, slow, over budget and under floor stay open until a successful run closes them, and that run's recovery names them but not missed again.
 - Channels treat it like any recovery (Twilio, Honeybadger and Bugsnag send it only with `recovered: true`).
 - While the job is silenced, missed closes without a message.
 

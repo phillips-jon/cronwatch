@@ -29,6 +29,7 @@ defmodule Cronwatch.Alerts.Honeybadger do
     "stuck" => "CronWatch::Stuck",
     "slow" => "CronWatch::Slow",
     "over_budget" => "CronWatch::OverBudget",
+    "under_floor" => "CronWatch::UnderFloor",
     "recovered" => "CronWatch::Recovered"
   }
 

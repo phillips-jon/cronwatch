@@ -415,6 +415,67 @@ internal static class Evaluate
         return breaches;
     }
 
+    /// <summary>
+    /// The metrics of a successful run that fell below their floor. A metric with a floor breaches
+    /// when it reports less than that floor. One without breaches when it reports 0 or less and
+    /// either it did so on the job's last successful run too (<paramref name="previous"/>, the
+    /// metrics under their floor then), or the earlier successful runs that reported it (at least
+    /// five, the newest twenty) all reported more than 0.
+    /// </summary>
+    internal static List<BudgetBreach> FloorBreaches(Definition def, Run run, IReadOnlyList<Run> history, IReadOnlyCollection<string>? previous = null)
+    {
+        var breaches = new List<BudgetBreach>();
+        var floors = def.Get("floor") as JsObject;
+        var before = new HashSet<string>(previous ?? [], StringComparer.Ordinal);
+        foreach (var e in run.Metrics)
+        {
+            string name = e.Key;
+            double value = e.Value;
+            if (floors != null && floors.Has(name))
+            {
+                double floor = JsNumber(floors.Get(name));
+                if (value < floor)
+                {
+                    breaches.Add(new BudgetBreach(name, value, floor, "floor"));
+                }
+                continue;
+            }
+            if (value > 0)
+            {
+                continue;
+            }
+            if (before.Contains(name))
+            {
+                breaches.Add(new BudgetBreach(name, value, 0, "0 or less on the run before too"));
+                continue;
+            }
+            var past = new List<double>();
+            foreach (var r in history)
+            {
+                if (past.Count >= BaselineWindow)
+                {
+                    break;
+                }
+                if (r.Status == RunStatus.Ok && r.Metrics.TryGetValue(name, out double v))
+                {
+                    past.Add(v);
+                }
+            }
+            if (past.Count < BaselineMinRuns || !past.TrueForAll(v => v > 0))
+            {
+                continue;
+            }
+            double lowest = past[0];
+            foreach (double v in past)
+            {
+                lowest = Math.Min(lowest, v);
+            }
+            breaches.Add(new BudgetBreach(name, value, lowest,
+                "the last " + past.Count.ToString(CultureInfo.InvariantCulture) + " runs all reported more than 0, the lowest " + AlertFormat.FormatNumber(lowest)));
+        }
+        return breaches;
+    }
+
     /// <summary>Whether <paramref name="history"/> (newest first) holds a full baseline window of successful runs.</summary>
     public static bool HasFullBaseline(IReadOnlyList<Run> history)
     {
@@ -595,6 +656,21 @@ internal static class Evaluate
             else
             {
                 CloseCondition(next, Condition.OverBudget);
+            }
+
+            var shortfalls = FloorBreaches(def, run, history, next.UnderFloor);
+            if (shortfalls.Count > 0)
+            {
+                next.UnderFloor = shortfalls.ConvertAll(b => b.Metric);
+                if (OpenCondition(next, Condition.UnderFloor, now))
+                {
+                    alerts.Add(new AlertDraft(AlertType.UnderFloor, run, new AlertDetails.UnderFloor(ValueList<BudgetBreach>.Of(shortfalls))));
+                }
+            }
+            else
+            {
+                next.UnderFloor = null;
+                CloseCondition(next, Condition.UnderFloor);
             }
 
             var pending = next.Pending();

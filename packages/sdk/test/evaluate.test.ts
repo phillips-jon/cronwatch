@@ -103,6 +103,43 @@ test("budgets: a ceiling, or three times the median once there are five runs", (
   assert.deepEqual(spike.alerts.map((a) => a.type), ["over_budget"]);
 });
 
+test("floors: a floor, or 0 after five runs that all reported more", () => {
+  const floored: JobDefinition = { name: "j", floor: { rows: 10 } };
+  const short = onRunFinish(floored, run("j", "ok", T0, 1000, { metrics: { rows: 9 } }), emptyState("j"), [], T0 + 1000);
+  assert.deepEqual(short.alerts.map((a) => a.type), ["under_floor"]);
+  assert.deepEqual(details(short.alerts[0], "under_floor").breaches, [{ metric: "rows", value: 9, limit: 10, basis: "floor" }]);
+  const back = onRunFinish(floored, run("j", "ok", T0 + HOUR, 1000, { metrics: { rows: 10 } }), short.state, [], T0 + HOUR + 1000);
+  assert.deepEqual(back.alerts.map((a) => a.type), ["recovered"]);
+  assert.equal(back.state.underFloor, undefined);
+
+  const bare: JobDefinition = { name: "j" };
+  const history = [1, 2, 3, 4, 5].map((i) => run("j", "ok", T0 - i * HOUR, 1000, { metrics: { rows: 100 * i, errors: 0 } }));
+  assert.deepEqual(onRunFinish(bare, run("j", "ok", T0, 1000, { metrics: { rows: 0 } }), emptyState("j"), history.slice(1), T0).alerts, [], "four runs are not a baseline");
+  assert.deepEqual(onRunFinish(bare, run("j", "ok", T0, 1000, { metrics: { rows: 1, errors: 0 } }), emptyState("j"), history, T0).alerts, [], "an always-0 metric never alerts");
+  const zero = onRunFinish(bare, run("j", "ok", T0, 1000, { metrics: { rows: 0, errors: 0 } }), emptyState("j"), history, T0);
+  assert.deepEqual(details(zero.alerts[0], "under_floor").breaches, [{ metric: "rows", value: 0, limit: 100, basis: "the last 5 runs all reported more than 0, the lowest 100" }]);
+  assert.deepEqual(zero.state.underFloor, ["rows"]);
+
+  // A job that keeps writing nothing stays open, past the point where its zeros are all the history there is.
+  let state = zero.state;
+  const runs = [...history];
+  for (let i = 1; i <= 30; i++) {
+    runs.unshift(run("j", "ok", T0 + (i - 1) * HOUR, 1000, { metrics: { rows: 0, errors: 0 } }));
+    const next = onRunFinish(bare, run("j", "ok", T0 + i * HOUR, 1000, { metrics: { rows: 0, errors: 0 } }), state, runs.slice(0, 25), T0 + i * HOUR);
+    assert.deepEqual(next.alerts, []);
+    assert.equal(next.state.open.under_floor, T0);
+    state = next.state;
+  }
+  const recovered = onRunFinish(bare, run("j", "ok", T0 + 31 * HOUR, 1000, { metrics: { rows: 5, errors: 0 } }), state, runs.slice(0, 25), T0 + 31 * HOUR);
+  assert.deepEqual(recovered.alerts.map((a) => a.type), ["recovered"]);
+  assert.deepEqual(details(recovered.alerts[0], "recovered").after, ["under_floor"]);
+
+  // A metric that has reported 0 before is judged as usual for it, and a floor of 0 turns the check off.
+  const mixed = [...history.slice(0, 4), run("j", "ok", T0 - 6 * HOUR, 1000, { metrics: { rows: 0 } })];
+  assert.deepEqual(onRunFinish(bare, run("j", "ok", T0, 1000, { metrics: { rows: 0 } }), emptyState("j"), mixed, T0).alerts, []);
+  assert.deepEqual(onRunFinish({ name: "j", floor: { rows: 0 } }, run("j", "ok", T0, 1000, { metrics: { rows: 0 } }), emptyState("j"), history, T0).alerts, []);
+});
+
 test("onCheck reports a missed cron run once, and clears when a run covers it", () => {
   const d = { name: "j", schedule: "0 * * * *", grace: "10m" };
   const stored: StoredJob = { name: "j", definition: d, createdAt: T0 - 3 * HOUR, updatedAt: T0 };

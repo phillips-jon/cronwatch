@@ -29,6 +29,7 @@ from .types import (
     StoredJob,
     _read_alerts,
     _read_conditions,
+    _read_metric_names,
     _read_number,
     _read_open,
 )
@@ -50,6 +51,7 @@ __all__ = [
     "budget_breaches",
     "empty_state",
     "failure_count",
+    "floor_breaches",
     "format_number",
     "grace_ms",
     "has_full_baseline",
@@ -151,8 +153,8 @@ def empty_state(job: str) -> JobState:
 
 def normalize_state(state: JobState | Mapping[str, Any] | Any, job: str) -> JobState:
     """A stored state with every field present, or a fresh one. State written
-    by an older version lacks the newer fields. `sending` is the exception: it
-    is there only while it holds an alert (see hold_alerts).
+    by an older version lacks the newer fields. `sending` and `under_floor`
+    are the exceptions: each is there only while it holds something.
 
     Read leniently, since a foreign, hand-edited or damaged row must affect
     only its own job, and the next write puts it right: a state that is not
@@ -160,7 +162,8 @@ def normalize_state(state: JobState | Mapping[str, Any] | Any, job: str) -> JobS
     keeps only its entries whose value is a number; `silenced_until` and
     `last_alert_at` that are not numbers read as None; `pending_recovery`
     keeps only its strings, and `undelivered` only its alerts (anything but
-    a list reads as []). Unknown fields are kept as written."""
+    a list reads as []), and `under_floor` only its strings (None when
+    none). Unknown fields are kept as written."""
     if isinstance(state, Mapping):
         state = JobState.from_dict(state)
     if not isinstance(state, JobState):
@@ -174,6 +177,7 @@ def normalize_state(state: JobState | Mapping[str, Any] | Any, job: str) -> JobS
     out.undelivered = _read_alerts(state.undelivered)
     if not isinstance(out.sending, list) or not out.sending:
         out.sending = None
+    out.under_floor = _read_metric_names(state.under_floor)
     return out
 
 
@@ -363,6 +367,37 @@ def budget_breaches(definition: JobDefinition, run: Run, history: Sequence[Run])
     return breaches
 
 
+def floor_breaches(definition: JobDefinition, run: Run, history: Sequence[Run], previous: Sequence[str] = ()) -> list[dict[str, Any]]:
+    """The metrics of a successful run that fell below their floor. A metric
+    with a floor breaches when it reports less than that floor. One without
+    breaches when it reports 0 or less and either it did so on the job's last
+    successful run too (`previous`, the metrics under their floor then), or
+    the earlier successful runs that reported it (at least five, the newest
+    twenty) all reported more than 0. So a job that keeps writing nothing
+    stays under its floor however long it goes on, and a metric that is
+    always 0 never alerts."""
+    breaches: list[dict[str, Any]] = []
+    floors = definition.floor or {}
+    for metric in _js.object_keys(run.metrics):
+        value = run.metrics[metric]
+        floor = floors.get(metric) if isinstance(floors, dict) else None
+        if floor is not None:
+            if value < floor:
+                breaches.append({"metric": metric, "value": value, "limit": floor, "basis": "floor"})
+            continue
+        if value > 0:
+            continue
+        if metric in previous:
+            breaches.append({"metric": metric, "value": value, "limit": 0, "basis": "0 or less on the run before too"})
+            continue
+        past = [r.metrics[metric] for r in history if r.status == RunStatus.OK and _js.is_number(r.metrics.get(metric))][:BASELINE_WINDOW]
+        if len(past) < BASELINE_MIN_RUNS or not all(v > 0 for v in past):
+            continue
+        lowest = min(past)
+        breaches.append({"metric": metric, "value": value, "limit": lowest, "basis": f"the last {len(past)} runs all reported more than 0, the lowest {format_number(lowest)}"})
+    return breaches
+
+
 def has_full_baseline(history: Sequence[Run]) -> bool:
     """Whether `history` (newest first) holds a full baseline window of successful runs."""
     return sum(1 for r in history if r.status == RunStatus.OK) >= BASELINE_WINDOW
@@ -444,6 +479,15 @@ def on_run_finish(definition: JobDefinition, run: Run, state: JobState, history:
                 alerts.append(AlertDraft(AlertType.OVER_BUDGET, run, {"breaches": breaches}))
         else:
             _close_condition(following, Condition.OVER_BUDGET)
+
+        short = floor_breaches(definition, run, history, following.under_floor or ())
+        if short:
+            following.under_floor = [b["metric"] for b in short]
+            if _open_condition(following, Condition.UNDER_FLOOR, now):
+                alerts.append(AlertDraft(AlertType.UNDER_FLOOR, run, {"breaches": short}))
+        else:
+            following.under_floor = None
+            _close_condition(following, Condition.UNDER_FLOOR)
 
         pending = following.pending_recovery or []
         if pending and not open_conditions(following):

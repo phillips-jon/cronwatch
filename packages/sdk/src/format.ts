@@ -79,6 +79,14 @@ export function composeAlert(draft: AlertDraft, def: StoredJobDefinition, now: n
       if (run) lines.push(`Started ${when(run.startedAt, now)}.`);
       break;
     }
+    case "under_floor": {
+      title = `${name} fell short`;
+      for (const b of draft.details.breaches) {
+        lines.push(b.basis === "floor" ? `${b.metric}: ${formatNumber(b.value)}, below the floor of ${formatNumber(b.limit)}.` : `${b.metric}: ${formatNumber(b.value)} (${b.basis}).`);
+      }
+      if (run) lines.push(`Started ${when(run.startedAt, now)}.`);
+      break;
+    }
     case "recovered": {
       if (draft.details.reason === "unscheduled") {
         title = `${name} is no longer scheduled`;

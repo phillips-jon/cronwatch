@@ -213,7 +213,7 @@ func toneOf(run Run, job JobSummary, now int64) string {
 		return "timeout"
 	}
 	latest := job.LastRun != nil && job.LastRun.ID == run.ID
-	if latest && (hasCondition(job.Open, ConditionOverBudget) || hasCondition(job.Open, ConditionSlow)) {
+	if latest && (hasCondition(job.Open, ConditionOverBudget) || hasCondition(job.Open, ConditionUnderFloor) || hasCondition(job.Open, ConditionSlow)) {
 		return "warn"
 	}
 	return "ok"
@@ -242,9 +242,13 @@ func describeRun(run Run, tone string, job JobSummary, now int64) string {
 	}
 	extra := ""
 	if tone == "warn" {
-		extra = ", slow"
-		if hasCondition(job.Open, ConditionOverBudget) {
+		switch {
+		case hasCondition(job.Open, ConditionOverBudget):
 			extra = ", over budget"
+		case hasCondition(job.Open, ConditionUnderFloor):
+			extra = ", under floor"
+		default:
+			extra = ", slow"
 		}
 	}
 	return string(run.Status) + " at " + at + took + extra
@@ -267,6 +271,26 @@ func overCeilings(job JobSummary) []string {
 		}
 	}
 	return over
+}
+
+// underFloors are the metrics of the job's last run under their floors, or
+// at 0 or less without one.
+func underFloors(job JobSummary) []string {
+	if job.LastRun == nil {
+		return nil
+	}
+	floor, _ := get(job.Definition.o, "floor").(*js.Object)
+	var under []string
+	for _, m := range job.LastRun.Metrics {
+		if limit, ok := floor.Get(m.Name); ok {
+			if m.Value < jsNumber(limit) {
+				under = append(under, m.Name)
+			}
+		} else if m.Value <= 0 {
+			under = append(under, m.Name)
+		}
+	}
+	return under
 }
 
 // laneNote is what is worth saying about the job in a few words, or ""
@@ -301,6 +325,13 @@ func laneNote(job JobSummary, missed *int64, now int64) string {
 		text := "went over budget"
 		if over := overCeilings(job); len(over) > 0 {
 			text += " on " + strings.Join(over, " and ")
+		}
+		return text + " at " + whenUTC(last.StartedAt, now)
+	}
+	if hasCondition(job.Open, ConditionUnderFloor) && last != nil {
+		text := "fell short"
+		if under := underFloors(job); len(under) > 0 {
+			text += " on " + strings.Join(under, " and ")
 		}
 		return text + " at " + whenUTC(last.StartedAt, now)
 	}
@@ -611,7 +642,7 @@ var timelineLegend = func() string {
 		{box("run ok"), "ran"},
 		{box("run bad"), "failed"},
 		{box("run timeout"), "timed out"},
-		{box("run warn"), "over budget or slow"},
+		{box("run warn"), "over budget, under floor or slow"},
 		{box("run running"), "running"},
 		{box("missed"), "missed"},
 	}

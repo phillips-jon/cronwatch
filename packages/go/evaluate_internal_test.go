@@ -117,6 +117,67 @@ func TestARecoveryWaitsWhileAnotherConditionIsOpen(t *testing.T) {
 	}
 }
 
+func TestFloorsAFloorOr0AfterFiveRunsThatAllReportedMore(t *testing.T) {
+	withMetrics := func(r Run, metrics ...Metric) Run {
+		r.Metrics = Metrics(metrics)
+		return r
+	}
+	breaches := func(a alertDraft) string { return js.Stringify(a.Details.jsValue()) }
+	floored := def(t, `{"name":"j","floor":{"rows":10}}`)
+	short, _ := onRunFinish(floored, withMetrics(testRun("j", StatusOK, t0, 1000), Metric{"rows", 9}), emptyState("j"), nil, t0+1000)
+	if strings.Join(types(short.alerts), ",") != "under_floor" || breaches(short.alerts[0]) != `{"breaches":[{"metric":"rows","value":9,"limit":10,"basis":"floor"}]}` {
+		t.Fatal(types(short.alerts))
+	}
+	back, _ := onRunFinish(floored, withMetrics(testRun("j", StatusOK, t0+tHour, 1000), Metric{"rows", 10}), short.state, nil, t0+tHour+1000)
+	if strings.Join(types(back.alerts), ",") != "recovered" || back.state.UnderFloor != nil {
+		t.Error(types(back.alerts), back.state.UnderFloor)
+	}
+
+	bare := def(t, `{"name":"j"}`)
+	var history []Run
+	for i := int64(1); i <= 5; i++ {
+		history = append(history, withMetrics(testRun("j", StatusOK, t0-i*tHour, 1000), Metric{"rows", float64(100 * i)}, Metric{"errors", 0}))
+	}
+	if out, _ := onRunFinish(bare, withMetrics(testRun("j", StatusOK, t0, 1000), Metric{"rows", 0}), emptyState("j"), history[1:], t0); len(out.alerts) != 0 {
+		t.Error("four runs are not a baseline")
+	}
+	if out, _ := onRunFinish(bare, withMetrics(testRun("j", StatusOK, t0, 1000), Metric{"rows", 1}, Metric{"errors", 0}), emptyState("j"), history, t0); len(out.alerts) != 0 {
+		t.Error("an always-0 metric never alerts")
+	}
+	zero, _ := onRunFinish(bare, withMetrics(testRun("j", StatusOK, t0, 1000), Metric{"rows", 0}, Metric{"errors", 0}), emptyState("j"), history, t0)
+	if len(zero.alerts) != 1 || breaches(zero.alerts[0]) != `{"breaches":[{"metric":"rows","value":0,"limit":100,"basis":"the last 5 runs all reported more than 0, the lowest 100"}]}` {
+		t.Fatal(types(zero.alerts))
+	}
+	if strings.Join(zero.state.UnderFloor, ",") != "rows" {
+		t.Error(zero.state.UnderFloor)
+	}
+
+	// A job that keeps writing nothing stays open, past the point where its zeros are all the history there is.
+	state := zero.state
+	runs := append([]Run{}, history...)
+	for i := int64(1); i <= 30; i++ {
+		runs = append([]Run{withMetrics(testRun("j", StatusOK, t0+(i-1)*tHour, 1000), Metric{"rows", 0}, Metric{"errors", 0})}, runs...)
+		next, _ := onRunFinish(bare, withMetrics(testRun("j", StatusOK, t0+i*tHour, 1000), Metric{"rows", 0}, Metric{"errors", 0}), state, runs[:min(25, len(runs))], t0+i*tHour)
+		if at, _ := next.state.openAt(ConditionUnderFloor); len(next.alerts) != 0 || at != t0 {
+			t.Fatal(i, types(next.alerts), at)
+		}
+		state = next.state
+	}
+	recovered, _ := onRunFinish(bare, withMetrics(testRun("j", StatusOK, t0+31*tHour, 1000), Metric{"rows", 5}, Metric{"errors", 0}), state, runs[:25], t0+31*tHour)
+	if strings.Join(types(recovered.alerts), ",") != "recovered" || js.Stringify(recovered.alerts[0].Details.jsValue()) != `{"after":["under_floor"]}` {
+		t.Error(types(recovered.alerts))
+	}
+
+	// A metric that has reported 0 before is judged as usual for it, and a floor of 0 turns the check off.
+	mixed := append(append([]Run{}, history[:4]...), withMetrics(testRun("j", StatusOK, t0-6*tHour, 1000), Metric{"rows", 0}))
+	if out, _ := onRunFinish(bare, withMetrics(testRun("j", StatusOK, t0, 1000), Metric{"rows", 0}), emptyState("j"), mixed, t0); len(out.alerts) != 0 {
+		t.Error("a metric seen at 0 before is not judged")
+	}
+	if out, _ := onRunFinish(def(t, `{"name":"j","floor":{"rows":0}}`), withMetrics(testRun("j", StatusOK, t0, 1000), Metric{"rows", 0}), emptyState("j"), history, t0); len(out.alerts) != 0 {
+		t.Error("a floor of 0 is never crossed")
+	}
+}
+
 func TestSummarizeTakesTheNewestTwentyRuns(t *testing.T) {
 	stored := StoredJob{Name: "j", Definition: def(t, `{"name":"j"}`), CreatedAt: t0 - 30*tHour, UpdatedAt: t0}
 	recent := []Run{testRun("j", StatusRunning, t0-tMin, -1), testRun("j", StatusFailed, t0-tHour, 1000)}

@@ -7,7 +7,7 @@ group: Java
 
 # Java
 
-`dev.cronwatch:cronwatch` is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a Java process can share one database with a Node, Ruby, Python, PHP, Go, Rust, Elixir or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers the library itself: a `main` a crontab runs, a service on the JDK's own HTTP server or in a servlet container. The Spring Boot starter (`@Scheduled` and ShedLock), Quartz and JobRunr have a page of their own: [Java schedulers](/docs/java-schedulers/).
+`dev.cronwatch:cronwatch` is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow, over budget and under floor by the same rules, sends the same alert text, and writes the same rows, so a Java process can share one database with a Node, Ruby, Python, PHP, Go, Rust, Elixir or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers the library itself: a `main` a crontab runs, a service on the JDK's own HTTP server or in a servlet container. The Spring Boot starter (`@Scheduled` and ShedLock), Quartz and JobRunr have a page of their own: [Java schedulers](/docs/java-schedulers/).
 
 ```xml
 <!-- pom.xml -->
@@ -62,12 +62,13 @@ Declare each job once, at startup, and keep its handle:
 Job nightly = cw.job("nightly-report", JobOptions.builder()
     .schedule("0 2 * * *").timezone("UTC")
     .grace("15m").timeout(Duration.ofMinutes(30))
-    .expect("Report written").budget("cost", 2));
+    .expect("Report written").budget("cost", 2).floor("pages", 1));
 
 nightly.run(job -> {
   Path path = reports.build();                        // an IOException thrown here is thrown from run()
   job.log("Report written: " + path);                 // kept with the run, shown in alerts
-  job.metric("cost", 1.2);                            // watched against budgets and baselines
+  job.metric("cost", 1.2);                            // watched against budgets, floors and baselines
+  job.metric("pages", reports.pages());
 });
 
 Path path = nightly.call(job -> reports.build());     // call() returns what the function returns
@@ -382,7 +383,7 @@ The builder's options:
 | `noShutdownHook()` | the hook on | see [Threads and the timeout](#threads-and-the-timeout) |
 | `clock` | the system clock | epoch milliseconds; for tests |
 
-A job's options, on `JobOptions.builder()`: `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the JVM's zone by default), `grace` (`"10m"`), `timeout` (`"1h"`), `maxDuration`, `budget` (a metric and its ceiling, or a map of them), `expect`, `expectMatch`, `expectThat`, `failuresBeforeAlert` (1), `description` and `tags`, with the rules in the [TypeScript API reference](/docs/api/).
+A job's options, on `JobOptions.builder()`: `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the JVM's zone by default), `grace` (`"10m"`), `timeout` (`"1h"`), `maxDuration`, `budget` (a metric and its ceiling, or a map of them), `floor` (a metric and its floor, or a map of them; no higher than its ceiling), `expect`, `expectMatch`, `expectThat`, `failuresBeforeAlert` (1), `description` and `tags`, with the rules in the [TypeScript API reference](/docs/api/).
 
 `timeout` and `maxDuration` both measure a run's length. `timeout` gives up on a run still going: once a running run is older than it, the next check marks it `timeout` (a failure) and the job is stuck. `maxDuration` flags a run that finished successfully but slowly: it stays ok and the job is slow. Set `timeout` well above `maxDuration`: `.maxDuration("10m").timeout("1h")` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
 

@@ -43,7 +43,7 @@ Option names and their defaults, every framework integration's settings keys (La
 
 What the docs say a job does is promised:
 
-- when a run counts as missed, failed, stuck, slow or over budget, as [What it catches](/docs/conditions/) and [Schedules, grace and timeouts](/docs/schedules/) describe it, and the job options that set it (`grace`, `timeout`, `maxDuration`, `failuresBeforeAlert`, `budget`, `expect` and the rest) with their defaults;
+- when a run counts as missed, failed, stuck, slow, over budget or under a floor, as [What it catches](/docs/conditions/) and [Schedules, grace and timeouts](/docs/schedules/) describe it, and the job options that set it (`grace`, `timeout`, `maxDuration`, `failuresBeforeAlert`, `budget`, `floor`, `expect` and the rest) with their defaults;
 - one alert per condition: a condition opens once, alerts once, and closes with one recovery. There are no repeat reminders while it stays open. If reminders are ever added, they come as an option you turn on, in a minor release, and the default stays one alert;
 - how schedules are read, including the two that never make sense (a one-time date is refused, a date no month has never fires);
 - the stored spellings of triggers and tags, and the job names the integrations give, as [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names) lists them.

@@ -16,11 +16,13 @@ public sealed class JobOptions
     private readonly List<string> _order = [];
     private readonly Dictionary<string, object?> _values = new(StringComparer.Ordinal);
     private readonly BudgetMap _budget;
+    private readonly FloorMap _floor;
 
     /// <summary>Options with nothing set.</summary>
     public JobOptions()
     {
         _budget = new BudgetMap(this);
+        _floor = new FloorMap(this);
     }
 
     private void Put(string key, object? value)
@@ -78,6 +80,26 @@ public sealed class JobOptions
         }
     }
 
+    /// <summary>
+    /// Floors for metrics, in the order given: <c>Floor = { ["rows"] = 1 }</c> alerts when a run
+    /// reports rows below 1. A metric without one alerts when a run reports 0 or less and the five
+    /// to twenty successful runs before it all reported more than 0. A floor of 0 lets a metric
+    /// reach 0 without alerting.
+    /// </summary>
+    public FloorMap Floor
+    {
+        get => _floor;
+        init
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            foreach (var e in value)
+            {
+                _floor[e.Key] = e.Value;
+            }
+            Touch("floor");
+        }
+    }
+
     /// <summary>What a successful run's output must show; see <see cref="Cronwatch.Expect"/>.</summary>
     public Expect? Expect { get => _expect; init => _expect = value; }
 
@@ -132,13 +154,13 @@ public sealed class JobOptions
         if (!_values.ContainsKey(key))
         {
             _order.Add(key);
-            _values[key] = _budget;
+            _values[key] = key == "floor" ? _floor : (object)_budget;
         }
     }
 
     /// <summary>
-    /// A copy of these options, for an integration that adds to options the app gave. The budget
-    /// and every value are copied; the expect rule is shared, as it is immutable.
+    /// A copy of these options, for an integration that adds to options the app gave. The budget,
+    /// the floor and every value are copied; the expect rule is shared, as it is immutable.
     /// </summary>
     internal JobOptions Copy()
     {
@@ -165,6 +187,14 @@ public sealed class JobOptions
                 }
                 Touch("budget");
             }
+            else if (v is FloorMap f)
+            {
+                foreach (var e in f)
+                {
+                    _floor[e.Key] = e.Value;
+                }
+                Touch("floor");
+            }
             else
             {
                 Put(key, JsonText.Copy(v));
@@ -189,7 +219,12 @@ public sealed class JobOptions
         foreach (string key in _order)
         {
             object? v = _values[key];
-            o.Set(key, v is BudgetMap b ? b.ToJs() : JsonText.Copy(v));
+            o.Set(key, v switch
+            {
+                BudgetMap b => b.ToJs(),
+                FloorMap f => f.ToJs(),
+                _ => JsonText.Copy(v),
+            });
         }
         return o;
     }
@@ -251,6 +286,49 @@ public sealed class JobOptions
         public IEnumerator<KeyValuePair<string, double>> GetEnumerator()
         {
             foreach (var e in _ceilings)
+            {
+                yield return new KeyValuePair<string, double>(e.Key, (double)e.Value!);
+            }
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    /// <summary>A job's floor: metric names and floors, in the order given.</summary>
+    public sealed class FloorMap : IEnumerable<KeyValuePair<string, double>>
+    {
+        private readonly JobOptions _owner;
+        private readonly JsObject _floors = new();
+
+        internal FloorMap(JobOptions owner)
+        {
+            _owner = owner;
+        }
+
+        /// <summary>A metric's floor.</summary>
+        public double this[string metric]
+        {
+            get => _floors.Get(metric) is double d ? d : throw new KeyNotFoundException(metric);
+            set
+            {
+                ArgumentNullException.ThrowIfNull(metric);
+                _floors.Set(metric, value);
+                _owner.Touch("floor");
+            }
+        }
+
+        /// <summary>Adds a floor, for a collection initializer.</summary>
+        public void Add(string metric, double floor) => this[metric] = floor;
+
+        /// <summary>How many metrics have a floor.</summary>
+        public int Count => _floors.Count;
+
+        internal JsObject ToJs() => _floors.Copy();
+
+        /// <inheritdoc/>
+        public IEnumerator<KeyValuePair<string, double>> GetEnumerator()
+        {
+            foreach (var e in _floors)
             {
                 yield return new KeyValuePair<string, double>(e.Key, (double)e.Value!);
             }

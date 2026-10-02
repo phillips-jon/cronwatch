@@ -64,7 +64,7 @@ final class WebGoldenTest extends TestCase
             }
         };
         $nightly = $cw->job('nightly-report', [
-            'schedule' => '0 2 * * *', 'timezone' => 'UTC', 'grace' => '15m', 'maxDuration' => '10m', 'budget' => ['cost' => 2],
+            'schedule' => '0 2 * * *', 'timezone' => 'UTC', 'grace' => '15m', 'maxDuration' => '10m', 'budget' => ['cost' => 2], 'floor' => ['rows' => 40],
             'expect' => 'Report written', 'failuresBeforeAlert' => 2, 'description' => 'Builds the <b>PDF</b>', 'tags' => ['reports', '<t>'],
         ]);
         $durations = [2000, 2500, 90_000, 3100, 1800];
@@ -77,6 +77,16 @@ final class WebGoldenTest extends TestCase
                 $job->metric('2', 0.123456);
                 $clock->advance($duration);
             }));
+        }
+
+        // Five runs that wrote rows, then one that wrote none: under its floor.
+        $importer = $cw->job('import', ['schedule' => '0 * * * *']);
+        for ($i = 0; $i < 6; $i++) {
+            $clock->set(Clock::T0 - (6 - $i) * self::HOUR - 30 * self::MIN);
+            $importer->run(function (JobContext $job) use ($i, $clock): void {
+                $job->metric('rows', $i === 5 ? 0 : 120 + $i);
+                $clock->advance(800);
+            });
         }
 
         $broken = $cw->job('broken', ['expect' => 'done']);

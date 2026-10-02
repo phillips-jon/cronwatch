@@ -25,8 +25,12 @@ public final class Condition {
   /** A successful run reported a metric over its budget or baseline. */
   public static final Condition OVER_BUDGET = new Condition("over_budget");
 
+  /** A successful run reported a metric under its floor, or 0 after runs that reported more. */
+  public static final Condition UNDER_FLOOR = new Condition("under_floor");
+
   /** Every condition the SDK knows, in its order. */
-  public static final List<Condition> ALL = List.of(MISSED, FAILED, STUCK, SLOW, OVER_BUDGET);
+  public static final List<Condition> ALL =
+      List.of(MISSED, FAILED, STUCK, SLOW, OVER_BUDGET, UNDER_FLOOR);
 
   private final String value;
 
@@ -42,6 +46,7 @@ public final class Condition {
       case "stuck" -> STUCK;
       case "slow" -> SLOW;
       case "over_budget" -> OVER_BUDGET;
+      case "under_floor" -> UNDER_FLOOR;
       default -> new Condition(Objects.requireNonNull(value, "value"));
     };
   }

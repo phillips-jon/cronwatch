@@ -297,7 +297,7 @@ final class Plugin
                 continue;
             }
             $options = [];
-            foreach (['tags', 'grace', 'timeout', 'maxDuration', 'budget', 'failuresBeforeAlert'] as $key) {
+            foreach (['tags', 'grace', 'timeout', 'maxDuration', 'budget', 'floor', 'failuresBeforeAlert'] as $key) {
                 if ($definition->has($key)) {
                     $options[$key] = $definition->get($key);
                 }

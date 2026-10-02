@@ -189,6 +189,34 @@ test("slow and over-budget alerts come from the job's own baseline", async () =>
   assert.deepEqual(alerts.types(), ["slow", "over_budget", "recovered"]);
 });
 
+test("an under-floor alert names the metric and what it was judged against", async () => {
+  const { cw, c, alerts } = make();
+  const job = cw.job("import", { floor: { files: 1 } });
+  for (let i = 0; i < 5; i++) {
+    await job.run(async (j) => { c.advance(1000); j.metrics({ rows: 4812 + i, files: 2 }); });
+    c.advance(HOUR);
+  }
+  await job.run(async (j) => { c.advance(1000); j.metrics({ rows: 0, files: 0 }); });
+  assert.deepEqual(alerts.types(), ["under_floor"]);
+  const alert = alerts.alerts[0]!;
+  assert.equal(alert.title, "import fell short");
+  assert.match(alert.message, /rows: 0 \(the last 5 runs all reported more than 0, the lowest 4,812\)/);
+  assert.match(alert.message, /files: 0, below the floor of 1\./);
+  c.advance(HOUR);
+  await job.run(async (j) => { c.advance(1000); j.metrics({ rows: 0, files: 0 }); });
+  assert.deepEqual(alerts.types(), ["under_floor"]);
+  c.advance(HOUR);
+  await job.run(async (j) => { c.advance(1000); j.metrics({ rows: 10, files: 1 }); });
+  assert.deepEqual(alerts.types(), ["under_floor", "recovered"]);
+});
+
+test("a floor must be a finite number, and no higher than its ceiling", () => {
+  const { cw } = make();
+  assert.throws(() => cw.job("a", { floor: { rows: Number.NaN } }), /floor\.rows must be a finite number/);
+  assert.throws(() => cw.job("b", { floor: { cost: 3 }, budget: { cost: 2 } }), /floor\.cost \(3\) is above budget\.cost \(2\)/);
+  cw.job("c", { floor: { delta: -5 }, budget: { delta: 5 } });
+});
+
 test("silence swallows alerts and nothing opens underneath; unsilence alerts again", async () => {
   const { cw, c, alerts } = make();
   const job = cw.job("flaky");

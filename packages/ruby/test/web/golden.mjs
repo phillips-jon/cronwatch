@@ -56,7 +56,7 @@ async function quietly(promise) {
 }
 
 const nightly = cw.job("nightly-report", {
-  schedule: "0 2 * * *", timezone: "UTC", grace: "15m", maxDuration: "10m", budget: { cost: 2 },
+  schedule: "0 2 * * *", timezone: "UTC", grace: "15m", maxDuration: "10m", budget: { cost: 2 }, floor: { rows: 40 },
   expect: "Report written", failuresBeforeAlert: 2, description: "Builds the <b>PDF</b>", tags: ["reports", "<t>"],
 });
 const durations = [2000, 2500, 90_000, 3100, 1800];
@@ -69,6 +69,16 @@ for (let i = 0; i < durations.length; i++) {
     job.metric("2", 0.123456);
     now += durations[i];
   }));
+}
+
+// Five runs that wrote rows, then one that wrote none: under its floor.
+const importer = cw.job("import", { schedule: "0 * * * *" });
+for (let i = 0; i < 6; i++) {
+  now = T0 - (6 - i) * HOUR - 30 * MIN;
+  await importer.run((job) => {
+    job.metric("rows", i === 5 ? 0 : 120 + i);
+    now += 800;
+  });
 }
 
 const broken = cw.job("broken", { expect: "done" });

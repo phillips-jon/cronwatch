@@ -606,6 +606,60 @@ function evaluateCases() {
       steps: [run(T0, { ms: 2000, metrics: { cost: 5 } }), run(T0 + HOUR, { ms: 500, metrics: { cost: 5 } }), run(T0 + 2 * HOUR, { ms: 500, metrics: { cost: 0.25 } })],
     },
     {
+      name: "under a floor, and recovered",
+      definition: { name: "j", floor: { rows: 10, delta: -5 } },
+      steps: [run(T0, { metrics: { rows: 12, delta: 0 } }), run(T0 + HOUR, { metrics: { rows: 9, delta: -6 } }), run(T0 + 2 * HOUR, { metrics: { rows: 5 } }), run(T0 + 3 * HOUR, { metrics: { rows: 10, delta: -5 } })],
+    },
+    {
+      name: "down to 0 after five runs that all reported more, and an always-0 metric",
+      definition: { name: "import" },
+      steps: [
+        ...[4812, 5120, 4990, 6001.5, 5003].map((rows, i) => run(T0 + i * HOUR, { metrics: { rows, errors: 0 } })),
+        run(T0 + 5 * HOUR, { metrics: { rows: 0, errors: 0 } }),
+        run(T0 + 6 * HOUR, { metrics: { rows: -2, errors: 0 } }),
+        run(T0 + 7 * HOUR, { metrics: { rows: 7, errors: 0 } }),
+      ],
+    },
+    {
+      name: "a run of zeros longer than the history stays under the floor until a run reports more",
+      definition: { name: "import" },
+      steps: [
+        ...hourly(5, T0, { metrics: { rows: 100 } }),
+        ...hourly(30, T0 + 5 * HOUR, { metrics: { rows: 0 } }),
+        fail(T0 + 35 * HOUR),
+        run(T0 + 36 * HOUR, { metrics: { rows: 0 } }),
+        run(T0 + 37 * HOUR, { metrics: { rows: 1 } }),
+      ],
+    },
+    {
+      name: "four runs are not enough to judge 0, a metric seen at 0 before is not judged, and a floor of 0 is never crossed",
+      definition: { name: "j", floor: { skipped: 0 } },
+      steps: [
+        ...hourly(4, T0, { metrics: { a: 3, skipped: 2 } }),
+        run(T0 + 4 * HOUR, { metrics: { a: 0, skipped: 0 } }),
+        ...hourly(5, T0 + 5 * HOUR, { metrics: { a: 3, skipped: 2 } }),
+        run(T0 + 10 * HOUR, { metrics: { a: 0, skipped: 0 } }),
+        run(T0 + 11 * HOUR, { metrics: { skipped: 0 } }),
+      ],
+    },
+    {
+      name: "slow, over budget and under a floor in one run, in that order",
+      definition: { name: "j", maxDuration: "1s", budget: { cost: 1 }, floor: { rows: 1, cost: 0.5 } },
+      steps: [run(T0, { ms: 2000, metrics: { cost: 5, rows: 0 } }), run(T0 + HOUR, { ms: 500, metrics: { cost: 0.25, rows: 0 } }), run(T0 + 2 * HOUR, { ms: 500, metrics: { cost: 0.75, rows: 3 } })],
+    },
+    {
+      name: "a metric under its floor while silenced alerts on the next run under it once the silence ends",
+      definition: { name: "j" },
+      steps: [
+        ...hourly(5, T0, { metrics: { rows: 5 } }),
+        { op: "silence", until: T0 + 6 * HOUR },
+        run(T0 + 5 * HOUR, { metrics: { rows: 0 } }),
+        { op: "unsilence" },
+        run(T0 + 6 * HOUR, { metrics: { rows: 0 } }),
+        run(T0 + 7 * HOUR, { metrics: { rows: 4 } }),
+      ],
+    },
+    {
       name: "silence swallows alerts and opens nothing, closes still close, and alerts return after",
       definition: { name: "flaky", schedule: "every 1h" },
       steps: [
@@ -853,7 +907,10 @@ function formatCases() {
     [{ type: "slow", run: null, details: { durationMs: 999, thresholdMs: 500, basis: "maxDuration" } }, def, T0],
     [{ type: "over_budget", run: sampleRun({ status: "ok" }), details: { breaches: [{ metric: "cost", value: 1.2, limit: 1, basis: "budget" }, { metric: "tokens", value: 5000, limit: 3000, basis: "three times the usual 1,000" }] } }, def, T0],
     [{ type: "over_budget", run: null, details: { breaches: [{ metric: "rows", value: 1234567.891, limit: 1e21, basis: "budget" }, { metric: "tiny", value: 0.00005, limit: 0.00001, basis: "budget" }, { metric: "neg", value: -1234.5, limit: -2000, basis: "budget" }] } }, def, T0],
+    [{ type: "under_floor", run: sampleRun({ status: "ok" }), details: { breaches: [{ metric: "files", value: 0, limit: 1, basis: "floor" }, { metric: "rows", value: 0, limit: 4812, basis: "the last 20 runs all reported more than 0, the lowest 4,812" }] } }, def, T0],
+    [{ type: "under_floor", run: null, details: { breaches: [{ metric: "rows", value: -0.5, limit: 0, basis: "0 or less on the run before too" }, { metric: "neg", value: -1234.5, limit: -1000, basis: "floor" }] } }, def, T0],
     [{ type: "recovered", run: sampleRun({ status: "ok" }), details: { after: ["missed", "over_budget", "failed"] } }, def, T0 + 2 * MIN],
+    [{ type: "recovered", run: sampleRun({ status: "ok" }), details: { after: ["under_floor", "slow"] } }, def, T0 + 2 * MIN],
     [{ type: "recovered", run: sampleRun({ status: "ok", durationMs: null }), details: { after: [] } }, def, T0],
     [{ type: "recovered", run: null, details: { after: ["stuck"] } }, def, T0],
     [{ type: "recovered", run: null, details: { after: ["missed"], reason: "unscheduled", since: T0 - 3 * HOUR } }, { name: "nightly" }, T0],
@@ -995,6 +1052,10 @@ function healthCases() {
       job: "j", open: { failed: 5, slow: "x", stuck: null, missed: 6 }, consecutiveFailures: 1, silencedUntil: 9, lastAlertAt: 4,
       pendingRecovery: ["missed", 1, null, "failed"], undelivered: [null, 1, "x", [], { type: "failed", at: 5 }], futureField: 1,
     },
+    { job: "j", open: { under_floor: 3 }, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: 3, underFloor: ["rows", 1, null, "files"] },
+    { job: "j", open: {}, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: null, underFloor: [] },
+    { job: "j", open: {}, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: null, underFloor: [1, null] },
+    { job: "j", open: {}, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: null, underFloor: "rows" },
   ];
   const normalized = olds.map((old) => ({ state: old, normalized: clone(normalizeState(old, "j")) }));
   const mutes = [
@@ -1823,6 +1884,7 @@ function channelAlerts() {
     { name: "a missed run", alert: clone(sdk.composeAlert({ type: "missed", run: null, details: { dueAt: T0 - 30 * MIN, deadline: T0 - 15 * MIN, graceMs: 15 * MIN, lastRunAt: null } }, def, T0)) },
     { name: "a stuck run", alert: clone(sdk.composeAlert({ type: "stuck", run: sampleRun({ status: "timeout", durationMs: HOUR + 1, output: "started" }), details: { consecutiveFailures: 1, threshold: 1 } }, def, T0 + HOUR)) },
     { name: "over budget, with a triage full of markdown", alert: { ...clone(sdk.composeAlert({ type: "over_budget", run: sampleRun({ status: "ok", metrics: { cost: 1.2 } }), details: { breaches: [{ metric: "cost", value: 1.2, limit: 1, basis: "budget" }] } }, def, T0)), triage: "Check *this* _now_ ~maybe~ `x` | y (z) [a] <b> \\ " + "d".repeat(1200) } },
+    { name: "under a floor", alert: clone(sdk.composeAlert({ type: "under_floor", run: sampleRun({ status: "ok", metrics: { rows: 0 } }), details: { breaches: [{ metric: "rows", value: 0, limit: 4812, basis: "the last 20 runs all reported more than 0, the lowest 4,812" }] } }, def, T0)) },
     { name: "slow", alert: clone(sdk.composeAlert({ type: "slow", run: sampleRun({ status: "ok", durationMs: 15_000 }), details: { durationMs: 15_000, thresholdMs: 10_000, basis: "maxDuration" } }, def, T0)) },
     { name: "recovered", alert: clone(sdk.composeAlert({ type: "recovered", run: sampleRun({ status: "ok" }), details: { after: ["missed", "over_budget"] } }, def, T0 + MIN)) },
     { name: "no longer scheduled", alert: clone(sdk.composeAlert({ type: "recovered", run: null, details: { after: ["missed"], reason: "unscheduled", since: T0 - 3 * HOUR } }, { name: "nightly", grace: "15m" }, T0 + MIN)) },

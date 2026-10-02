@@ -167,6 +167,7 @@
       <li><code class="bad">stuck</code><span>A run started and was still going past its timeout, or never reported finishing. A killed process, a serverless timeout, a deploy mid-run.</span></li>
       <li><code class="warn">slow</code><span>A successful run took longer than <code>maxDuration</code>, or more than twice the job’s own recent p95.</span></li>
       <li><code class="warn">over_budget</code><span>On a successful run, a number you reported with <code>job.metric()</code> went above its ceiling, or three times its median.</span></li>
+      <li><code class="warn">under_floor</code><span>On a successful run, a number you reported went below its floor, or fell to 0 after runs that never did. The job that exits cleanly and wrote nothing.</span></li>
       <li><code class="ok">recovered</code><span>A successful run left nothing open. One message, naming everything that was.</span></li>
     </ul>
   </div>

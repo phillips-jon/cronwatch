@@ -139,7 +139,7 @@ export function pgCronRun(row: DetailRow, job: string, idPrefix: string, fallbac
 
 /** The options of a stored definition that can be declared again, without its schedule. */
 function unscheduled(definition: StoredJobDefinition | JobOptions): JobOptions {
-  const { description, tags, grace, timeout, maxDuration, budget, failuresBeforeAlert } = definition;
+  const { description, tags, grace, timeout, maxDuration, budget, floor, failuresBeforeAlert } = definition;
   const out: JobOptions = {};
   if (description !== undefined) out.description = description;
   if (tags !== undefined) out.tags = tags;
@@ -147,6 +147,7 @@ function unscheduled(definition: StoredJobDefinition | JobOptions): JobOptions {
   if (timeout !== undefined) out.timeout = timeout;
   if (maxDuration !== undefined) out.maxDuration = maxDuration;
   if (budget !== undefined) out.budget = budget;
+  if (floor !== undefined) out.floor = floor;
   if (failuresBeforeAlert !== undefined) out.failuresBeforeAlert = failuresBeforeAlert;
   return out;
 }

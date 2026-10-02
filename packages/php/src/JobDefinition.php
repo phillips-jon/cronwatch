@@ -18,6 +18,7 @@ namespace Cronwatch;
  * @property-read mixed $timeout
  * @property-read mixed $maxDuration
  * @property-read array<string, int|float>|null $budget
+ * @property-read array<string, int|float>|null $floor
  * @property-read mixed $expect
  * @property-read mixed $failuresBeforeAlert
  * @property-read string|null $description
@@ -26,7 +27,7 @@ namespace Cronwatch;
 final class JobDefinition
 {
     /** The options job() takes, in the SDK's order. */
-    public const OPTIONS = ['schedule', 'timezone', 'grace', 'timeout', 'maxDuration', 'budget', 'expect', 'failuresBeforeAlert', 'description', 'tags'];
+    public const OPTIONS = ['schedule', 'timezone', 'grace', 'timeout', 'maxDuration', 'budget', 'floor', 'expect', 'failuresBeforeAlert', 'description', 'tags'];
 
     /** @param array<string, mixed> $fields */
     public function __construct(public readonly array $fields = [])
@@ -40,8 +41,10 @@ final class JobDefinition
             return $data;
         }
         $fields = Js::fields($data ?? []);
-        if (isset($fields['budget']) && ($fields['budget'] instanceof \stdClass || is_array($fields['budget']))) {
-            $fields['budget'] = Js::fields($fields['budget']);
+        foreach (['budget', 'floor'] as $key) {
+            if (isset($fields[$key]) && ($fields[$key] instanceof \stdClass || is_array($fields[$key]))) {
+                $fields[$key] = Js::fields($fields[$key]);
+            }
         }
         if (isset($fields['tags']) && is_array($fields['tags'])) {
             $fields['tags'] = array_values($fields['tags']);
@@ -99,7 +102,7 @@ final class JobDefinition
             if ($value === null || $value instanceof \Closure) {
                 continue;
             }
-            $out[$key] = $key === 'budget' && is_array($value) ? Js::obj($value) : $value;
+            $out[$key] = ($key === 'budget' || $key === 'floor') && is_array($value) ? Js::obj($value) : $value;
         }
         return Js::obj($out);
     }

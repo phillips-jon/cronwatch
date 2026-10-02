@@ -4,8 +4,8 @@ defmodule Cronwatch do
 
   The same library as `@cronwatch/sdk`, the library behind cronwatch.dev,
   for Elixir and Erlang services: it records each run of a job in a store
-  the app already has, judges it (failed, stuck, slow, over budget, missed
-  its schedule), and sends one alert when a condition opens and one recovery
+  the app already has, judges it (failed, stuck, slow, over budget, under
+  floor, missed its schedule), and sends one alert when a condition opens and one recovery
   when it closes. An Elixir process shares a store with Node, Ruby, Python,
   PHP, Go and Rust processes byte for byte.
 
@@ -106,7 +106,7 @@ defmodule Cronwatch do
 
   @doc """
   Declares a job and answers its handle. Options: `schedule`, `timezone`,
-  `grace`, `timeout`, `max_duration`, `budget`, `expect`,
+  `grace`, `timeout`, `max_duration`, `budget`, `floor`, `expect`,
   `failures_before_alert`, `description` and `tags`, kept in the order given
   (the stored definition follows it), and `instance`.
   """
@@ -199,8 +199,8 @@ defmodule Cronwatch do
 
   @doc """
   Reports a number for a run: tokens, cost, rows, anything, watched against
-  budgets and baselines. A later value for the same name replaces an earlier
-  one. Raises `Cronwatch.Error` for a value that is not a finite number.
+  budgets, floors and baselines. A later value for the same name replaces an
+  earlier one. Raises `Cronwatch.Error` for a value that is not a finite number.
   """
   @spec metric(Context.t() | RunHandle.t(), String.t() | atom(), number()) :: :ok
   def metric(%Context{} = ctx, name, value) do

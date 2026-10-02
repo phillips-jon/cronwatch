@@ -650,3 +650,9 @@ func TestTheSourcesQueries(t *testing.T) {
 		t.Errorf("jobs %v", r.Jobs)
 	}
 }
+
+func TestUnscheduledKeepsTheBudgetAndFloor(t *testing.T) {
+	def := cronwatch.DescribeJob("x", cronwatch.Schedule("0 2 * * *"), cronwatch.Grace("5m"), cronwatch.Budget("cost", 2), cronwatch.Floor("rows", 1), cronwatch.FailuresBeforeAlert(2))
+	again := cronwatch.DescribeJob("x", pgcron.Unscheduled(def)...)
+	same(t, "kept", js.Stringify(again), `{"grace":"5m","budget":{"cost":2},"floor":{"rows":1},"failuresBeforeAlert":2,"name":"x"}`)
+}

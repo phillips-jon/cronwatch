@@ -244,6 +244,87 @@ class ClientTest < Minitest::Test
     assert_equal %i[slow over_budget recovered], alerts.types
   end
 
+  def test_an_under_floor_alert_names_the_metric_and_what_it_was_judged_against
+    cw, clock, alerts = make
+    job = cw.job("import", floor: { files: 1 })
+    5.times do |i|
+      job.run do |j|
+        clock.advance(1000)
+        j.metrics(rows: 4812 + i, files: 2)
+      end
+      clock.advance(HOUR)
+    end
+    job.run do |j|
+      clock.advance(1000)
+      j.metrics(rows: 0, files: 0)
+    end
+    assert_equal [:under_floor], alerts.types
+    alert = alerts.alerts[0]
+    assert_equal "import fell short", alert.title
+    assert_match(/rows: 0 \(the last 5 runs all reported more than 0, the lowest 4,812\)/, alert.message)
+    assert_match(/files: 0, below the floor of 1\./, alert.message)
+    clock.advance(HOUR)
+    job.run do |j|
+      clock.advance(1000)
+      j.metrics(rows: 0, files: 0)
+    end
+    assert_equal [:under_floor], alerts.types
+    clock.advance(HOUR)
+    job.run do |j|
+      clock.advance(1000)
+      j.metrics(rows: 10, files: 1)
+    end
+    assert_equal %i[under_floor recovered], alerts.types
+  end
+
+  def test_floors_a_floor_or_0_after_five_runs_that_all_reported_more
+    finish = lambda do |definition, at, metrics, state, history|
+      run = Cronwatch::Run.new(id: "r#{at}", job: "j", status: :ok, started_at: at, finished_at: at + 1000,
+                               duration_ms: 1000, error: nil, output: nil, metrics: metrics, trigger: "run")
+      Cronwatch::Evaluate.on_run_finish(definition, run, state || Cronwatch::Evaluate.empty_state("j"), history, at + 1000)
+    end
+    past = lambda do |at, metrics|
+      Cronwatch::Run.new(id: "p#{at}", job: "j", status: :ok, started_at: at, finished_at: at + 1000,
+                         duration_ms: 1000, error: nil, output: nil, metrics: metrics, trigger: "run")
+    end
+
+    floored = Cronwatch::JobDefinition.from_h("name" => "j", "floor" => { "rows" => 10 })
+    short = finish.call(floored, T0, { "rows" => 9 }, nil, [])
+    assert_equal [:under_floor], short.alerts.map(&:type)
+    assert_equal [{ metric: "rows", value: 9, limit: 10, basis: "floor" }], short.alerts[0].details[:breaches]
+    back = finish.call(floored, T0 + HOUR, { "rows" => 10 }, short.state, [])
+    assert_equal [:recovered], back.alerts.map(&:type)
+    assert_nil back.state.under_floor
+
+    bare = Cronwatch::JobDefinition.from_h("name" => "j")
+    history = (1..5).map { |i| past.call(T0 - (i * HOUR), { "rows" => 100 * i, "errors" => 0 }) }
+    assert_equal [], finish.call(bare, T0, { "rows" => 0 }, nil, history.drop(1)).alerts, "four runs are not a baseline"
+    assert_equal [], finish.call(bare, T0, { "rows" => 1, "errors" => 0 }, nil, history).alerts, "an always-0 metric never alerts"
+    zero = finish.call(bare, T0, { "rows" => 0, "errors" => 0 }, nil, history)
+    assert_equal [{ metric: "rows", value: 0, limit: 100, basis: "the last 5 runs all reported more than 0, the lowest 100" }],
+                 zero.alerts[0].details[:breaches]
+    assert_equal ["rows"], zero.state.under_floor
+
+    # A job that keeps writing nothing stays open, past the point where its zeros are all the history there is.
+    state = zero.state
+    runs = history.dup
+    (1..30).each do |i|
+      runs.unshift(past.call(T0 + ((i - 1) * HOUR), { "rows" => 0, "errors" => 0 }))
+      following = finish.call(bare, T0 + (i * HOUR), { "rows" => 0, "errors" => 0 }, state, runs.first(25))
+      assert_equal [], following.alerts
+      assert_equal T0 + 1000, following.state.open[:under_floor]
+      state = following.state
+    end
+    recovered = finish.call(bare, T0 + (31 * HOUR), { "rows" => 5, "errors" => 0 }, state, runs.first(25))
+    assert_equal [:recovered], recovered.alerts.map(&:type)
+    assert_equal [:under_floor], recovered.alerts[0].details[:after]
+
+    # A metric that has reported 0 before is judged as usual for it, and a floor of 0 turns the check off.
+    mixed = history.first(4) + [past.call(T0 - (6 * HOUR), { "rows" => 0 })]
+    assert_equal [], finish.call(bare, T0, { "rows" => 0 }, nil, mixed).alerts
+    assert_equal [], finish.call(Cronwatch::JobDefinition.from_h("name" => "j", "floor" => { "rows" => 0 }), T0, { "rows" => 0 }, nil, history).alerts
+  end
+
   def test_silence_swallows_alerts_and_nothing_opens_underneath_unsilence_alerts_again
     cw, _, alerts = make
     job = cw.job("flaky")
@@ -516,6 +597,10 @@ class ClientTest < Minitest::Test
       { budget: { cost: Float::INFINITY } } => /budget\.cost/,
       { budget: { cost: -1 } } => /budget\.cost/,
       { budget: 5 } => /budget must be an object/,
+      { floor: { rows: Float::NAN } } => /floor\.rows must be a finite number \(got NaN\)/,
+      { floor: { rows: "1" } } => /floor\.rows must be a finite number \(got 1\)/,
+      { floor: 5 } => /floor must be an object of \{ metric: floor \}/,
+      { floor: { cost: 3 }, budget: { cost: 2 } } => /floor\.cost \(3\) is above budget\.cost \(2\), so every run would alert/,
       { grace: Float::NAN } => /grace must be a non-negative number of milliseconds/,
       { timeout: 0 } => /job "a": timeout must be longer than zero/,
       { max_duration: "0s" } => /maxDuration must be longer than zero/,
@@ -527,6 +612,7 @@ class ClientTest < Minitest::Test
     end
     assert_match(/failuresBeforeAlert/, assert_raises(ArgumentError) { Cronwatch.new(defaults: { failures_before_alert: Float::NAN }).job("a") }.message)
     cw.job("a", budget: { errors: 0 }, failures_before_alert: 2, timeout: "5m", timezone: "america/new_york")
+    cw.job("c", floor: { delta: -5 }, budget: { delta: 5 })
   end
 
   def test_a_returned_string_is_capped_like_logged_output

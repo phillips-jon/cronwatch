@@ -119,7 +119,7 @@ Under it is the day. Each job gets a lane across the last 24 hours and the next 
 | green | a run that ended ok |
 | red | a failed run |
 | a pale red box | a run that timed out |
-| amber | the last run, when it went over budget or ran slow |
+| amber | the last run, when it went over budget, fell under a floor or ran slow |
 | an outline | a run still going (red once it is past its timeout) |
 | a dashed red box | the slot the check reported missed, and every later slot whose grace has run out |
 | a solid vertical line | now |

@@ -30,6 +30,7 @@ var discordColor = map[cronwatch.AlertType]int{
 	cronwatch.AlertStuck:      0xc62828,
 	cronwatch.AlertSlow:       0xb7791f,
 	cronwatch.AlertOverBudget: 0xb7791f,
+	cronwatch.AlertUnderFloor: 0xb7791f,
 	cronwatch.AlertRecovered:  0x1f8a4c,
 }
 

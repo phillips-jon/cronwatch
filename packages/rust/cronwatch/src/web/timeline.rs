@@ -183,7 +183,11 @@ fn tone_of(run: &Run, job: &JobSummary, now: i64) -> &'static str {
         _ => {}
     }
     let latest = job.last_run.as_ref().is_some_and(|l| l.id == run.id);
-    if latest && (job.open.contains(&Condition::OverBudget) || job.open.contains(&Condition::Slow)) {
+    if latest
+        && (job.open.contains(&Condition::OverBudget)
+            || job.open.contains(&Condition::UnderFloor)
+            || job.open.contains(&Condition::Slow))
+    {
         return "warn";
     }
     "ok"
@@ -208,7 +212,13 @@ fn describe_run(run: &Run, tone: &str, job: &JobSummary, now: i64) -> String {
     }
     let took = run.duration_ms.map_or(String::new(), |d| format!(", took {}", format_duration(d as f64)));
     let extra = if tone == "warn" {
-        if job.open.contains(&Condition::OverBudget) { ", over budget" } else { ", slow" }
+        if job.open.contains(&Condition::OverBudget) {
+            ", over budget"
+        } else if job.open.contains(&Condition::UnderFloor) {
+            ", under floor"
+        } else {
+            ", slow"
+        }
     } else {
         ""
     };
@@ -225,6 +235,23 @@ fn over_ceilings(job: &JobSummary) -> Vec<String> {
         .filter(|(k, limit)| {
             let value = job.last_run.as_ref().and_then(|r| r.metrics.get(k)).unwrap_or(f64::NEG_INFINITY);
             value > js_number(limit)
+        })
+        .map(|(k, _)| k.to_string())
+        .collect()
+}
+
+/// The metrics of the job's last run under their floors, or at 0 or less
+/// without one.
+fn under_floors(job: &JobSummary) -> Vec<String> {
+    let floors = job.definition.get("floor").and_then(Value::as_object);
+    let Some(last) = job.last_run.as_ref() else {
+        return Vec::new();
+    };
+    last.metrics
+        .iter()
+        .filter(|(k, v)| match floors.and_then(|f| f.get(k)) {
+            Some(floor) => *v < js_number(floor),
+            None => *v <= 0.0,
         })
         .map(|(k, _)| k.to_string())
         .collect()
@@ -275,6 +302,14 @@ pub(crate) fn lane_note(job: &JobSummary, missed: Option<i64>, now: i64) -> Stri
         let over = over_ceilings(job);
         if !over.is_empty() {
             text.push_str(&format!(" on {}", over.join(" and ")));
+        }
+        return format!("{text} at {}", when_utc(last.started_at, now));
+    }
+    if let (true, Some(last)) = (open(Condition::UnderFloor), last) {
+        let mut text = "fell short".to_string();
+        let under = under_floors(job);
+        if !under.is_empty() {
+            text.push_str(&format!(" on {}", under.join(" and ")));
         }
         return format!("{text} at {}", when_utc(last.started_at, now));
     }
@@ -582,7 +617,7 @@ fn timeline_legend() -> String {
         (boxed("run ok"), "ran"),
         (boxed("run bad"), "failed"),
         (boxed("run timeout"), "timed out"),
-        (boxed("run warn"), "over budget or slow"),
+        (boxed("run warn"), "over budget, under floor or slow"),
         (boxed("run running"), "running"),
         (boxed("missed"), "missed"),
     ];

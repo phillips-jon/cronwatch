@@ -134,7 +134,7 @@ defmodule Cronwatch.BridgeTest do
       entry("nightly", "entry 1", "0 2 * * *",
         timezone: "UTC",
         defaults: [grace: "5m"],
-        options: [budget: [cost: 2], tags: ["reports"]]
+        options: [budget: [cost: 2], floor: [rows: 1], tags: ["reports"]]
       )
 
     odd = entry("odd", "entry 4", "", problem: "cronwatch: entry 4 cannot be read")
@@ -142,7 +142,7 @@ defmodule Cronwatch.BridgeTest do
     Cronwatch.check!(instance: cw)
 
     assert stored(cw, "nightly") ==
-             ~s({"grace":"5m","schedule":"0 2 * * *","timezone":"UTC","budget":{"cost":2},"tags":["reports","gocron","gocron:billing"],"name":"nightly"})
+             ~s({"grace":"5m","schedule":"0 2 * * *","timezone":"UTC","budget":{"cost":2},"floor":{"rows":1},"tags":["reports","gocron","gocron:billing"],"name":"nightly"})
 
     assert stored(cw, "twice") == ~s({"tags":["gocron","gocron:billing"],"name":"twice"})
     assert stored(cw, "odd") == ~s({"tags":["gocron","gocron:billing"],"name":"odd"})
@@ -163,7 +163,7 @@ defmodule Cronwatch.BridgeTest do
     Watch.settle(w)
 
     assert stored(cw, "nightly") ==
-             ~s|{"description":"A scheduled task (no longer scheduled)","tags":["reports","gocron","gocron:billing"],"grace":"5m","budget":{"cost":2},"name":"nightly"}|
+             ~s|{"description":"A scheduled task (no longer scheduled)","tags":["reports","gocron","gocron:billing"],"grace":"5m","budget":{"cost":2},"floor":{"rows":1},"name":"nightly"}|
   end
 
   test "a job forgotten while the scheduler still runs it comes back with its schedule" do
@@ -254,6 +254,7 @@ defmodule Cronwatch.BridgeTest do
       timeout: 7_200_000,
       max_duration: "30m",
       budget: [cost: 2, rows: 10],
+      floor: [rows: 1],
       failures_before_alert: 2,
       description: "Nightly",
       tags: ["river", "river:billing"],

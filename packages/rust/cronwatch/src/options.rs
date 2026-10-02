@@ -164,6 +164,19 @@ impl JobOptions {
         self
     }
 
+    /// A floor for a metric reported with `JobContext::metric`:
+    /// `floor("rows", 1.0)` alerts when a run reports rows below 1. Give it
+    /// once per metric. Metrics without a floor alert when a run reports 0
+    /// or less and the five to twenty successful runs before it all reported
+    /// more than 0. Catches the job that ran cleanly and wrote nothing. A
+    /// floor of 0 lets a metric reach 0 without alerting.
+    pub fn floor(mut self, metric: impl Into<String>, floor: f64) -> Self {
+        let mut floors = self.fields.get("floor").and_then(Value::as_object).cloned().unwrap_or_default();
+        floors.set(metric.into(), floor);
+        self.fields.set("floor", floors);
+        self
+    }
+
     /// Makes a successful run fail unless its output contains `text`.
     /// Catches the job that exits cleanly and did nothing.
     pub fn expect(mut self, text: impl Into<String>) -> Self {
@@ -287,6 +300,27 @@ pub(crate) fn validate_definition(name: &str, def: &Definition) -> Result<(), Er
             if !ceiling.is_finite() || ceiling < 0.0 {
                 return invalid(format!(
                     "job {quoted}: budget.{metric} must be a finite number, 0 or more (got {})",
+                    js::format_number(ceiling)
+                ));
+            }
+        }
+    }
+    if let Some(v) = def.get("floor") {
+        let Value::Object(floors) = v else {
+            return invalid(format!("job {quoted}: floor must be an object of {{ metric: floor }}"));
+        };
+        let budget = def.get("budget").and_then(Value::as_object);
+        for (metric, v) in floors.iter() {
+            let Some(floor) = v.as_f64().filter(|f| f.is_finite()) else {
+                return invalid(format!(
+                    "job {quoted}: floor.{metric} must be a finite number (got {})",
+                    js_text(Some(v))
+                ));
+            };
+            if let Some(ceiling) = budget.and_then(|b| b.get(metric)).and_then(Value::as_f64).filter(|c| floor > *c) {
+                return invalid(format!(
+                    "job {quoted}: floor.{metric} ({}) is above budget.{metric} ({}), so every run would alert",
+                    js::format_number(floor),
                     js::format_number(ceiling)
                 ));
             }

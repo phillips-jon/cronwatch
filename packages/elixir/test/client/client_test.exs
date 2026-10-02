@@ -244,6 +244,46 @@ defmodule Cronwatch.ClientTest do
     assert Capture.types(alerts) == ["slow", "over_budget", "recovered"]
   end
 
+  test "an under-floor alert names the metric and what it was judged against" do
+    %{cw: cw, clock: c, alerts: alerts} = make()
+    job = Cronwatch.job!("import", floor: [files: 1], instance: cw)
+
+    metrics = fn rows, files ->
+      fn j ->
+        Clock.advance(c, 1000)
+        Cronwatch.metric(j, "rows", rows)
+        Cronwatch.metric(j, "files", files)
+      end
+    end
+
+    for i <- 0..4 do
+      Cronwatch.run(job, metrics.(4812 + i, 2))
+      Clock.advance(c, @hour)
+    end
+
+    Cronwatch.run(job, metrics.(0, 0))
+    assert Capture.types(alerts) == ["under_floor"]
+    [alert] = Capture.alerts(alerts)
+    assert alert.title == "import fell short"
+    assert alert.message =~ "rows: 0 (the last 5 runs all reported more than 0, the lowest 4,812)"
+    assert alert.message =~ "files: 0, below the floor of 1."
+    Clock.advance(c, @hour)
+    Cronwatch.run(job, metrics.(0, 0))
+    assert Capture.types(alerts) == ["under_floor"]
+    Clock.advance(c, @hour)
+    Cronwatch.run(job, metrics.(10, 1))
+    assert Capture.types(alerts) == ["under_floor", "recovered"]
+  end
+
+  test "a floor must be a finite number, and no higher than its ceiling" do
+    %{cw: cw} = make()
+    assert {:error, %{message: m}} = Cronwatch.job("a", floor: [rows: :nan], instance: cw)
+    assert m =~ "floor.rows must be a finite number"
+    assert {:error, %{message: m}} = Cronwatch.job("b", floor: [cost: 3], budget: [cost: 2], instance: cw)
+    assert m =~ "floor.cost (3) is above budget.cost (2)"
+    assert {:ok, _} = Cronwatch.job("c", floor: [delta: -5], budget: [delta: 5], instance: cw)
+  end
+
   test "silence swallows alerts and nothing opens underneath; unsilence alerts again" do
     %{cw: cw, alerts: alerts} = make()
     job = Cronwatch.job!("flaky", instance: cw)

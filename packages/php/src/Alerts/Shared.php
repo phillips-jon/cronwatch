@@ -28,7 +28,7 @@ final class Shared
     {
         return match ($type) {
             AlertType::RECOVERED => 'info',
-            AlertType::SLOW, AlertType::OVER_BUDGET => 'warning',
+            AlertType::SLOW, AlertType::OVER_BUDGET, AlertType::UNDER_FLOOR => 'warning',
             default => 'error',
         };
     }

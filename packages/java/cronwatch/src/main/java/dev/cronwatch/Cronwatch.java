@@ -237,6 +237,40 @@ public final class Cronwatch implements AutoCloseable {
           }
         }
       }
+      if (def.has("floor") && !(def.get("floor") instanceof JsObject)) {
+        throw CronwatchException.invalid(
+            "job " + quoted + ": floor must be an object of { metric: floor }");
+      }
+      if (def.get("floor") instanceof JsObject floors) {
+        JsObject budget = def.get("budget") instanceof JsObject b ? b : new JsObject();
+        for (Map.Entry<String, @Nullable Object> e : floors.entries()) {
+          double floor = e.getValue() instanceof Number x ? x.doubleValue() : Double.NaN;
+          if (!Double.isFinite(floor)) {
+            throw CronwatchException.invalid(
+                "job "
+                    + quoted
+                    + ": floor."
+                    + e.getKey()
+                    + " must be a finite number (got "
+                    + Js.formatNumber(floor)
+                    + ")");
+          }
+          if (budget.get(e.getKey()) instanceof Number ceiling && floor > ceiling.doubleValue()) {
+            throw CronwatchException.invalid(
+                "job "
+                    + quoted
+                    + ": floor."
+                    + e.getKey()
+                    + " ("
+                    + Js.formatNumber(floor)
+                    + ") is above budget."
+                    + e.getKey()
+                    + " ("
+                    + Js.formatNumber(ceiling.doubleValue())
+                    + "), so every run would alert");
+          }
+        }
+      }
     } catch (IllegalArgumentException e) {
       throw CronwatchException.invalid(
           Objects.requireNonNullElse(e.getMessage(), "invalid option"));

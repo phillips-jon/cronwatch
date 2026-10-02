@@ -40,6 +40,7 @@ var honeybadgerClass = map[cronwatch.AlertType]string{
 	cronwatch.AlertStuck:      "CronWatch::Stuck",
 	cronwatch.AlertSlow:       "CronWatch::Slow",
 	cronwatch.AlertOverBudget: "CronWatch::OverBudget",
+	cronwatch.AlertUnderFloor: "CronWatch::UnderFloor",
 	cronwatch.AlertRecovered:  "CronWatch::Recovered",
 }
 

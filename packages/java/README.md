@@ -1,6 +1,6 @@
 # cronwatch for Java
 
-Cron and scheduled-job monitoring that lives inside your JVM service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
+Cron and scheduled-job monitoring that lives inside your JVM service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
 
 This is the Java port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Java process and a Node, Ruby, Python, PHP, Go, Rust or Elixir process can share one database, and every port reads the tables the others write. It is built in phases ([DESIGN.md](DESIGN.md) has the plan and how each part works). Phase 1 has the core: jobs, runs in the calling thread, runs that span calls, checks, silences, sources, deferred delivery and the triage hook, the current run across threads, the shutdown hook, the memory store, and the SQL store over JDBC on SQLite. Phase 2 adds the SQL store on Postgres, MySQL and MariaDB, the SDK's fifteen alert channels, Claude triage and the pg_cron source. Phase 3 adds the dashboard and its JSON API and a job's handler, framework-free, with adapters for the JDK's own HTTP server, servlet containers (`dev.cronwatch:cronwatch-servlet`) and Spring MVC and WebFlux (`dev.cronwatch:cronwatch-spring-boot-starter`). Phase 4 has the scheduler integrations: the Spring Boot starter's (every `@Scheduled` method watched with no code changes, ShedLock, the app's Quartz schedulers when `cronwatch-quartz` is a dependency), `cronwatch-quartz` and `cronwatch-jobrunr`, and `CronwatchCli` for a check from a crontab line.
 
@@ -41,12 +41,13 @@ try (Cronwatch cw = Cronwatch.builder()
   Job nightly = cw.job("nightly-report", JobOptions.builder()
       .schedule("0 2 * * *").timezone("UTC")
       .grace("15m").timeout(Duration.ofMinutes(30))
-      .expect("Report written").budget("cost", 2));
+      .expect("Report written").budget("cost", 2).floor("pages", 1));
 
   nightly.run(job -> {
     Files.writeString(Path.of("report.txt"), "done"); // an IOException thrown here is thrown from run()
     job.log("Report written");                        // kept with the run, shown in alerts
-    job.metric("cost", 1.2);                          // watched against budgets and baselines
+    job.metric("cost", 1.2);                          // watched against budgets, floors and baselines
+    job.metric("pages", 3);
   });
 
   Path path = nightly.call(job -> Files.writeString(Path.of("report.txt"), "done"));

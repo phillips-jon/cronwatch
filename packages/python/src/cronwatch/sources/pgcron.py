@@ -63,7 +63,7 @@ _MS = _dt.timedelta(milliseconds=1)
 #: What a source never takes from `options`: pg_cron gives the schedule and its timezone.
 _SCHEDULE_ONLY = ("schedule", "timezone")
 #: The options of a definition that are declared again, without its schedule, for a name no longer in use.
-_UNSCHEDULED = ("description", "tags", "grace", "timeout", "max_duration", "budget", "failures_before_alert")
+_UNSCHEDULED = ("description", "tags", "grace", "timeout", "max_duration", "budget", "floor", "failures_before_alert")
 
 
 @dataclass

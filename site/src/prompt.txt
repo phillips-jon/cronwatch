@@ -1,5 +1,6 @@
 Add CronWatch to this project so that every scheduled job is recorded and I am
-told when one is missed, fails, gets stuck, runs slow or goes over budget.
+told when one is missed, fails, gets stuck, runs slow, goes over budget or
+quietly does nothing.
 
 CronWatch is an open source library: @cronwatch/sdk for TypeScript (Node,
 Cloudflare Workers, Deno, Bun), the cronwatch gem for Ruby and Rails,

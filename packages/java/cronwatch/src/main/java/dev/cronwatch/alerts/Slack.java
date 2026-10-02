@@ -21,6 +21,7 @@ public final class Slack implements Channel {
           "stuck", ":no_entry:",
           "slow", ":turtle:",
           "over_budget", ":moneybag:",
+          "under_floor", ":chart_with_downwards_trend:",
           "recovered", ":white_check_mark:");
 
   private final SlackOptions options;

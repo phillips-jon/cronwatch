@@ -6,7 +6,8 @@ module Cronwatch
     # Integrations, Webhooks).
     class Discord
       COLOR = {
-        missed: 0xb7791f, failed: 0xc62828, stuck: 0xc62828, slow: 0xb7791f, over_budget: 0xb7791f, recovered: 0x1f8a4c,
+        missed: 0xb7791f, failed: 0xc62828, stuck: 0xc62828, slow: 0xb7791f, over_budget: 0xb7791f, under_floor: 0xb7791f,
+        recovered: 0x1f8a4c,
       }.freeze
 
       # The longest embed description Discord takes. The title (under 256)

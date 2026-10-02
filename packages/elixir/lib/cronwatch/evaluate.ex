@@ -54,7 +54,8 @@ defmodule Cronwatch.Evaluate do
         consecutive_failures: JobState.failure_count(s.consecutive_failures),
         pending_recovery: s.pending_recovery || [],
         undelivered: s.undelivered || [],
-        sending: if(s.sending in [nil, []], do: nil, else: s.sending)
+        sending: if(s.sending in [nil, []], do: nil, else: s.sending),
+        under_floor: if(s.under_floor in [nil, []], do: nil, else: s.under_floor)
     }
   end
 
@@ -277,6 +278,66 @@ defmodule Cronwatch.Evaluate do
     end)
   end
 
+  # The run's metrics under their floor, or, without one, at 0 or less when
+  # they were under it on the last successful run too (`previous`) or the
+  # earlier successful runs that reported them (at least five, the newest
+  # twenty) all reported more than 0.
+  defp floor_breaches(def, %Run{} = run, history, previous) do
+    floor =
+      case Object.get(def, "floor") do
+        %Object{} = f -> f
+        _ -> nil
+      end
+
+    Enum.flat_map(run.metrics.pairs, fn {name, value} ->
+      case floor && Object.fetch(floor, name) do
+        {:ok, v} ->
+          limit = js_number(v)
+          if gt(limit, value), do: [%{metric: name, value: value, limit: limit, basis: "floor"}], else: []
+
+        _ ->
+          cond do
+            gt(value, 0) ->
+              []
+
+            name in previous ->
+              [%{metric: name, value: value, limit: 0, basis: "0 or less on the run before too"}]
+
+            true ->
+              floor_baseline(name, value, history)
+          end
+      end
+    end)
+  end
+
+  defp floor_baseline(name, value, history) do
+    past =
+      history
+      |> Enum.filter(&(&1.status == "ok"))
+      |> Enum.flat_map(fn r ->
+        case Object.fetch(r.metrics, name) do
+          {:ok, m} when is_number(m) -> [m]
+          _ -> []
+        end
+      end)
+      |> Enum.take(@baseline_window)
+
+    if length(past) >= @baseline_min_runs and Enum.all?(past, &(&1 > 0)) do
+      lowest = Enum.min(past)
+
+      [
+        %{
+          metric: name,
+          value: value,
+          limit: lowest,
+          basis: "the last #{length(past)} runs all reported more than 0, the lowest #{Format.format_number(lowest)}"
+        }
+      ]
+    else
+      []
+    end
+  end
+
   # `a > b` over JavaScript numbers, NaN comparing false.
   defp gt(a, b) when is_number(a) and is_number(b), do: a > b
   defp gt(:infinity, b), do: b not in [:infinity, :nan]
@@ -414,6 +475,20 @@ defmodule Cronwatch.Evaluate do
             breaches ->
               case open_condition(next, "over_budget", now) do
                 {next, true} -> {next, alerts ++ [{"over_budget", run, %{breaches: breaches}}]}
+                {next, false} -> {next, alerts}
+              end
+          end
+
+        {next, alerts} =
+          case floor_breaches(def, run, history, next.under_floor || []) do
+            [] ->
+              {close_condition(%{next | under_floor: nil}, "under_floor"), alerts}
+
+            breaches ->
+              next = %{next | under_floor: Enum.map(breaches, & &1.metric)}
+
+              case open_condition(next, "under_floor", now) do
+                {next, true} -> {next, alerts ++ [{"under_floor", run, %{breaches: breaches}}]}
                 {next, false} -> {next, alerts}
               end
           end

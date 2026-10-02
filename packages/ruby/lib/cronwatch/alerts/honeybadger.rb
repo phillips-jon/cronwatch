@@ -9,7 +9,7 @@ module Cronwatch
     class Honeybadger
       CLASS = {
         missed: "CronWatch::Missed", failed: "CronWatch::Failed", stuck: "CronWatch::Stuck", slow: "CronWatch::Slow",
-        over_budget: "CronWatch::OverBudget", recovered: "CronWatch::Recovered",
+        over_budget: "CronWatch::OverBudget", under_floor: "CronWatch::UnderFloor", recovered: "CronWatch::Recovered",
       }.freeze
       private_constant :CLASS
 

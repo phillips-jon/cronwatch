@@ -77,6 +77,17 @@ module Cronwatch
           end
           lines << "Started #{at_time(run.started_at, now)}." if run
           "#{name} went over budget"
+        when :under_floor
+          details[:breaches].each do |b|
+            value = Evaluate.format_number(b[:value])
+            lines << if b[:basis] == "floor"
+                       "#{b[:metric]}: #{value}, below the floor of #{Evaluate.format_number(b[:limit])}."
+                     else
+                       "#{b[:metric]}: #{value} (#{b[:basis]})."
+                     end
+          end
+          lines << "Started #{at_time(run.started_at, now)}." if run
+          "#{name} fell short"
         when :recovered
           if details[:reason]&.to_sym == :unscheduled
             since = details[:since]

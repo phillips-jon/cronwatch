@@ -49,7 +49,7 @@ public final class SchedulerBridge {
 
   /** The options a job keeps when it is declared again without its schedule. */
   private static final List<String> KEPT =
-      List.of("tags", "grace", "timeout", "maxDuration", "budget", "failuresBeforeAlert");
+      List.of("tags", "grace", "timeout", "maxDuration", "budget", "floor", "failuresBeforeAlert");
 
   private SchedulerBridge() {}
 
@@ -208,7 +208,7 @@ public final class SchedulerBridge {
   /**
    * The options that declare a job again without its schedule: its description followed by {@code
    * (no longer scheduled)} ({@code A scheduled task} when it had none), its tags, grace, timeout,
-   * maxDuration, budget and failuresBeforeAlert, as stored.
+   * maxDuration, budget, floor and failuresBeforeAlert, as stored.
    */
   public static JobOptions unscheduled(Definition def) {
     String description = def.description();
@@ -229,7 +229,7 @@ public final class SchedulerBridge {
 
   /**
    * The options that declare a stored definition again, in its order: schedule, timezone, grace,
-   * timeout, maxDuration, budget, failuresBeforeAlert, description, tags, and expect ({@code
+   * timeout, maxDuration, budget, floor, failuresBeforeAlert, description, tags, and expect ({@code
    * contains} as {@code expect}, a pattern as the same pattern run by the JavaScript engine, and a
    * custom function as one that passes every output, since the function is the other process's).
    * Fields no option gives are left out. For a worker whose job another process scheduled.
@@ -261,7 +261,8 @@ public final class SchedulerBridge {
 
   /**
    * {@code options} with one of the fields {@link #unscheduled} keeps, as stored: a duration's text
-   * as text and a number of milliseconds as a number, a budget in the order its metrics were given.
+   * as text and a number of milliseconds as a number, a budget or floor in the order its metrics
+   * were given.
    */
   private static void withField(JobOptions options, Definition def, String key) {
     Object value = def.get(key);
@@ -293,6 +294,15 @@ public final class SchedulerBridge {
           for (Map.Entry<String, @Nullable Object> e : budget.entries()) {
             if (e.getValue() instanceof Number ceiling) {
               options.budget(e.getKey(), ceiling.doubleValue());
+            }
+          }
+        }
+      }
+      case "floor" -> {
+        if (value instanceof JsObject floors) {
+          for (Map.Entry<String, @Nullable Object> e : floors.entries()) {
+            if (e.getValue() instanceof Number floor) {
+              options.floor(e.getKey(), floor.doubleValue());
             }
           }
         }

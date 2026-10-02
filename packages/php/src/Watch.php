@@ -22,6 +22,7 @@ final class Watch
 {
     /**
      * @param array<string, int|float>|null $budget
+     * @param array<string, int|float>|null $floor
      * @param list<string>|null $tags
      */
     public function __construct(
@@ -37,6 +38,7 @@ final class Watch
         public readonly ?string $description = null,
         public readonly ?array $tags = null,
         public readonly bool $enabled = true,
+        public readonly ?array $floor = null,
     ) {
     }
 

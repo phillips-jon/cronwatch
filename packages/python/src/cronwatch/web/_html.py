@@ -244,7 +244,7 @@ def _brand(base: str, crumb: str | None = None) -> str:
 
 
 def _health_state(job: JobSummary) -> str:
-    """The job's health, with any open condition it does not already say (over budget, slow) after it."""
+    """The job's health, with any open condition it does not already say (over budget, under floor, slow) after it."""
     cls, label = HEALTH[str(job.health)]
     extras = "".join(f'<span class="state warn">{h(str(c).replace("_", " ", 1))}</span>' for c in job.open if str(c) not in SHOWN_BY_HEALTH)
     return f'<span class="state {cls}"><i class="sq {cls}" aria-hidden="true"></i>{label}</span>{extras}'
@@ -447,6 +447,7 @@ def job_page(job: JobSummary, runs: Sequence[Run], now: int, base: str, complete
     else:
         schedule = '<span class="muted">none</span>'
     budget = f"<dt>Budget</dt><dd>{h(', '.join(f'{k} ≤ {text(v)}' for k, v in entries(d.budget)))}</dd>" if truthy(d.budget) else ""
+    floor = f"<dt>Floor</dt><dd>{h(', '.join(f'{k} ≥ {text(v)}' for k, v in entries(d.floor)))}</dd>" if truthy(d.floor) else ""
     failures = d.failures_before_alert
     alert_after = (
         f"<dt>Alert after</dt><dd>{h(failures)} consecutive failures</dd>"
@@ -519,6 +520,7 @@ def job_page(job: JobSummary, runs: Sequence[Run], now: int, base: str, complete
   <dt>Timeout</dt><dd>{h(timeout)}</dd>
   {max_duration}
   {budget}
+  {floor}
   {expect}
   {alert_after}
   {tag_list}

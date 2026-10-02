@@ -23,6 +23,7 @@ public final class Honeybadger implements Channel {
           "stuck", "CronWatch::Stuck",
           "slow", "CronWatch::Slow",
           "over_budget", "CronWatch::OverBudget",
+          "under_floor", "CronWatch::UnderFloor",
           "recovered", "CronWatch::Recovered");
 
   private final HoneybadgerOptions options;

@@ -126,8 +126,8 @@ module Cronwatch
         <<~RUBY
           # frozen_string_literal: true
 
-          # CronWatch: told when a scheduled job is missed, failed, stuck, slow or
-          # over budget. https://cronwatch.dev/docs/
+          # CronWatch: told when a scheduled job is missed, failed, stuck, slow,
+          # over budget or under its floor. https://cronwatch.dev/docs/
           #
           # Monitor a job by including Cronwatch::ActiveJob and declaring its schedule:
           #

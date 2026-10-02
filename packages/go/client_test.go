@@ -187,6 +187,34 @@ func TestSlowAndOverBudgetFromTheJobsBaseline(t *testing.T) {
 	sameList(t, "recovered", k.alerts.Types(), []string{"slow", "over_budget", "recovered"})
 }
 
+func TestAnUnderFloorAlertNamesTheMetricAndWhatItWasJudgedAgainst(t *testing.T) {
+	k := newKit(t)
+	job := k.cw.MustJob("import", cronwatch.Floor("files", 1))
+	run := func(rows, files float64) {
+		check(t, job.Run(bg, func(_ context.Context, j *cronwatch.JobContext) error {
+			k.c.Advance(1000)
+			return j.Metrics(cronwatch.Metrics{{Name: "rows", Value: rows}, {Name: "files", Value: files}})
+		}))
+	}
+	for i := 0; i < 5; i++ {
+		run(float64(4812+i), 2)
+		k.c.Advance(HOUR)
+	}
+	run(0, 0)
+	sameList(t, "under floor", k.alerts.Types(), []string{"under_floor"})
+	alert := k.alerts.List()[0]
+	eq(t, "title", alert.Title, "import fell short")
+	if !strings.Contains(alert.Message, "rows: 0 (the last 5 runs all reported more than 0, the lowest 4,812)") || !strings.Contains(alert.Message, "files: 0, below the floor of 1.") {
+		t.Error(alert.Message)
+	}
+	k.c.Advance(HOUR)
+	run(0, 0)
+	sameList(t, "still under", k.alerts.Types(), []string{"under_floor"})
+	k.c.Advance(HOUR)
+	run(10, 1)
+	sameList(t, "recovered", k.alerts.Types(), []string{"under_floor", "recovered"})
+}
+
 func TestSilenceSwallowsAlertsAndUnsilenceAlertsAgain(t *testing.T) {
 	k := newKit(t)
 	job := k.cw.MustJob("flaky")

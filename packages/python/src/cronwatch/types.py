@@ -52,6 +52,7 @@ class Condition(StrEnum):
     STUCK = "stuck"
     SLOW = "slow"
     OVER_BUDGET = "over_budget"
+    UNDER_FLOOR = "under_floor"
 
 
 _CONDITIONS: tuple[Condition, ...] = tuple(Condition)
@@ -63,6 +64,7 @@ class AlertType(StrEnum):
     STUCK = "stuck"
     SLOW = "slow"
     OVER_BUDGET = "over_budget"
+    UNDER_FLOOR = "under_floor"
     RECOVERED = "recovered"
 
 
@@ -123,6 +125,7 @@ class JobDefinition:
         "timeout": "timeout",
         "max_duration": "maxDuration",
         "budget": "budget",
+        "floor": "floor",
         "expect": "expect",
         "failures_before_alert": "failuresBeforeAlert",
         "description": "description",
@@ -151,6 +154,7 @@ class JobDefinition:
     timeout = property(lambda self: self._fields.get("timeout"))
     max_duration = property(lambda self: self._fields.get("maxDuration"))
     budget = property(lambda self: self._fields.get("budget"))
+    floor = property(lambda self: self._fields.get("floor"))
     expect = property(lambda self: self._fields.get("expect"))
     failures_before_alert = property(lambda self: self._fields.get("failuresBeforeAlert"))
     description = property(lambda self: self._fields.get("description"))
@@ -502,6 +506,11 @@ def _read_conditions(value: Any) -> list[Condition | str]:
     return [_enum(Condition, c) for c in value if isinstance(c, str)]
 
 
+def _read_metric_names(value: Any) -> list[str] | None:
+    names = [m for m in value if isinstance(m, str)] if isinstance(value, (list, tuple)) else []
+    return names or None
+
+
 def _read_alerts(value: Any) -> list[Alert]:
     if not isinstance(value, (list, tuple)):
         return []
@@ -534,12 +543,15 @@ class JobState:
     #: when empty: the key is never written as an empty list.
     sending: list[Any] | None = None
     version: int | None = None
+    #: The metrics under their floor at the job's last successful run (see
+    #: floor_breaches). None when none: the key is never written as an empty list.
+    under_floor: list[str] | None = None
     #: Keys a newer release wrote that this one does not know, as their JSON,
     #: written back unchanged so a shared store never loses them.
     extra: dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
 
     #: The keys this release reads, camelCase as stored.
-    _KEYS: ClassVar[tuple[str, ...]] = ("job", "open", "consecutiveFailures", "silencedUntil", "lastAlertAt", "pendingRecovery", "undelivered", "sending", "version")
+    _KEYS: ClassVar[tuple[str, ...]] = ("job", "open", "consecutiveFailures", "silencedUntil", "lastAlertAt", "pendingRecovery", "undelivered", "sending", "underFloor", "version")
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any] | JobState) -> JobState:
@@ -558,14 +570,15 @@ class JobState:
             pending_recovery=None if pending is None else _read_conditions(pending),
             undelivered=None if undelivered is None else _read_alerts(undelivered),
             sending=[SendingAlert.from_json(e) for e in sending] if isinstance(sending, list) and sending else None,
+            under_floor=_read_metric_names(_get(data, "underFloor")),
             version=_get(data, "version"),
             extra={k: v for k, v in data.items() if k not in known},
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """pendingRecovery, undelivered, sending and version are left out when
-        unset, as in state written before they existed (sending also when
-        empty). The version comes after the known keys, where the SDK's
+        """pendingRecovery, undelivered, sending, underFloor and version are
+        left out when unset, as in state written before they existed (sending
+        and underFloor also when empty). The version comes after the known keys, where the SDK's
         spread of a normalized state puts it, and the keys this release does
         not know come after it, as they were read."""
         out: dict[str, Any] = {
@@ -581,6 +594,8 @@ class JobState:
             out["undelivered"] = [a.to_dict() for a in self.undelivered]
         if self.sending:
             out["sending"] = [_sending_to_json(e) for e in self.sending]
+        if self.under_floor:
+            out["underFloor"] = list(self.under_floor)
         if self.version is not None:
             out["version"] = self.version
         for key, value in self.extra.items():
@@ -597,6 +612,7 @@ class JobState:
             pending_recovery=None if self.pending_recovery is None else list(self.pending_recovery),
             undelivered=None if self.undelivered is None else list(self.undelivered),
             sending=None if self.sending is None else list(self.sending),
+            under_floor=None if self.under_floor is None else list(self.under_floor),
             version=self.version,
             extra=dict(self.extra),
         )

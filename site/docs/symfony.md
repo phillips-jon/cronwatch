@@ -97,7 +97,7 @@ cronwatch:
         exclude: ['app:heartbeat']
 ```
 
-The options are `name` and a job's (`schedule`, `timezone`, `grace`, `timeout`, `maxDuration`, `budget`, `expect`, `failuresBeforeAlert`, `description`, `tags`; see [PHP](/docs/php/#api)); `#[Watch(enabled: false)]` and `false` leave a message out. `defaults` applies `grace`, `timeout`, `timezone` and `failuresBeforeAlert` to every job that sets none. `scheduler: { watch: false }` turns the Scheduler watching off.
+The options are `name` and a job's (`schedule`, `timezone`, `grace`, `timeout`, `maxDuration`, `budget`, `floor`, `expect`, `failuresBeforeAlert`, `description`, `tags`; see [PHP](/docs/php/#api)); `#[Watch(enabled: false)]` and `false` leave a message out. `defaults` applies `grace`, `timeout`, `timezone` and `failuresBeforeAlert` to every job that sets none. `scheduler: { watch: false }` turns the Scheduler watching off.
 
 ## Messenger messages
 

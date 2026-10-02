@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 
 	"cronwatch.dev/go/internal/js"
@@ -44,9 +45,9 @@ func emptyState(job string) JobState {
 }
 
 // normalizeState is a stored state with every field present, or a fresh
-// one. State written by an older version lacks the newer fields. Sending is
-// the exception: it is there only while it holds an alert (see holdAlerts),
-// and then last, after any key another writer added.
+// one. State written by an older version lacks the newer fields. Sending and
+// UnderFloor are the exceptions: each is there only while it holds
+// something, and then last, after any key another writer added.
 func normalizeState(state *JobState, job string) JobState {
 	if state == nil {
 		return emptyState(job)
@@ -67,15 +68,21 @@ func normalizeState(state *JobState, job string) JobState {
 	}
 	tail := s.tail[:0:0]
 	for _, k := range s.tail {
-		if k != "sending" {
+		if k != "sending" && k != "underFloor" {
 			tail = append(tail, k)
 		}
 	}
 	delete(s.extra, "sending")
+	delete(s.extra, "underFloor")
 	if len(s.Sending) > 0 {
 		tail = append(tail, "sending")
 	} else {
 		s.Sending = nil
+	}
+	if len(s.UnderFloor) > 0 {
+		tail = append(tail, "underFloor")
+	} else {
+		s.UnderFloor = nil
 	}
 	s.tail = tail
 	return s
@@ -343,6 +350,51 @@ func budgetBreaches(def Definition, run Run, history []Run) []BudgetBreach {
 	return breaches
 }
 
+// floorBreaches are the metrics of a successful run that fell below their
+// floor. A metric with a floor breaches when it reports less than that
+// floor. One without breaches when it reports 0 or less and either it did
+// so on the job's last successful run too (previous, the metrics under
+// their floor then), or the earlier successful runs that reported it (at
+// least five, the newest twenty) all reported more than 0.
+func floorBreaches(def Definition, run Run, history []Run, previous []string) []BudgetBreach {
+	breaches := []BudgetBreach{}
+	floor, _ := get(def.o, "floor").(*js.Object)
+	for _, m := range run.Metrics {
+		if v, ok := floor.Get(m.Name); ok {
+			if m.Value < jsNumber(v) {
+				breaches = append(breaches, BudgetBreach{Metric: m.Name, Value: m.Value, Limit: jsLimit(v), Basis: "floor"})
+			}
+			continue
+		}
+		if m.Value > 0 {
+			continue
+		}
+		if slices.Contains(previous, m.Name) {
+			breaches = append(breaches, BudgetBreach{Metric: m.Name, Value: m.Value, Limit: 0, Basis: "0 or less on the run before too"})
+			continue
+		}
+		var past []float64
+		for _, r := range history {
+			if len(past) >= baselineWindow {
+				break
+			}
+			if r.Status != StatusOK {
+				continue
+			}
+			if value, ok := r.Metrics.Get(m.Name); ok {
+				past = append(past, value)
+			}
+		}
+		if len(past) < baselineMinRuns || slices.ContainsFunc(past, func(v float64) bool { return !(v > 0) }) {
+			continue
+		}
+		lowest := slices.Min(past)
+		breaches = append(breaches, BudgetBreach{Metric: m.Name, Value: m.Value, Limit: lowest,
+			Basis: fmt.Sprintf("the last %d runs all reported more than 0, the lowest %s", len(past), formatNumber(lowest))})
+	}
+	return breaches
+}
+
 // jsLimit is a ceiling as it goes into an alert: the stored value when it is
 // a number, which it is for every definition this package or the SDK writes.
 func jsLimit(v any) float64 {
@@ -446,6 +498,16 @@ func onRunFinish(def Definition, run Run, state JobState, history []Run, now int
 			}
 		} else {
 			closeCondition(&next, ConditionOverBudget)
+		}
+
+		if short := floorBreaches(def, run, history, next.UnderFloor); len(short) > 0 {
+			next.setUnderFloor(short)
+			if openCondition(&next, ConditionUnderFloor, now) {
+				alerts = append(alerts, alertDraft{AlertUnderFloor, &r, UnderFloorDetails{Breaches: short}})
+			}
+		} else {
+			next.setUnderFloor(nil)
+			closeCondition(&next, ConditionUnderFloor)
 		}
 
 		if len(next.PendingRecovery) > 0 && len(next.Open) == 0 {

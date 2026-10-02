@@ -9,13 +9,15 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * What an alert carries beyond its title and message, one record per kind of alert: {@link Missed},
- * {@link Failure} (for failed and stuck), {@link Slow}, {@link OverBudget} and {@link Recovered}.
+ * {@link Failure} (for failed and stuck), {@link Slow}, {@link OverBudget}, {@link UnderFloor} and
+ * {@link Recovered}.
  */
 public sealed interface AlertDetails
     permits AlertDetails.Missed,
         AlertDetails.Failure,
         AlertDetails.Slow,
         AlertDetails.OverBudget,
+        AlertDetails.UnderFloor,
         AlertDetails.Recovered {
 
   /** The details as the SDK writes them. */
@@ -100,6 +102,28 @@ public sealed interface AlertDetails
   }
 
   /**
+   * The metrics under their floors.
+   *
+   * @param breaches each metric under its floor; {@code limit} is the floor, or for a metric
+   *     without one the lowest of the earlier runs it was judged against
+   */
+  record UnderFloor(List<BudgetBreach> breaches) implements AlertDetails {
+    /** Keeps an unmodifiable copy. */
+    public UnderFloor {
+      breaches = List.copyOf(breaches);
+    }
+
+    @Override
+    public JsObject toValue() {
+      List<Object> list = new ArrayList<>();
+      for (BudgetBreach b : breaches) {
+        list.add(b.toValue());
+      }
+      return new JsObject().set("breaches", list);
+    }
+  }
+
+  /**
    * The conditions that closed. A recovery with reason {@code unscheduled} closes missed alone
    * because the job no longer has a schedule; {@code since} is when missed opened. Without a
    * reason, a successful run closed everything that was open.
@@ -151,7 +175,7 @@ public sealed interface AlertDetails
           Values.number(o, "thresholdMs"),
           Values.string(o, "basis"));
     }
-    if (type.equals(AlertType.OVER_BUDGET)) {
+    if (type.equals(AlertType.OVER_BUDGET) || type.equals(AlertType.UNDER_FLOOR)) {
       List<BudgetBreach> breaches = new ArrayList<>();
       if (o.get("breaches") instanceof List<?> list) {
         for (Object b : list) {
@@ -164,7 +188,9 @@ public sealed interface AlertDetails
                   Values.string(bo, "basis")));
         }
       }
-      return new OverBudget(breaches);
+      return type.equals(AlertType.OVER_BUDGET)
+          ? new OverBudget(breaches)
+          : new UnderFloor(breaches);
     }
     if (type.equals(AlertType.RECOVERED)) {
       List<Condition> after = new ArrayList<>();

@@ -7,7 +7,7 @@ group: Python
 
 # Python
 
-`cronwatch-sdk` is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a Python process can share one database with a Node, Ruby, PHP, Go, Rust, Elixir, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers plain Python and the API underneath.
+`cronwatch-sdk` is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow, over budget and under floor by the same rules, sends the same alert text, and writes the same rows, so a Python process can share one database with a Node, Ruby, PHP, Go, Rust, Elixir, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers plain Python and the API underneath.
 
 ```bash
 pip install cronwatch-sdk        # or: uv add cronwatch-sdk
@@ -426,7 +426,7 @@ A triage of your own is any function that takes the context (`alert`, `recent_ru
 | `on_error` | the `cronwatch` logger | `lambda error, where: ...` for failures outside jobs: the store, a channel, triage |
 | `now` | the system clock | a function returning epoch milliseconds; for tests |
 
-`cw.job(name, **options)` takes `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the process's zone by default), `grace` (`"10m"`), `timeout` (`"1h"`), `max_duration`, `budget` (`{"metric": ceiling}`), `expect` (a string the output must contain, a compiled `re` pattern it must match, or a function), `failures_before_alert` (1), `description` and `tags`, with the rules in the [API reference](/docs/api/). An `expect` pattern, like an `expect` function, runs in your process with no time limit, so keep it clear of repeats that can backtrack without end (see [expect rules](/docs/conditions/#expect-rules)). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit. Bad options raise `ValueError` when the job is declared.
+`cw.job(name, **options)` takes `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the process's zone by default), `grace` (`"10m"`), `timeout` (`"1h"`), `max_duration`, `budget` (`{"metric": ceiling}`), `floor` (`{"metric": floor}`), `expect` (a string the output must contain, a compiled `re` pattern it must match, or a function), `failures_before_alert` (1), `description` and `tags`, with the rules in the [API reference](/docs/api/). An `expect` pattern, like an `expect` function, runs in your process with no time limit, so keep it clear of repeats that can backtrack without end (see [expect rules](/docs/conditions/#expect-rules)). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit. Bad options raise `ValueError` when the job is declared.
 
 `timeout` and `max_duration` both measure a run's length, and are easy to mix up. `timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure) and the job is stuck. `max_duration` is for a run that finished: one that succeeded but took longer is slow, and stays a success. So set `timeout` well above `max_duration`: `max_duration="10m", timeout="1h"` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
 

@@ -1,6 +1,7 @@
 /**
- * CronWatch: monitoring for scheduled jobs. Missed, failed, stuck, slow and over-budget runs are
- * alerted once and recovered once, from the job's own process, with no service to run.
+ * CronWatch: monitoring for scheduled jobs. Missed, failed, stuck, slow, over-budget and
+ * under-floor runs are alerted once and recovered once, from the job's own process, with no service
+ * to run.
  *
  * <p>The API is {@link dev.cronwatch.Cronwatch}. Stores are in {@code dev.cronwatch.store} (the
  * interface, {@code MemoryStore}, and {@code SqlStore} over a {@code DataSource}; {@code

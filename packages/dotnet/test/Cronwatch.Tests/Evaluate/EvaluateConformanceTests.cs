@@ -161,7 +161,7 @@ public class EvaluateConformanceTests
     {
         var f = Fixtures.Load("evaluate");
         var scenarios = Fixtures.Objects(f, "scenarios");
-        Assert.Equal(50, scenarios.Count);
+        Assert.Equal(56, scenarios.Count);
         var skipped = new List<string>();
         played = 0;
         foreach (var sc in scenarios)
@@ -205,7 +205,7 @@ public class EvaluateConformanceTests
         var fails = new Fixtures.Failures();
         var skipped = Replay(fails, out int played);
         Assert.True(played > 0, "no scenarios replayed");
-        Assert.Equal(50, played);
+        Assert.Equal(56, played);
         Assert.Empty(skipped);
         fails.Check("evaluate");
     }

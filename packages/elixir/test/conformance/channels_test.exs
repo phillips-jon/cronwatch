@@ -140,7 +140,7 @@ defmodule Cronwatch.Conformance.ChannelsTest do
       length(list(f, "sends")) + length(list(f, "failures")) + length(list(field(f, "textCuts"), "errorBodies")) +
         length(list(field(f, "textCuts"), "discordDescriptions"))
 
-    assert count == 90 + 18 + 6 + 8
+    assert count == 96 + 18 + 6 + 8
   end
 
   test "conformance/channels.json: the webhook's payload, \"schema\":1 first, and its signature" do
@@ -178,7 +178,7 @@ defmodule Cronwatch.Conformance.ChannelsTest do
     assert failures == [],
            "channels.json webhookPayloads: #{length(failures)} cases differ:\n" <> Enum.join(failures, "\n")
 
-    assert length(cases) == 15
+    assert length(cases) == 16
 
     assert Webhook.signature("key", "The quick brown fox jumps over the lazy dog") ==
              "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"

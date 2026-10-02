@@ -19,7 +19,7 @@ module Cronwatch
       def severity(type)
         case type.to_sym
         when :recovered then "info"
-        when :slow, :over_budget then "warning"
+        when :slow, :over_budget, :under_floor then "warning"
         else "error"
         end
       end

@@ -1,6 +1,6 @@
 # @cronwatch/sdk
 
-Cron and scheduled-job monitoring that lives inside your app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make.
+Cron and scheduled-job monitoring that lives inside your app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make.
 
 Docs: [cronwatch.dev/docs](https://cronwatch.dev/docs/)
 
@@ -28,6 +28,7 @@ export const nightlyReport = cw.job("nightly-report", {
   timeout: "30m",            // a run still going after this is stuck (maxDuration: a finished run longer than it is slow)
   expect: "Report written",  // output must contain this, or the run failed
   budget: { cost: 2 },       // cost above 2 is over budget
+  floor: { pages: 1 },       // fewer than 1 page is under the floor
 });
 ```
 
@@ -41,6 +42,7 @@ export const GET = nightlyReport.handler(async (job) => {
   const report = await buildReport();
   job.log("Report written:", report.path);
   job.metric("cost", report.usdCost);
+  job.metric("pages", report.pages);
 });
 ```
 
@@ -67,6 +69,7 @@ cw.startChecking();
 - **stuck**: a run started and never reported finishing within `timeout`
 - **slow**: a successful run took longer than `maxDuration`, or twice the job's recent p95
 - **over_budget**: on a successful run, a metric went above its `budget` ceiling, or three times its usual median
+- **under_floor**: on a successful run, a metric went below its `floor`, or, without one, fell to 0 after runs that all reported more
 - **recovered**: a successful run left nothing open; one message names everything that was
 
 Each condition alerts once when it opens. When a successful run leaves nothing open, one recovered message names everything that closed.

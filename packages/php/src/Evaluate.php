@@ -121,6 +121,8 @@ final class Evaluate
         $next->pendingRecovery = $state->pendingRecovery ?? [];
         $next->undelivered = $state->undelivered ?? [];
         $next->sending = $state->sending === null || $state->sending === [] ? null : array_values($state->sending);
+        $underFloor = array_values(array_filter($state->underFloor ?? [], 'is_string'));
+        $next->underFloor = $underFloor === [] ? null : $underFloor;
         return $next;
     }
 
@@ -392,6 +394,58 @@ final class Evaluate
     }
 
     /**
+     * The metrics of a successful run that fell below their floor. A metric
+     * with a floor breaches when it reports less than that floor. One without
+     * breaches when it reports 0 or less and either it did so on the job's last
+     * successful run too (`previous`, the metrics under their floor then), or
+     * the earlier successful runs that reported it (at least five, the newest
+     * twenty) all reported more than 0. So a job that keeps writing nothing stays
+     * under its floor however long it goes on, and a metric that is always 0
+     * never alerts.
+     *
+     * @param list<Run> $history
+     * @param list<string> $previous
+     * @return list<array{metric: string, value: int|float, limit: int|float, basis: string}>
+     */
+    public static function floorBreaches(JobDefinition $def, Run $run, array $history, array $previous = []): array
+    {
+        $breaches = [];
+        $floors = is_array($def->get('floor')) ? $def->get('floor') : [];
+        foreach (Js::objectKeys($run->metrics) as $metric) {
+            $value = $run->metrics[$metric];
+            if (array_key_exists($metric, $floors)) {
+                $floor = $floors[$metric];
+                if ($value < $floor) {
+                    $breaches[] = ['metric' => $metric, 'value' => $value, 'limit' => $floor, 'basis' => 'floor'];
+                }
+                continue;
+            }
+            if ($value > 0) {
+                continue;
+            }
+            if (in_array($metric, $previous, true)) {
+                $breaches[] = ['metric' => $metric, 'value' => $value, 'limit' => 0, 'basis' => '0 or less on the run before too'];
+                continue;
+            }
+            $past = [];
+            foreach ($history as $r) {
+                if ($r->status === RunStatus::OK && Js::isNumber($r->metrics[$metric] ?? null)) {
+                    $past[] = $r->metrics[$metric];
+                    if (count($past) === self::BASELINE_WINDOW) {
+                        break;
+                    }
+                }
+            }
+            if (count($past) < self::BASELINE_MIN_RUNS || array_filter($past, fn ($v) => !($v > 0)) !== []) {
+                continue;
+            }
+            $lowest = min($past);
+            $breaches[] = ['metric' => $metric, 'value' => $value, 'limit' => $lowest, 'basis' => 'the last ' . count($past) . ' runs all reported more than 0, the lowest ' . self::formatNumber($lowest)];
+        }
+        return $breaches;
+    }
+
+    /**
      * Whether `history` (newest first) holds a full baseline window of successful runs.
      *
      * @param list<Run> $history
@@ -514,6 +568,17 @@ final class Evaluate
                 }
             } else {
                 self::closeCondition($next, Condition::OVER_BUDGET);
+            }
+
+            $short = self::floorBreaches($def, $run, $history, $next->underFloor ?? []);
+            if ($short !== []) {
+                $next->underFloor = array_column($short, 'metric');
+                if (self::openCondition($next, Condition::UNDER_FLOOR, $now)) {
+                    $alerts[] = new AlertDraft(AlertType::UNDER_FLOOR, $run, ['breaches' => $short]);
+                }
+            } else {
+                $next->underFloor = null;
+                self::closeCondition($next, Condition::UNDER_FLOOR);
             }
 
             $pending = $next->pendingRecovery ?? [];

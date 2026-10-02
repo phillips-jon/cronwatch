@@ -32,7 +32,7 @@ public static class SchedulerBridge
     /// <summary>How long a sync an integration starts itself may take before it is given up.</summary>
     public static readonly TimeSpan SyncTimeout = TimeSpan.FromSeconds(30);
 
-    private static readonly string[] Kept = ["tags", "grace", "timeout", "maxDuration", "budget", "failuresBeforeAlert"];
+    private static readonly string[] Kept = ["tags", "grace", "timeout", "maxDuration", "budget", "floor", "failuresBeforeAlert"];
 
     /// <summary>
     /// The app's name for its tag: <c>$CRONWATCH_APP_ID</c> when set, else
@@ -163,7 +163,7 @@ public static class SchedulerBridge
     /// <summary>
     /// The options that declare a job again without its schedule: its description followed by
     /// <c>(no longer scheduled)</c> (<c>A scheduled task</c> when it had none), its tags, grace,
-    /// timeout, maxDuration, budget and failuresBeforeAlert, as stored.
+    /// timeout, maxDuration, budget, floor and failuresBeforeAlert, as stored.
     /// </summary>
     public static JobOptions Unscheduled(Definition def)
     {
@@ -250,6 +250,18 @@ public static class SchedulerBridge
                         if (JsonText.TryNumber(e.Value, out double ceiling))
                         {
                             options.Budget[e.Key] = ceiling;
+                        }
+                    }
+                }
+                break;
+            case "floor":
+                if (value is JsObject floors)
+                {
+                    foreach (var e in floors)
+                    {
+                        if (JsonText.TryNumber(e.Value, out double floor))
+                        {
+                            options.Floor[e.Key] = floor;
                         }
                     }
                 }

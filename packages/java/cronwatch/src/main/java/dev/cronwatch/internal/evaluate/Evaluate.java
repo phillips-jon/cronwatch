@@ -158,7 +158,8 @@ public final class Evaluate {
 
   /**
    * A stored state with every field present, or a fresh one. State written by an older version
-   * lacks the newer fields.
+   * lacks the newer fields. {@code sending} and {@code underFloor} are the exceptions: each is
+   * there only while it holds something.
    */
   public static JobState normalizeState(@Nullable JobState state, String job) {
     if (state == null) {
@@ -433,6 +434,70 @@ public final class Evaluate {
   }
 
   /**
+   * The metrics of a successful run that fell below their floor. A metric with a floor breaches
+   * when it reports less than that floor. One without breaches when it reports 0 or less and either
+   * it did so on the job's last successful run too ({@code previous}, the metrics under their floor
+   * then), or the earlier successful runs that reported it (at least five, the newest twenty) all
+   * reported more than 0. So a job that keeps writing nothing stays under its floor however long it
+   * goes on, and a metric that is always 0 never alerts.
+   */
+  static List<BudgetBreach> floorBreaches(
+      Definition def, Run run, List<Run> history, @Nullable List<String> previous) {
+    List<BudgetBreach> breaches = new ArrayList<>();
+    JsObject floors = def.get("floor") instanceof JsObject f ? f : null;
+    for (Map.Entry<String, Double> e : run.metrics().asMap().entrySet()) {
+      String name = e.getKey();
+      double value = e.getValue();
+      if (floors != null && floors.has(name)) {
+        double floor = jsNumber(floors.get(name));
+        if (value < floor) {
+          breaches.add(new BudgetBreach(name, value, floor, "floor"));
+        }
+        continue;
+      }
+      if (value > 0) {
+        continue;
+      }
+      if (previous != null && previous.contains(name)) {
+        breaches.add(new BudgetBreach(name, value, 0, "0 or less on the run before too"));
+        continue;
+      }
+      List<Double> past = new ArrayList<>();
+      for (Run r : history) {
+        if (past.size() >= BASELINE_WINDOW) {
+          break;
+        }
+        Double v = r.metrics().get(name);
+        if (r.status().equals(RunStatus.OK) && v != null) {
+          past.add(v);
+        }
+      }
+      if (past.size() < BASELINE_MIN_RUNS) {
+        continue;
+      }
+      double lowest = Double.POSITIVE_INFINITY;
+      boolean allAbove = true;
+      for (double v : past) {
+        allAbove &= v > 0;
+        lowest = Math.min(lowest, v);
+      }
+      if (!allAbove) {
+        continue;
+      }
+      breaches.add(
+          new BudgetBreach(
+              name,
+              value,
+              lowest,
+              "the last "
+                  + past.size()
+                  + " runs all reported more than 0, the lowest "
+                  + Format.formatNumber(lowest)));
+    }
+    return breaches;
+  }
+
+  /**
    * JavaScript's {@code Number(v)} for a JSON value, as a comparison with {@code >} coerces one.
    */
   public static double jsNumber(@Nullable Object v) {
@@ -565,6 +630,22 @@ public final class Evaluate {
         }
       } else {
         closeCondition(next, Condition.OVER_BUDGET);
+      }
+
+      List<BudgetBreach> shortfalls = floorBreaches(def, run, history, next.underFloor);
+      if (!shortfalls.isEmpty()) {
+        List<String> metrics = new ArrayList<>();
+        for (BudgetBreach b : shortfalls) {
+          metrics.add(b.metric());
+        }
+        next.underFloor = metrics;
+        if (openCondition(next, Condition.UNDER_FLOOR, now)) {
+          alerts.add(
+              new AlertDraft(AlertType.UNDER_FLOOR, run, new AlertDetails.UnderFloor(shortfalls)));
+        }
+      } else {
+        next.underFloor = null;
+        closeCondition(next, Condition.UNDER_FLOOR);
       }
 
       List<Condition> pending = next.pending();

@@ -49,7 +49,7 @@ struct Datadog {
 
 fn alert_type(t: &AlertType) -> &'static str {
     match t {
-        AlertType::Slow | AlertType::OverBudget => "warning",
+        AlertType::Slow | AlertType::OverBudget | AlertType::UnderFloor => "warning",
         AlertType::Recovered => "success",
         _ => "error",
     }

@@ -87,7 +87,7 @@ defmodule Cronwatch.Alerts.Datadog do
     Shared.send(s.transport || ctx.transport, "Datadog", s.url, headers, JS.stringify(Object.new(event)), [s.api_key])
   end
 
-  defp alert_type(type) when type in ["slow", "over_budget"], do: "warning"
+  defp alert_type(type) when type in ["slow", "over_budget", "under_floor"], do: "warning"
   defp alert_type("recovered"), do: "success"
   defp alert_type(_), do: "error"
 

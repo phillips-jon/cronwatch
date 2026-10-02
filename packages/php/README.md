@@ -1,6 +1,6 @@
 # cronwatch/cronwatch
 
-Cron and scheduled-job monitoring that lives inside your PHP app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make.
+Cron and scheduled-job monitoring that lives inside your PHP app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or falls short. No server to run, no account to make.
 
 This is the PHP port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text, the same requests to every alert channel and the same stored rows, so a PHP process can share one database with a Node, Ruby, Python, Go or Rust process, and every port reads the tables the others write. It has the core, the stores (memory, SQLite, MySQL, MariaDB and Postgres), every alert channel, Claude triage, the pg_cron source, a `vendor/bin/cronwatch check` command, the dashboard and JSON API, a job handler for crons that call a URL, the Laravel and Symfony integrations, a WordPress plugin, a Drupal module and a Craft CMS plugin ([DESIGN.md](DESIGN.md) has how each works).
 
@@ -70,7 +70,7 @@ A run that is never finished is marked stuck by the first check after the job's 
 
 ### Options
 
-`job($name, [...])`: `schedule` (five or six field cron, a nickname such as `@hourly`, or `every 5m`), `timezone` (IANA; default PHP's), `grace` (default `10m`), `timeout` (default `1h`), `maxDuration`, `budget` (`['metric' => ceiling]`), `expect` (a string the output must contain, a `Cronwatch\Pattern` it must match, or a callable), `failuresBeforeAlert` (default 1), `description`, `tags`. Durations are strings like `1h30m`, milliseconds, or a `DateInterval`.
+`job($name, [...])`: `schedule` (five or six field cron, a nickname such as `@hourly`, or `every 5m`), `timezone` (IANA; default PHP's), `grace` (default `10m`), `timeout` (default `1h`), `maxDuration`, `budget` (`['metric' => ceiling]`), `floor` (`['metric' => floor]`: a run reporting less alerts), `expect` (a string the output must contain, a `Cronwatch\Pattern` it must match, or a callable), `failuresBeforeAlert` (default 1), `description`, `tags`. Durations are strings like `1h30m`, milliseconds, or a `DateInterval`.
 
 `new Cronwatch(...)`: `store`, `alerts` (channels or callables; default the console), `triage` (a callable returning a short diagnosis added to each alert), `sources`, `cronSecret` (default `CRON_SECRET`; `null` for none on purpose), `retention` (default `30d`), `defaults`, `redact` (secrets are blanked from output and errors by default; pass your own callable, or `false`), `deliver` (`check` queues alerts for another process's check to send), `onError` (store and channel failures; default PHP's error log), `now`.
 

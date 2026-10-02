@@ -95,11 +95,29 @@ public class PagesTests
         Assert.Equal(Body(Capture("GET", "/cronwatch/jobs/never-ran")), page);
     }
 
+    private static List<Run> ImportRuns(Run latest)
+    {
+        var runs = new List<Run> { latest };
+        for (int i = 1; i <= 5; i++)
+        {
+            long at = latest.StartedAt - (i * 3_600_000L);
+            runs.Add(latest with
+            {
+                Id = latest.Id + "-" + i,
+                StartedAt = at,
+                FinishedAt = at + 800,
+                Metrics = Metrics.Of([new("rows", 125 - i)]),
+            });
+        }
+        return runs;
+    }
+
     [Fact]
     public void The_board_is_the_sdk_s_byte_for_byte()
     {
-        // Every job of the seed but nightly-report has at most one run, its last, so the board's
-        // inputs are all in the API's captures from before anything changed.
+        // Every job of the seed but nightly-report and import has at most one run, its last, so the
+        // board's inputs are in the API's captures from before anything changed. import's five
+        // earlier runs are the seed's, an hour apart before its last.
         JsObject all = Json.ParseObject(Body(Capture("GET", "/cronwatch/api/jobs")));
         var jobs = Fixtures.Objects(all, "jobs").Select(Summary).ToList();
         JsObject nightly = Json.ParseObject(Body(Capture("GET", "/cronwatch/api/jobs/nightly-report")));
@@ -108,6 +126,7 @@ public class PagesTests
         {
             runsByJob[job.Name] = job.Name == "nightly-report"
                 ? Fixtures.Objects(nightly, "runs").Select(Run.FromValue).ToList()
+                : job.Name == "import" && job.LastRun is { } latest ? ImportRuns(latest)
                 : job.LastRun is { } last ? [last] : [];
         }
         var lanes = jobs.Take(Timeline.BoardLanes).Select(j => new LaneInput(j, runsByJob[j.Name], true)).ToList();

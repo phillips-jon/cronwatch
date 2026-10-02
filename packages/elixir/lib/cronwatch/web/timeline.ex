@@ -194,7 +194,7 @@ defmodule Cronwatch.Web.Timeline do
 
   defp tone_of(run, job, _now) do
     latest = job.last_run != nil and job.last_run.id == run.id
-    if latest and ("over_budget" in job.open or "slow" in job.open), do: "warn", else: "ok"
+    if latest and ("over_budget" in job.open or "under_floor" in job.open or "slow" in job.open), do: "warn", else: "ok"
   end
 
   defp timeout_text(job) do
@@ -222,6 +222,7 @@ defmodule Cronwatch.Web.Timeline do
           cond do
             tone != "warn" -> ""
             "over_budget" in job.open -> ", over budget"
+            "under_floor" in job.open -> ", under floor"
             true -> ", slow"
           end
 
@@ -240,6 +241,25 @@ defmodule Cronwatch.Web.Timeline do
       _ ->
         []
     end
+  end
+
+  # The metrics of the job's last run under their floors, or at 0 or less
+  # without one.
+  defp under_floors(%{last_run: nil}), do: []
+
+  defp under_floors(%{last_run: run} = job) do
+    floors =
+      case Object.get(job.definition, "floor") do
+        %Object{} = f -> f
+        _ -> Object.new()
+      end
+
+    for {k, v} <- Object.to_list(run.metrics),
+        (case Object.fetch(floors, k) do
+           {:ok, floor} -> greater?(Evaluate.js_number(floor), v)
+           :error -> v == 0 or greater?(0, v)
+         end),
+        do: k
   end
 
   defp metric(%{last_run: nil}, _k), do: :neg_infinity
@@ -285,6 +305,11 @@ defmodule Cronwatch.Web.Timeline do
       open?.("over_budget") and last != nil ->
         over = over_ceilings(job)
         text = if over == [], do: "went over budget", else: "went over budget on #{Enum.join(over, " and ")}"
+        "#{text} at #{when_utc(last.started_at, now)}"
+
+      open?.("under_floor") and last != nil ->
+        under = under_floors(job)
+        text = if under == [], do: "fell short", else: "fell short on #{Enum.join(under, " and ")}"
         "#{text} at #{when_utc(last.started_at, now)}"
 
       open?.("slow") and last != nil and last.duration_ms != nil ->
@@ -570,7 +595,7 @@ defmodule Cronwatch.Web.Timeline do
       {boxed.("run ok"), "ran"},
       {boxed.("run bad"), "failed"},
       {boxed.("run timeout"), "timed out"},
-      {boxed.("run warn"), "over budget or slow"},
+      {boxed.("run warn"), "over budget, under floor or slow"},
       {boxed.("run running"), "running"},
       {boxed.("missed"), "missed"}
     ]

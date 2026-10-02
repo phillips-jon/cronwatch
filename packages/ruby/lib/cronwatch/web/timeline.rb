@@ -178,7 +178,7 @@ module Cronwatch
         return "timeout" if status == "timeout"
 
         latest = !job.last_run.nil? && job.last_run.id == run.id
-        latest && (open?(job, :over_budget) || open?(job, :slow)) ? "warn" : "ok"
+        latest && (open?(job, :over_budget) || open?(job, :under_floor) || open?(job, :slow)) ? "warn" : "ok"
       end
 
       def timeout_text(job)
@@ -192,7 +192,12 @@ module Cronwatch
         return "running since #{at}, past its #{timeout_text(job)} timeout" if tone == "stuck"
 
         took = run.duration_ms.nil? ? "" : ", took #{Duration.format(run.duration_ms)}"
-        extra = tone == "warn" ? (open?(job, :over_budget) ? ", over budget" : ", slow") : ""
+        extra =
+          if tone != "warn" then ""
+          elsif open?(job, :over_budget) then ", over budget"
+          elsif open?(job, :under_floor) then ", under floor"
+          else ", slow"
+          end
         "#{run.status} at #{at}#{took}#{extra}"
       end
 
@@ -203,6 +208,16 @@ module Cronwatch
           value = metrics.key?(k) ? metrics[k] : metrics[k.to_sym]
           (value.nil? ? -Float::INFINITY : value) > limit
         end.map(&:first)
+      end
+
+      # The metrics of the job's last run under their floors, or at 0 or less without one.
+      def under_floors(job)
+        floors = HTML.entries(job.definition.floor).to_h
+        metrics = job.last_run&.metrics || {}
+        JS.object_keys(metrics).select do |k|
+          value = metrics[k]
+          floors.key?(k.to_s) ? value < floors[k.to_s] : value <= 0
+        end.map(&:to_s)
       end
 
       # What is worth saying about the job in a few words, or nil when all is well.
@@ -225,6 +240,10 @@ module Cronwatch
         if open?(job, :over_budget) && last
           over = over_ceilings(job)
           return "went over budget#{over.empty? ? "" : " on #{over.join(" and ")}"} at #{when_at(last.started_at, now)}"
+        end
+        if open?(job, :under_floor) && last
+          under = under_floors(job)
+          return "fell short#{under.empty? ? "" : " on #{under.join(" and ")}"} at #{when_at(last.started_at, now)}"
         end
         return "slow: took #{Duration.format(last.duration_ms)}" if open?(job, :slow) && !last&.duration_ms.nil?
         return "failing" if open?(job, :failed)
@@ -386,7 +405,7 @@ module Cronwatch
           [box.call("run ok"), "ran"],
           [box.call("run bad"), "failed"],
           [box.call("run timeout"), "timed out"],
-          [box.call("run warn"), "over budget or slow"],
+          [box.call("run warn"), "over budget, under floor or slow"],
           [box.call("run running"), "running"],
           [box.call("missed"), "missed"],
         ]

@@ -7,7 +7,7 @@ group: .NET
 
 # .NET
 
-The `Cronwatch` package is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a .NET process can share one database with a Node, Ruby, Python, PHP, Go, Rust, Elixir or Java process and the [MCP server](/docs/mcp/) works against any of them. This page covers the library itself: a console program a crontab runs, a Generic Host or ASP.NET Core app, hosted jobs on a cron. Hangfire and Quartz.NET have a page of their own: [.NET schedulers](/docs/dotnet-schedulers/).
+The `Cronwatch` package is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow, over budget and under floor by the same rules, sends the same alert text, and writes the same rows, so a .NET process can share one database with a Node, Ruby, Python, PHP, Go, Rust, Elixir or Java process and the [MCP server](/docs/mcp/) works against any of them. This page covers the library itself: a console program a crontab runs, a Generic Host or ASP.NET Core app, hosted jobs on a cron. Hangfire and Quartz.NET have a page of their own: [.NET schedulers](/docs/dotnet-schedulers/).
 
 ```bash
 dotnet add package Cronwatch
@@ -423,7 +423,7 @@ The core, `Cronwatch.Hosting`, `Cronwatch.AspNetCore` and `Cronwatch.Quartz` are
 | `ProcessExitHook` | `true` | see [The current run and the timeout](#the-current-run-and-the-timeout) |
 | `Clock` | `TimeProvider.System` | every time and timer the client uses; a `FakeTimeProvider` in tests |
 
-A job's options, on `JobOptions`: `Schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `Timezone` (IANA; the clock's local zone by default), `Grace` (`"10m"`), `Timeout` (`"1h"`), `MaxDuration`, `Budget` (metrics and their ceilings), `Expect`, `FailuresBeforeAlert` (1), `Description` and `Tags`, with the rules in the [TypeScript API reference](/docs/api/). `Timeout` and `MaxDuration` both measure a run's length: `Timeout` gives up on a run still going (it becomes `timeout`, a failure, and the job is stuck), while `MaxDuration` flags a run that finished successfully but slowly (it stays ok, and the job is slow). Set `Timeout` well above `MaxDuration`: `new JobOptions { MaxDuration = "10m", Timeout = "1h" }`.
+A job's options, on `JobOptions`: `Schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `Timezone` (IANA; the clock's local zone by default), `Grace` (`"10m"`), `Timeout` (`"1h"`), `MaxDuration`, `Budget` (metrics and their ceilings), `Floor` (metrics and their floors; one below its floor, or without one at 0 after runs that all reported more, is under floor), `Expect`, `FailuresBeforeAlert` (1), `Description` and `Tags`, with the rules in the [TypeScript API reference](/docs/api/). `Timeout` and `MaxDuration` both measure a run's length: `Timeout` gives up on a run still going (it becomes `timeout`, a failure, and the job is stuck), while `MaxDuration` flags a run that finished successfully but slowly (it stays ok, and the job is slow). Set `Timeout` well above `MaxDuration`: `new JobOptions { MaxDuration = "10m", Timeout = "1h" }`.
 
 | Method | |
 |---|---|

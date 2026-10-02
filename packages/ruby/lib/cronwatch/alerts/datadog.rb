@@ -9,7 +9,8 @@ module Cronwatch
     # job:<name> and alert:<type>, then `tags`.
     class Datadog
       ALERT_TYPE = {
-        missed: "error", failed: "error", stuck: "error", slow: "warning", over_budget: "warning", recovered: "success",
+        missed: "error", failed: "error", stuck: "error", slow: "warning", over_budget: "warning", under_floor: "warning",
+        recovered: "success",
       }.freeze
       private_constant :ALERT_TYPE
 

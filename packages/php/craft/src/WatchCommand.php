@@ -40,6 +40,8 @@ final class WatchCommand extends Behavior
     public string|int|null $maxDuration = null;
     /** @var array<string, int|float>|null */
     public ?array $budget = null;
+    /** @var array<string, int|float>|null */
+    public ?array $floor = null;
     public ?string $expect = null;
     public ?int $failuresBeforeAlert = null;
     public ?string $description = null;
@@ -58,7 +60,7 @@ final class WatchCommand extends Behavior
     public function options(): array
     {
         $options = [];
-        foreach (['name', 'schedule', 'timezone', 'grace', 'timeout', 'maxDuration', 'budget', 'expect', 'failuresBeforeAlert', 'description', 'tags'] as $key) {
+        foreach (['name', 'schedule', 'timezone', 'grace', 'timeout', 'maxDuration', 'budget', 'floor', 'expect', 'failuresBeforeAlert', 'description', 'tags'] as $key) {
             if ($this->{$key} !== null) {
                 $options[$key] = $this->{$key};
             }

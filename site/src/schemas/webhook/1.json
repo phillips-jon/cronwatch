@@ -41,6 +41,10 @@
       "then": { "properties": { "details": { "$ref": "#/$defs/overBudget" } } }
     },
     {
+      "if": { "properties": { "type": { "const": "under_floor" } } },
+      "then": { "properties": { "details": { "$ref": "#/$defs/underFloor" } } }
+    },
+    {
       "if": { "properties": { "type": { "const": "recovered" } } },
       "then": { "properties": { "details": { "$ref": "#/$defs/recovered" } } }
     }
@@ -48,13 +52,13 @@
   "$defs": {
     "condition": {
       "type": "string",
-      "description": "A condition a job can be in. These five today; a later release may add one.",
-      "examples": ["missed", "failed", "stuck", "slow", "over_budget"]
+      "description": "A condition a job can be in. These six today; a later release may add one.",
+      "examples": ["missed", "failed", "stuck", "slow", "over_budget", "under_floor"]
     },
     "alertType": {
       "type": "string",
-      "description": "A condition that opened, or recovered when conditions closed. These six today; a later release may add one, so treat a type you do not know as you would an unknown condition.",
-      "examples": ["missed", "failed", "stuck", "slow", "over_budget", "recovered"]
+      "description": "A condition that opened, or recovered when conditions closed. These seven today; a later release may add one, so treat a type you do not know as you would an unknown condition.",
+      "examples": ["missed", "failed", "stuck", "slow", "over_budget", "under_floor", "recovered"]
     },
     "duration": {
       "description": "A duration as the job declared it: a string such as \"15m\" or \"1h30m\", or milliseconds.",
@@ -72,6 +76,7 @@
         "timeout": { "$ref": "#/$defs/duration" },
         "maxDuration": { "$ref": "#/$defs/duration" },
         "budget": { "type": "object", "additionalProperties": { "type": "number" } },
+        "floor": { "type": "object", "additionalProperties": { "type": "number" } },
         "expect": { "type": "string", "description": "The expect rule: the string itself, or a description of a pattern or a function." },
         "failuresBeforeAlert": { "type": "integer", "minimum": 1 },
         "description": { "type": "string" },
@@ -140,6 +145,26 @@
               "value": { "type": "number" },
               "limit": { "type": "number" },
               "basis": { "type": "string", "description": "budget, or how the limit was worked out from recent runs." }
+            }
+          }
+        }
+      }
+    },
+    "underFloor": {
+      "type": "object",
+      "required": ["breaches"],
+      "properties": {
+        "breaches": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["metric", "value", "limit", "basis"],
+            "properties": {
+              "metric": { "type": "string" },
+              "value": { "type": "number" },
+              "limit": { "type": "number", "description": "The floor, or for a metric without one the lowest of the earlier runs it was judged against (0 when it was already under its floor on the run before)." },
+              "basis": { "type": "string", "description": "floor, or how the metric was judged against recent runs." }
             }
           }
         }

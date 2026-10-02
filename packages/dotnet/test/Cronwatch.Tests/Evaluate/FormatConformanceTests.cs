@@ -16,7 +16,7 @@ public class FormatConformanceTests
         var f = Fixtures.Load("format");
         var fails = new Fixtures.Failures();
         var alerts = Fixtures.Objects(f, "alerts");
-        Assert.Equal(32, alerts.Count);
+        Assert.Equal(35, alerts.Count);
         int i = 0;
         foreach (var c in alerts)
         {

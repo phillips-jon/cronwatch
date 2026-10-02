@@ -195,15 +195,27 @@ public abstract record AlertDetails
     public sealed record OverBudget(ValueList<BudgetBreach> Breaches) : AlertDetails
     {
         /// <inheritdoc/>
-        public override JsObject ToValue()
+        public override JsObject ToValue() => BreachesValue(Breaches, Unknown);
+
+        internal static JsObject BreachesValue(ValueList<BudgetBreach> breaches, string? unknown)
         {
             var list = new List<object?>();
-            foreach (var b in Breaches)
+            foreach (var b in breaches)
             {
                 list.Add(b.ToValue());
             }
-            return Values.WithUnknown(new JsObject().Set("breaches", list), Unknown);
+            return Values.WithUnknown(new JsObject().Set("breaches", list), unknown);
         }
+    }
+
+    /// <summary>
+    /// Metrics under their floors; a breach's <c>Limit</c> is the floor, or for a metric without
+    /// one the lowest of the earlier runs it was judged against.
+    /// </summary>
+    public sealed record UnderFloor(ValueList<BudgetBreach> Breaches) : AlertDetails
+    {
+        /// <inheritdoc/>
+        public override JsObject ToValue() => OverBudget.BreachesValue(Breaches, Unknown);
     }
 
     /// <summary>
@@ -250,7 +262,7 @@ public abstract record AlertDetails
                 Unknown = Values.Unknown(o, "durationMs", "thresholdMs", "basis"),
             };
         }
-        if (type == AlertType.OverBudget)
+        if (type == AlertType.OverBudget || type == AlertType.UnderFloor)
         {
             var breaches = new List<BudgetBreach>();
             if (o.Get("breaches") is List<object?> list)
@@ -264,7 +276,9 @@ public abstract record AlertDetails
                     });
                 }
             }
-            return new OverBudget(ValueList<BudgetBreach>.Of(breaches)) { Unknown = Values.Unknown(o, "breaches") };
+            var read = ValueList<BudgetBreach>.Of(breaches);
+            string? unknown = Values.Unknown(o, "breaches");
+            return type == AlertType.OverBudget ? new OverBudget(read) { Unknown = unknown } : new UnderFloor(read) { Unknown = unknown };
         }
         if (type == AlertType.Recovered)
         {
@@ -296,10 +310,10 @@ public abstract record AlertDetails
     }
 }
 
-/// <summary>A metric over its budget: the value, the limit, and where the limit came from.</summary>
+/// <summary>A metric over its budget or under its floor: the value, the limit, and where the limit came from.</summary>
 /// <param name="Metric">The metric's name.</param>
 /// <param name="Value">What the run reported.</param>
-/// <param name="Limit">The limit it went over.</param>
+/// <param name="Limit">The limit it went past.</param>
 /// <param name="Basis">Where the limit came from.</param>
 public sealed record BudgetBreach(string Metric, double Value, double Limit, string Basis)
 {

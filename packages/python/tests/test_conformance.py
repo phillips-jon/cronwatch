@@ -824,7 +824,7 @@ def test_webhook_payloads() -> None:
         mine = webhook.signature(c["secret"], request["body"])
         return differs([c["body"], c["signature"], c["signature"]], [request["body"], request["headers"]["x-cronwatch-signature"], f"sha256={mine}"])
 
-    assert len(CHANNELS["webhookPayloads"]) == 15
+    assert len(CHANNELS["webhookPayloads"]) == 16
     each_case(CHANNELS["webhookPayloads"], check)
 
 

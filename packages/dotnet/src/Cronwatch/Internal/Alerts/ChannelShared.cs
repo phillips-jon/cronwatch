@@ -22,7 +22,7 @@ internal static class ChannelShared
         {
             return "info";
         }
-        return type == AlertType.Slow || type == AlertType.OverBudget ? "warning" : "error";
+        return type == AlertType.Slow || type == AlertType.OverBudget || type == AlertType.UnderFloor ? "warning" : "error";
     }
 
     /// <summary>Lowercase hex.</summary>

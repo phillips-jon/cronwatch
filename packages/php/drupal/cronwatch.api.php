@@ -31,7 +31,7 @@ function hook_cronwatch_alerts_alter(array &$channels): void {
  *
  * @param array<string, mixed> $options
  *   The job's options: schedule, grace, timeout, maxDuration, budget,
- *   expect, failuresBeforeAlert, description and tags.
+ *   floor, expect, failuresBeforeAlert, description and tags.
  * @param string $name
  *   The job's name: drupal:cron, drupal:<module> or drupal:queue:<worker>.
  * @param array<string, string> $context

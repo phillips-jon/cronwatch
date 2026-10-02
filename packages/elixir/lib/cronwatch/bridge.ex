@@ -168,12 +168,12 @@ defmodule Cronwatch.Bridge do
 
   # The options a job keeps when it is declared again without its schedule,
   # as the PHP, Go and Rust ports keep them.
-  @kept ["tags", "grace", "timeout", "maxDuration", "budget", "failuresBeforeAlert"]
+  @kept ["tags", "grace", "timeout", "maxDuration", "budget", "floor", "failuresBeforeAlert"]
 
   @doc """
   The options that declare a job again without its schedule: its
   description followed by ` (no longer scheduled)` (`A scheduled task` when
-  it had none), its tags, grace, timeout, maxDuration, budget and
+  it had none), its tags, grace, timeout, maxDuration, budget, floor and
   failuresBeforeAlert.
   """
   @spec unscheduled(Object.t()) :: keyword()
@@ -194,7 +194,7 @@ defmodule Cronwatch.Bridge do
 
   @doc """
   The options that declare a stored definition again, in its order:
-  schedule, timezone, grace, timeout, maxDuration, budget,
+  schedule, timezone, grace, timeout, maxDuration, budget, floor,
   failuresBeforeAlert, description, tags, and expect (`contains` as a
   string, a pattern as a pattern of the same source, run by the JavaScript
   regular expression engine the redaction uses, and a custom function as
@@ -219,8 +219,8 @@ defmodule Cronwatch.Bridge do
   end
 
   # One of the fields unscheduled keeps, as stored: a duration's text as
-  # text and a number of milliseconds as a number, a budget in the order its
-  # metrics were given.
+  # text and a number of milliseconds as a number, a budget or floor in the
+  # order its metrics were given.
   defp field(definition, key) do
     value = Object.get(definition, key)
 
@@ -230,6 +230,7 @@ defmodule Cronwatch.Bridge do
       {"timeout", d} when is_binary(d) or is_number(d) -> [timeout: d]
       {"maxDuration", d} when is_binary(d) or is_number(d) -> [max_duration: d]
       {"budget", %Object{} = b} -> [budget: for({k, v} <- Object.to_list(b), is_number(v), do: {k, v})]
+      {"floor", %Object{} = f} -> [floor: for({k, v} <- Object.to_list(f), is_number(v), do: {k, v})]
       {"failuresBeforeAlert", n} when is_integer(n) and n >= 0 -> [failures_before_alert: n]
       _ -> []
     end

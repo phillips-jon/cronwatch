@@ -12,5 +12,6 @@ final class AlertType
     public const STUCK = 'stuck';
     public const SLOW = 'slow';
     public const OVER_BUDGET = 'over_budget';
+    public const UNDER_FLOOR = 'under_floor';
     public const RECOVERED = 'recovered';
 }

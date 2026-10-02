@@ -2137,6 +2137,98 @@
         ],
         "futureField": 1
       }
+    },
+    {
+      "state": {
+        "job": "j",
+        "open": {
+          "under_floor": 3
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": 3,
+        "underFloor": [
+          "rows",
+          1,
+          null,
+          "files"
+        ]
+      },
+      "normalized": {
+        "job": "j",
+        "open": {
+          "under_floor": 3
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": 3,
+        "pendingRecovery": [],
+        "undelivered": [],
+        "underFloor": [
+          "rows",
+          "files"
+        ]
+      }
+    },
+    {
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "underFloor": []
+      },
+      "normalized": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      }
+    },
+    {
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "underFloor": [
+          1,
+          null
+        ]
+      },
+      "normalized": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      }
+    },
+    {
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "underFloor": "rows"
+      },
+      "normalized": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      }
     }
   ],
   "muteOpens": [
