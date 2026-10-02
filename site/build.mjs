@@ -177,7 +177,10 @@ ${index ? `<meta property="og:url" content="${canonical}">\n` : ""}<meta propert
 <meta property="og:image:alt" content="CronWatch: Cron fails silently. This doesn’t. Beside it, the dashboard's health and last 24 hours.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="${THEME_COLOR}">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
 <link rel="stylesheet" href="https://use.typekit.net/gie6nes.css">
 <script src="${assets.theme}"></script>
 <link rel="stylesheet" href="${assets.css}">
@@ -710,6 +713,9 @@ function build() {
   rmSync(DIST, { recursive: true, force: true });
   mkdirSync(path.join(DIST, "assets"), { recursive: true });
   cpSync(path.join(SRC, "assets"), path.join(DIST, "assets"), { recursive: true });
+  // The icons browsers and phones look for at the root (favicon.ico, apple-touch-icon.png),
+  // and the manifest's; drawn by scripts/make-dashboard-icons.mjs.
+  cpSync(path.join(SRC, "root"), DIST, { recursive: true });
   // JSON Schemas, served at the URL each names as its $id (/schemas/webhook/1.json).
   cpSync(path.join(SRC, "schemas"), path.join(DIST, "schemas"), { recursive: true });
 
