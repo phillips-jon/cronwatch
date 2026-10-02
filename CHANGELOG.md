@@ -2,6 +2,20 @@
 
 Every notable change to CronWatch, newest first. All the packages, in every language, share one version, so each release is one section here, with a line per language where it matters. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and from 1.0 the versions follow [Semantic Versioning](https://semver.org) as the [Stability](https://cronwatch.dev/docs/stability/) page describes. The WordPress plugin, the Drupal module and the Craft CMS plugin keep their own changelogs too, for their stores.
 
+## Unreleased
+
+### Added
+
+Every language:
+
+- The dashboard switches between light and dark on Cmd+Shift+D (Ctrl+Shift+D on Windows and Linux) and keeps the choice in the browser's `localStorage`, under `cronwatch-theme`; until then it follows the system's setting. The dashboard shown inside WordPress, Drupal or Craft CMS does not load the dashboard's script, so it keeps following the system there.
+
+### Fixed
+
+.NET:
+
+- The Hangfire and Quartz.NET integrations no longer walk a cron's fire times again when two reads of the scheduler overlap (the read every minute and the check job, say): the read that ended first dropped what the other had just checked. `FireTimeChecks.BeginRead` starts a read, and what is dropped waits until the last read ends.
+
 ## 0.11.0 - 2026-10-01
 
 The preparation for 1.0: names settled across the languages, internals marked as internal, and the stored data, the JSON API and the webhook made ready to grow without breaking. Names that changed keep working under their old spelling, deprecated (see [Deprecations](https://cronwatch.dev/docs/deprecations/)); the breaking changes for 0.x users are listed first.

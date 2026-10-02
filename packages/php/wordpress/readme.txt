@@ -130,6 +130,10 @@ No. It is in wp-admin, for users who may manage options, and every change it mak
 
 == Changelog ==
 
+= Unreleased =
+
+* Released with the library 0.11.1, whose own dashboard gains a light and dark switch (Cmd+Shift+D); the dashboard in wp-admin is unchanged and follows the system's setting.
+
 = 0.11.0 =
 
 * The `cronwatch_log` action is the documented way to add a line to a run's output; the `cronwatch_log()` function still works.
