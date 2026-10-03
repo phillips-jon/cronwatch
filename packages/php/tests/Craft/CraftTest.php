@@ -406,7 +406,11 @@ final class CraftTest extends TestCase
             'method' => $method, 'header' => implode("\r\n", $lines), 'content' => $body,
             'ignore_errors' => true, 'follow_location' => 0, 'timeout' => 60,
         ]]);
+        error_clear_last();
         $answer = @file_get_contents('http://127.0.0.1:' . self::$port . $path, false, $context);
+        if ($answer === false && ($http_response_header ?? []) === []) {
+            return [0, [], self::noAnswer($method, $path)];
+        }
         $status = 0;
         $out = [];
         foreach ($http_response_header ?? [] as $line) {
@@ -429,6 +433,26 @@ final class CraftTest extends TestCase
             $out[$name] = trim($value);
         }
         return [$status, $out, (string) $answer];
+    }
+
+    /**
+     * Why a request got no answer at all, for the assertion that fails on it:
+     * the client's error, whether the built-in server is still running (and
+     * how it ended if not), and the end of its logs.
+     */
+    private static function noAnswer(string $method, string $path): string
+    {
+        $lines = ["no answer to {$method} {$path}: " . (error_get_last()['message'] ?? 'no error')];
+        if (self::$server !== null) {
+            $proc = proc_get_status(self::$server);
+            $lines[] = $proc['running'] ? 'the server is still running'
+                : "the server has exited: code {$proc['exitcode']}" . ($proc['signaled'] ? ", signal {$proc['termsig']}" : '');
+        }
+        foreach (['server.log', 'php-errors.log'] as $log) {
+            $text = @file_get_contents(self::$root . '/' . $log);
+            $lines[] = "{$log}:\n" . ($text === false || $text === '' ? '(empty)' : substr($text, -4000));
+        }
+        return implode("\n", $lines);
     }
 
     /** The CSRF token for a user's session, from Craft's session-info action. */
@@ -635,8 +659,8 @@ final class CraftTest extends TestCase
         self::must(['cwt/task/push', 'link', '2']);
         try {
             // A queue job run in a request whose Host a visitor chose.
-            [$status] = self::http('GET', '/actions/queue/run', null, ['Host' => 'cronwatch-login.example']);
-            $this->assertSame(200, $status);
+            [$status, , $body] = self::http('GET', '/actions/queue/run', null, ['Host' => 'cronwatch-login.example']);
+            $this->assertSame(200, $status, $body);
             $alerts = self::alerts();
             $this->assertSame([['failed', 'cwt.jobs.Flaky']], array_map(fn ($a) => [$a['type'], $a['job']], $alerts));
             $this->assertStringStartsWith('http://127.0.0.1:' . self::$port . '/', $alerts[0]['link'], 'the primary site\'s host');
