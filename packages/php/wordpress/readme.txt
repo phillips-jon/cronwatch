@@ -137,6 +137,10 @@ No. It is in wp-admin, for users who may manage options, and every change it mak
 
 == Changelog ==
 
+= Unreleased =
+
+* The settings offer every alert channel, not only email, Slack and the webhook: Discord, email through Resend, Postmark, SendGrid, Mailgun or Amazon SES, text messages through Twilio, and Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic. Each sends once its required fields are set; keys and tokens are never shown again once saved, and a channel only partly filled in is named in a notice. The services each one contacts are listed under External services.
+
 = 0.12.0 =
 
 * Released with the library 0.12.0, which adds the `under_floor` alert: a job that runs cleanly but reports a metric below its `floor`, or at 0 after runs that never were, sends one warning. Jobs take a `floor` option beside `budget`.

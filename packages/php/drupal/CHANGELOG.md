@@ -2,6 +2,11 @@
 
 All notable changes to the CronWatch module for Drupal, newest first. Each release carries the CronWatch library (`cronwatch/cronwatch`) of the same version.
 
+## Unreleased
+
+### Added
+- The settings offer every alert channel, not only email, Slack and the webhook: Discord, email through Resend, Postmark, SendGrid, Mailgun or Amazon SES, text messages through Twilio, and Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic. Each sends once its required fields are set, and a channel only partly filled in is refused beside the field it lacks. Run `drush updatedb` (update 10001 adds the new settings).
+
 ## 0.12.0 - 2026-10-01
 
 ### Added
