@@ -60,7 +60,7 @@ The site is static except for one thing: the form on `/contact/` posts to `/cont
 
 Its credentials live only in an env file on the server, never in the repository. To set it up:
 
-1. **SES.** The sender identity (the domain `joncphillips.com`) must be verified in SES in `us-east-1`. While the account is in the SES sandbox it can only send to verified identities; `jon@joncphillips.com` is on the verified domain, so that works either way.
+1. **SES.** The sender identity (the domain `cronwatch.dev`) must be verified in SES in `us-east-1`, with Easy DKIM's three CNAME records added at the DNS host. While the account is in the SES sandbox it can only send to verified identities; `hello@cronwatch.dev` is on the verified domain, so that works either way.
 
 2. **An IAM user that can only send as that address.** Save this as `cronwatch-contact-policy.json`, with your account ID in place of `<account-id>`:
    ```json
@@ -70,13 +70,13 @@ Its credentials live only in an env file on the server, never in the repository.
        {
          "Effect": "Allow",
          "Action": "ses:SendEmail",
-         "Resource": "arn:aws:ses:us-east-1:<account-id>:identity/joncphillips.com",
-         "Condition": { "StringEquals": { "ses:FromAddress": "contact@joncphillips.com" } }
+         "Resource": "arn:aws:ses:us-east-1:<account-id>:identity/*",
+         "Condition": { "StringEquals": { "ses:FromAddress": "hello@cronwatch.dev" } }
        }
      ]
    }
    ```
-   Then, with the AWS CLI signed in as an administrator:
+   The resource is every identity because SES checks the most specific one: with `hello@cronwatch.dev` verified as an address as well as the domain, it checks the address. The condition still holds the key to that one sender. Then, with the AWS CLI signed in as an administrator:
    ```
    aws iam create-user --user-name cronwatch-contact
    aws iam put-user-policy --user-name cronwatch-contact --policy-name ses-send-contact --policy-document file://cronwatch-contact-policy.json
@@ -95,8 +95,8 @@ Its credentials live only in an env file on the server, never in the repository.
    AWS_ACCESS_KEY_ID=<access key id>
    AWS_SECRET_ACCESS_KEY=<secret access key>
    AWS_REGION=us-east-1
-   CONTACT_FROM=CronWatch <contact@joncphillips.com>
-   CONTACT_TO=jon@joncphillips.com
+   CONTACT_FROM=CronWatch <hello@cronwatch.dev>
+   CONTACT_TO=hello@cronwatch.dev
    ```
    Check it with `stat -c '%a %U' ~/.config/cronwatch-contact.env`, which should print `600 joncphillips`. systemd reads the file as root before it starts the service, so nothing else needs to read it.
 
