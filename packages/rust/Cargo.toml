@@ -3,7 +3,7 @@ resolver = "3"
 members = ["cronwatch", "cronwatch-sqlx", "cronwatch-tokio-cron-scheduler", "cronwatch-apalis", "webserver", "examples/crontab"]
 
 [workspace.package]
-version = "0.12.0"
+version = "0.12.1"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
@@ -17,7 +17,7 @@ categories = ["development-tools", "asynchronous"]
 # release's crates always come together. scripts/release.mjs bumps both the
 # version above and the pin here.
 [workspace.dependencies]
-cronwatch = { path = "cronwatch", version = "=0.12.0" }
+cronwatch = { path = "cronwatch", version = "=0.12.1" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

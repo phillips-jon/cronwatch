@@ -2,7 +2,7 @@
   <!-- The release's version lives here alone: every project inherits it, and
        CronwatchClient.Version reads it back from the assembly. -->
   <PropertyGroup>
-    <Version>0.12.0</Version>
+    <Version>0.12.1</Version>
     <Authors>Jon C. Phillips</Authors>
     <Copyright>Copyright (c) Jon C. Phillips</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

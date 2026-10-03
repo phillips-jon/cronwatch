@@ -1,6 +1,6 @@
 # Release Notes for CronWatch
 
-## Unreleased
+## 0.12.1 - 2026-10-03
 
 ### Added
 - The settings offer every alert channel, not only email, Slack and the webhook: Discord, email through Resend, Postmark, SendGrid, Mailgun or Amazon SES, text messages through Twilio, and Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic. Each sends once its required fields are set (`discordWebhookUrl`, `resendApiKey` and the rest, each taking an environment variable), and a channel only partly filled in is refused beside the field it lacks.
