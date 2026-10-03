@@ -36,3 +36,4 @@ packages/dotnet/**/bin/
 packages/dotnet/**/obj/
 packages/dotnet/**/TestResults/
 packages/dotnet/artifacts/
+preflight.yml
