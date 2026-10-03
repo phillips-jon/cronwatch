@@ -216,6 +216,12 @@ if ! $served; then
     exit 1
 fi
 
+# Tell search engines which pages changed since the release that was live
+# (IndexNow). The site is already live, so a failure here only warns.
+if ! node site/scripts/indexnow.mjs "$WEB_ROOT" ${CURRENT_DIR:+"$CURRENT_DIR/$WEB_ROOT"} 9>&-; then
+    echo "IndexNow submission failed; the deploy itself is fine." >&2
+fi
+
 # Keep the newest releases that went live, for rollback; anything else goes.
 LIVE_DIR=$(readlink -f "$LIVE")
 kept=0

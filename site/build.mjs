@@ -29,6 +29,7 @@ const GITHUB = "https://github.com/phillips-jon/cronwatch";
  * and the docs is the parent POM's <revision>, which scripts/release.mjs bumps.
  */
 const JAVA_VERSION = /<revision>([^<]+)<\/revision>/.exec(readFileSync(path.join(here, "..", "packages", "java", "pom.xml"), "utf8"))[1];
+const SDK_VERSION = JSON.parse(readFileSync(path.join(here, "..", "packages", "sdk", "package.json"), "utf8")).version;
 const versioned = (text) => text.replace(/\{\{JAVA_VERSION\}\}/g, () => JAVA_VERSION);
 const args = process.argv.slice(2);
 const WATCHING = args.includes("--watch") || args.includes("--serve");
@@ -752,12 +753,36 @@ function build() {
   const promptHtml = escape(versioned(readFileSync(path.join(SRC, "prompt.txt"), "utf8")));
   landing = landing.replace(/\{\{PROMPT\}\}/g, () => promptHtml);
   for (const [key, value] of Object.entries(demoContent())) landing = landing.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), () => value);
+  const landingDescription = "Cron monitoring as a library for TypeScript, Ruby, Python, PHP, Go, Rust, Elixir, Java and .NET. Every run recorded in your own database, and an alert when one is missed, fails or gets stuck.";
+  // Structured data for search engines. A JSON-LD block is data, not script:
+  // browsers never run it, so the CSP's script-src does not apply. < is
+  // escaped so nothing in it can close the element.
+  const jsonLd = JSON.stringify({
+    "@context": "https://schema.org",
+    "@graph": [
+      { "@type": "WebSite", "@id": `${SITE}/#website`, name: "CronWatch", url: `${SITE}/` },
+      {
+        "@type": "SoftwareApplication",
+        name: "CronWatch",
+        url: `${SITE}/`,
+        description: landingDescription,
+        applicationCategory: "DeveloperApplication",
+        operatingSystem: "Linux, macOS, Windows",
+        softwareVersion: SDK_VERSION,
+        license: "https://opensource.org/licenses/MIT",
+        isAccessibleForFree: true,
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        sameAs: [GITHUB, "https://www.npmjs.com/package/@cronwatch/sdk"],
+      },
+    ],
+  }).replace(/</g, "\\u003c");
   writeFileSync(path.join(DIST, "index.html"), layout({
     title: "CronWatch",
-    description: "Cron monitoring as a library for TypeScript, Ruby, Python, PHP, Go, Rust, Elixir, Java and .NET. Every run recorded in your own database, and an alert when one is missed, fails or gets stuck.",
+    description: landingDescription,
     body: landing,
     path: "/",
     kind: "landing",
+    head: `<script type="application/ld+json">${jsonLd}</script>`,
   }));
 
   // Pages that share a frontmatter `group` are listed under its name. Give
@@ -834,12 +859,19 @@ if (WATCHING) {
 if (args.includes("--serve")) {
   const port = Number(process.env.PORT || 4321);
   const types = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".svg": "image/svg+xml", ".png": "image/png", ".woff2": "font/woff2", ".xml": "application/xml", ".txt": "text/plain", ".json": "application/json" };
+  // The production headers, read from the vhost so the two never drift and a
+  // CSP violation shows up here first. HSTS means nothing over plain HTTP on
+  // localhost, and caching is off here.
+  const nginx = readFileSync(path.join(here, "..", "deploy", "nginx.conf"), "utf8");
+  const headers = Object.fromEntries([...nginx.matchAll(/^\s*add_header ([\w-]+) "([^"]*)" always;/gm)]
+    .filter(([, name]) => name !== "Strict-Transport-Security")
+    .map(([, name, value]) => [name.toLowerCase(), value]));
   createServer((req, res) => {
     const url = new URL(req.url, "http://localhost");
     const clean = path.normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, "");
     const candidates = [clean, path.join(clean, "index.html"), `${clean.replace(/\/$/, "")}.html`].map((c) => path.join(DIST, c));
     const file = candidates.find((c) => c.startsWith(DIST) && existsSync(c) && statSync(c).isFile()) ?? path.join(DIST, "404.html");
-    res.writeHead(file.endsWith("404.html") ? 404 : 200, { "content-type": types[path.extname(file)] ?? "application/octet-stream", "cache-control": "no-store" });
+    res.writeHead(file.endsWith("404.html") ? 404 : 200, { ...headers, "content-type": types[path.extname(file)] ?? "application/octet-stream", "cache-control": "no-store" });
     res.end(readFileSync(file));
   }).listen(port, "127.0.0.1", () => console.log(`serving http://localhost:${port}`));
 }
