@@ -8,6 +8,7 @@ namespace Cronwatch\WordPress;
 
 use Cronwatch\Alert;
 use Cronwatch\Alerts\ChannelContext;
+use Cronwatch\Bridge\ChannelSettings;
 use Cronwatch\Duration;
 use Cronwatch\Js;
 use Cronwatch\JobDefinition;
@@ -79,8 +80,10 @@ final class Admin
      * Sanitizes and saves the posted settings. Returns the notice to show:
      * "saved", or the fields refused, joined by "-" in this order: "grace"
      * when the grace did not parse, "secret" when a webhook secret typed in
-     * held a control character, "token" when a token typed in was refused
-     * ("grace-token" when two were; the rest is saved either way). A token the plugin makes is kept for the page to
+     * held a control character, "token" when a token typed in was refused,
+     * "channels" when another channel is only partly filled in or refused
+     * (its problems kept for the page to show; it sends nothing until they
+     * are fixed) ("grace-token" when two were; the rest is saved either way). A token the plugin makes is kept for the page to
      * show once.
      *
      * @param array<string, mixed> $posted
@@ -88,6 +91,7 @@ final class Admin
     public static function saveSettings(array $posted): string
     {
         $old = Plugin::settings();
+        $refused = [];
         $text = fn (string $key): string => isset($posted[$key]) && is_string($posted[$key]) ? trim($posted[$key]) : '';
         $emails = array_filter(array_map(fn (string $a) => sanitize_email(trim($a)), explode(',', $text('email_to'))), fn (string $a) => $a !== '' && is_email($a));
         $new = [
@@ -98,8 +102,7 @@ final class Admin
             'grace' => $old['grace'],
             'api_enabled' => !empty($posted['api_enabled']) ? '1' : '',
             'api_token' => $old['api_token'],
-        ];
-        $refused = [];
+        ] + self::channelSettings($posted, $old, $refused);
         // The webhook's signing secret: never shown again, so left blank the saved one stays. One typed in is
         // saved exactly as typed, since the receiver signs with the same bytes (sanitize_text_field() would
         // escape "<", strip "%XX" and collapse spaces); one holding a control character is refused.
@@ -133,12 +136,71 @@ final class Admin
                 Duration::parse($grace, 'grace');
                 $new['grace'] = $grace;
             } catch (\Throwable) {
-                array_unshift($refused, 'grace');
+                $refused[] = 'grace';
             }
         }
         update_option(Plugin::SETTINGS, $new, false);
         Plugin::reset();
-        return $refused === [] ? 'saved' : implode('-', $refused);
+        $problems = ChannelSettings::problems(fn (string $key): string => (string) ($new[$key] ?? ''));
+        if ($problems !== []) {
+            set_transient('cronwatch_channels_' . get_current_user_id(), $problems, 600);
+            $refused[] = 'channels';
+        }
+        // "grace" first, then "secret", "token" and "channels", as the page reads them.
+        usort($refused, fn (string $a, string $b): int => array_search($a, self::REFUSALS, true) <=> array_search($b, self::REFUSALS, true));
+        return $refused === [] ? 'saved' : implode('-', array_unique($refused));
+    }
+
+    /** What a save can refuse, in the order its notice names them. */
+    private const REFUSALS = ['grace', 'secret', 'token', 'channels'];
+
+    /**
+     * The other channels' fields (ChannelSettings), each sanitized by its
+     * kind. A secret is never shown again, so one left blank keeps the saved
+     * one, and its "Remove it" box clears it; one typed in is saved exactly
+     * as typed, unless it holds a control character, which is refused
+     * ("secret") and the saved one kept.
+     *
+     * @param array<string, mixed> $posted
+     * @param array<string, string> $old
+     * @param list<string> $refused
+     * @return array<string, string>
+     */
+    private static function channelSettings(array $posted, array $old, array &$refused): array
+    {
+        $new = [];
+        foreach (ChannelSettings::providers() as $provider => $spec) {
+            foreach ($spec['fields'] as $field => $f) {
+                $key = "{$provider}_{$field}";
+                $value = isset($posted[$key]) && is_string($posted[$key]) ? $posted[$key] : '';
+                switch ($f['kind']) {
+                    case 'secret':
+                        $new[$key] = $old[$key] ?? '';
+                        if (!empty($posted["{$key}_clear"])) {
+                            $new[$key] = '';
+                        } elseif (Js::trim($value) !== '') {
+                            if (preg_match('/[\x00-\x1F\x7F]/', $value) === 1 || preg_match('//u', $value) !== 1) {
+                                $refused[] = 'secret';
+                            } else {
+                                $new[$key] = Js::trim($value);
+                            }
+                        }
+                        break;
+                    case 'url':
+                        $new[$key] = esc_url_raw(trim($value), ['https']);
+                        break;
+                    case 'choice':
+                        $new[$key] = array_key_exists($value, $f['options'] ?? []) ? $value : '';
+                        break;
+                    default:
+                        // A from address keeps its "Name <address>" form, which sanitize_text_field() would take for a tag.
+                        $new[$key] = $field === 'from'
+                            ? trim((string) preg_replace('/[\x00-\x1F\x7F]+/', ' ', wp_check_invalid_utf8($value)))
+                            : sanitize_text_field($value);
+                }
+            }
+        }
+        return $new;
     }
 
     /** admin-post.php?action=cronwatch_test */
@@ -194,7 +256,7 @@ final class Admin
         $notice = isset($_GET['cronwatch_notice']) ? sanitize_key(wp_unslash($_GET['cronwatch_notice'])) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- only picks which notice to show.
         echo '<div class="wrap"><h1>' . esc_html__('CronWatch', 'cronwatch') . '</h1>';
         // A save that refused more than one field names each: "grace-token".
-        $refused = array_intersect(explode('-', $notice), ['grace', 'secret', 'token']);
+        $refused = array_intersect(explode('-', $notice), self::REFUSALS);
         if ($notice === 'saved') {
             echo '<div class="notice notice-success"><p>' . esc_html__('Settings saved.', 'cronwatch') . '</p></div>';
         } elseif ($refused !== []) {
@@ -202,11 +264,20 @@ final class Admin
                 echo '<div class="notice notice-error"><p>' . esc_html__('The grace was not a duration such as 10m or 1h30m, so it was left as it was. The rest was saved.', 'cronwatch') . '</p></div>';
             }
             if (in_array('secret', $refused, true)) {
-                echo '<div class="notice notice-error"><p>' . esc_html__('The webhook signing secret was not saved: it may not hold a line break, a tab or another control character. The saved one was kept, and the rest was saved.', 'cronwatch') . '</p></div>';
+                echo '<div class="notice notice-error"><p>' . esc_html__('A secret was not saved: it may not hold a line break, a tab or another control character. The saved one was kept, and the rest was saved.', 'cronwatch') . '</p></div>';
             }
             if (in_array('token', $refused, true)) {
                 /* translators: %d: the least number of characters an API token may have. */
                 echo '<div class="notice notice-error"><p>' . esc_html(sprintf(__('The API token was not saved: it needs at least %d characters, each a letter, a digit or one of . _ ~ + / = -. The rest was saved.', 'cronwatch'), self::TOKEN_MIN)) . '</p></div>';
+            }
+            if (in_array('channels', $refused, true)) {
+                $problems = get_transient('cronwatch_channels_' . get_current_user_id());
+                delete_transient('cronwatch_channels_' . get_current_user_id());
+                echo '<div class="notice notice-warning"><p>' . esc_html__('Saved, but these channels send nothing until they are fixed:', 'cronwatch') . '</p><ul>';
+                foreach (is_array($problems) ? $problems : [] as $problem) {
+                    echo '<li>' . esc_html((string) $problem) . '</li>';
+                }
+                echo '</ul></div>';
             }
         } elseif ($notice === 'tested') {
             $results = get_transient('cronwatch_test_' . get_current_user_id());
@@ -261,6 +332,7 @@ final class Admin
             . ($settings['webhook_secret'] !== '' ? ' <label><input type="checkbox" name="cronwatch[webhook_secret_clear]" value="1"> ' . esc_html__('Remove it', 'cronwatch') . '</label>' : ''), $secret);
         self::row('grace', __('Grace', 'cronwatch'), '<input type="text" class="small-text" id="cronwatch-grace" name="cronwatch[grace]" value="' . esc_attr($settings['grace']) . '">', __('How late an event may run before it counts as missed, such as 10m or 1h.', 'cronwatch'));
         echo '</tbody></table>';
+        self::renderChannels($settings);
 
         echo '<h2>' . esc_html__('JSON API', 'cronwatch') . '</h2>';
         echo '<p>' . esc_html__('Off unless you turn it on. When on, CronWatch\'s JSON API (the jobs, their runs, silencing and the check) answers at the address below to anyone who sends the token, so an MCP server (@cronwatch/mcp) or a script can reach this site. The dashboard itself stays in wp-admin.', 'cronwatch') . '</p>';
@@ -290,6 +362,116 @@ final class Admin
 
         self::renderJobs();
         echo '</div>';
+    }
+
+    /**
+     * The other channels, by section, each folded away until one of its
+     * fields is set.
+     *
+     * @param array<string, string> $settings
+     */
+    private static function renderChannels(array $settings): void
+    {
+        $sections = [
+            ChannelSettings::CHAT => __('Chat', 'cronwatch'),
+            ChannelSettings::EMAIL => __('Email through a provider', 'cronwatch'),
+            ChannelSettings::SMS => __('Text messages', 'cronwatch'),
+            ChannelSettings::TRACKERS => __('Error trackers', 'cronwatch'),
+        ];
+        $intro = [
+            ChannelSettings::EMAIL => __('Email to, above, already sends through the site\'s own mail. Use a provider when the site cannot send mail reliably.', 'cronwatch'),
+        ];
+        echo '<h2>' . esc_html__('More channels', 'cronwatch') . '</h2>';
+        echo '<p>' . esc_html__('Each channel sends once all of its required fields are set. Keys and tokens are never shown again: leave one blank to keep it.', 'cronwatch') . '</p>';
+        $providers = ChannelSettings::providers();
+        foreach ($sections as $section => $title) {
+            echo '<h3>' . esc_html($title) . '</h3>';
+            if (isset($intro[$section])) {
+                echo '<p>' . esc_html($intro[$section]) . '</p>';
+            }
+            foreach ($providers as $provider => $spec) {
+                if ($spec['section'] !== $section) {
+                    continue;
+                }
+                $set = false;
+                foreach (array_keys($spec['fields']) as $field) {
+                    $set = $set || ($settings["{$provider}_{$field}"] ?? '') !== '';
+                }
+                echo '<details class="cronwatch-channel"' . ($set ? ' open' : '') . '><summary><strong>' . esc_html($spec['label']) . '</strong>'
+                    . ($set ? ' ' . esc_html__('(set)', 'cronwatch') : '') . '</summary>';
+                echo '<table class="form-table" role="presentation"><tbody>';
+                foreach ($spec['fields'] as $field => $f) {
+                    $key = "{$provider}_{$field}";
+                    $value = $settings[$key] ?? '';
+                    $attrs = ' id="cronwatch-' . esc_attr($key) . '" name="cronwatch[' . esc_attr($key) . ']"';
+                    $help = isset($f['help']) ? self::text($f['help']) : '';
+                    switch ($f['kind']) {
+                        case 'secret':
+                            $input = '<input type="password" class="regular-text"' . $attrs . ' value="" autocomplete="new-password">';
+                            if ($value !== '') {
+                                $input .= ' <label><input type="checkbox" name="cronwatch[' . esc_attr($key) . '_clear]" value="1"> ' . esc_html__('Remove it', 'cronwatch') . '</label>';
+                                $help = trim(__('One is saved. Leave blank to keep it.', 'cronwatch') . ' ' . $help);
+                            }
+                            break;
+                        case 'choice':
+                            $input = '<select' . $attrs . '>';
+                            foreach ($f['options'] ?? [] as $option => $label) {
+                                $input .= '<option value="' . esc_attr((string) $option) . '"' . selected($value, (string) $option, false) . '>' . esc_html(self::text($label)) . '</option>';
+                            }
+                            $input .= '</select>';
+                            break;
+                        default:
+                            $input = '<input type="' . ($f['kind'] === 'url' ? 'url' : 'text') . '" class="regular-text"' . $attrs . ' value="' . esc_attr($value) . '">';
+                    }
+                    $label = self::text($f['label']) . ($f['required'] ? '' : ' ' . __('(optional)', 'cronwatch'));
+                    self::row($key, $label, $input, $help);
+                }
+                echo '</tbody></table></details>';
+            }
+        }
+    }
+
+    /** A label or help line from ChannelSettings in the site's language (each written out, so it is found for translation). */
+    private static function text(string $english): string
+    {
+        return match ($english) {
+            'Webhook URL' => __('Webhook URL', 'cronwatch'),
+            'API key' => __('API key', 'cronwatch'),
+            'From' => __('From', 'cronwatch'),
+            'To' => __('To', 'cronwatch'),
+            'Server token' => __('Server token', 'cronwatch'),
+            'Message stream' => __('Message stream', 'cronwatch'),
+            'Region' => __('Region', 'cronwatch'),
+            'Domain' => __('Domain', 'cronwatch'),
+            'Access key ID' => __('Access key ID', 'cronwatch'),
+            'Secret access key' => __('Secret access key', 'cronwatch'),
+            'Account SID' => __('Account SID', 'cronwatch'),
+            'Auth token' => __('Auth token', 'cronwatch'),
+            'DSN' => __('DSN', 'cronwatch'),
+            'Environment' => __('Environment', 'cronwatch'),
+            'Site' => __('Site', 'cronwatch'),
+            'Access token' => __('Access token', 'cronwatch'),
+            'Release stage' => __('Release stage', 'cronwatch'),
+            'Account ID' => __('Account ID', 'cronwatch'),
+            'License key' => __('License key', 'cronwatch'),
+            'US' => __('US', 'cronwatch'),
+            'EU' => __('EU', 'cronwatch'),
+            'A channel webhook, from the server\'s Settings, Integrations, Webhooks.' => __('A channel webhook, from the server\'s Settings, Integrations, Webhooks.', 'cronwatch'),
+            'A sender address on a domain the provider has verified, such as CronWatch <alerts@example.com>.' => __('A sender address on a domain the provider has verified, such as CronWatch <alerts@example.com>.', 'cronwatch'),
+            'One or more addresses, separated by commas.' => __('One or more addresses, separated by commas.', 'cronwatch'),
+            'Such as production.' => __('Such as production.', 'cronwatch'),
+            'Empty is the server\'s default transactional stream.' => __('Empty is the server\'s default transactional stream.', 'cronwatch'),
+            'The sending domain, such as mg.example.com.' => __('The sending domain, such as mg.example.com.', 'cronwatch'),
+            'The AWS region the from address is verified in, such as us-east-1.' => __('The AWS region the from address is verified in, such as us-east-1.', 'cronwatch'),
+            'For an IAM user allowed ses:SendEmail.' => __('For an IAM user allowed ses:SendEmail.', 'cronwatch'),
+            'A Twilio number such as +15005550006, or a messaging service SID (MG...).' => __('A Twilio number such as +15005550006, or a messaging service SID (MG...).', 'cronwatch'),
+            'One or more numbers such as +15551110000, separated by commas. Recoveries are not texted.' => __('One or more numbers such as +15551110000, separated by commas. Recoveries are not texted.', 'cronwatch'),
+            'The project\'s DSN, from its Client Keys.' => __('The project\'s DSN, from its Client Keys.', 'cronwatch'),
+            'Such as datadoghq.eu. Empty is datadoghq.com.' => __('Such as datadoghq.eu. Empty is datadoghq.com.', 'cronwatch'),
+            'A project token with the post_server_item scope.' => __('A project token with the post_server_item scope.', 'cronwatch'),
+            'An ingest license key.' => __('An ingest license key.', 'cronwatch'),
+            default => $english,
+        };
     }
 
     private static function row(string $key, string $label, string $field, string $help): void

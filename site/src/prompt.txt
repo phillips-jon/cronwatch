@@ -37,6 +37,32 @@ First decide which steps this project needs:
 If scheduled jobs live in more than one, set up each side where its jobs run;
 they can share one database.
 
+Where alerts go: ask me before you write the client, unless I already said.
+The examples below use Slack, but every language has the same channels, and
+the client takes as many as I want:
+- Slack or Discord: an incoming webhook URL.
+- Webhook: a URL of mine, and a secret if the requests should be signed.
+- Email: Resend, Postmark, SendGrid, Mailgun or Amazon SES. Each needs the
+  provider's API key (for SES, AWS credentials with ses:SendEmail and the
+  region), a from address on a domain the provider has verified, and the
+  address or addresses to send to. CronWatch has no mail server of its own.
+- SMS: Twilio, with an account SID, an auth token, a from number and the
+  numbers to text.
+- Error trackers: Sentry, Honeybadger, Datadog, Rollbar, Bugsnag or New
+  Relic, with the project's DSN or API key.
+- WordPress, Drupal and Craft CMS: the settings page has every channel above,
+  and email through the site's own mail, which needs no provider. Nothing to
+  write in code: tell me what to fill in there, and to press "Send a test
+  alert" once it is saved.
+With no channel, alerts only go to the console, which nobody reads in
+production. Read every key, token and address from the environment or the
+framework's secrets, never from the code. Add the variable names to
+.env.example or this project's equivalent, and tell me at the end which
+accounts, keys and verified sender I still have to set up. If I named a
+channel without its details, wire it up from those variables anyway rather
+than leaving it out. Each channel's options: https://cronwatch.dev/docs/alerts/
+and the language's page.
+
 TypeScript and Node
 
 1. Install it with the driver for the store you will use in step 2 (it needs
@@ -773,6 +799,8 @@ Rules for you:
 - Use the real schedules already in use. Do not change when anything runs.
 - Keep the job names stable and human readable; they are the identity of the
   job across restarts and deploys.
+- Send alerts where I asked (see "Where alerts go" above). Do not finish with
+  only the console unless I chose that.
 - Do not add a retry loop or an uptime ping. CronWatch records what happened; it
   does not re-run work.
 - If this project already has a dashboard route or auth, mount cw.routes()

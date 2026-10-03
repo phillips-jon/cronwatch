@@ -776,6 +776,51 @@ final class DrupalTest extends TestCase
         $this->assertSame(403, $status);
     }
 
+    public function testTheOtherChannelsAreSetInTheFormAndMadeIntoChannels(): void
+    {
+        self::signIn('admin');
+        [$status, , $form] = self::http('GET', '/admin/config/system/cronwatch', 'admin');
+        $this->assertSame(200, $status);
+        $this->assertStringContainsString('More channels', $form);
+        $this->assertStringContainsString('id="edit-resend-api-key"', $form);
+        $this->assertStringContainsString('id="edit-newrelic-region"', $form);
+
+        $result = self::inDrupal(<<<'PHP'
+            $submit = function (array $values): array {
+                $state = (new \Drupal\Core\Form\FormState())->setValues($values + ['grace' => '10m', 'schedule' => '', 'check_on_cron' => 1, 'queues' => []]);
+                \Drupal::formBuilder()->submitForm(\Drupal\cronwatch\Form\SettingsForm::class, $state);
+                return array_map('strval', $state->getErrors());
+            };
+            // The test module's capturing channel (a closure) left out.
+            $names = fn (): array => array_values(array_map(fn ($c) => $c->name(), array_filter(\Drupal::service('cronwatch.recorder')->channels(), fn ($c) => $c instanceof \Cronwatch\Alerts\AlertChannel)));
+            $out = [];
+            $out['partial'] = $submit(['resend_api_key' => 're_123', 'resend_to' => 'ops@example.com']);
+            $out['partialSaved'] = \Drupal::config('cronwatch.settings')->get('resend_api_key');
+            $out['bad'] = $submit(['discord_webhook_url' => 'discord.com/x', 'newrelic_account_id' => 'abc', 'newrelic_license_key' => 'k']);
+            $out['ok'] = $submit([
+                'discord_webhook_url' => 'https://discord.com/api/webhooks/1/x',
+                'resend_api_key' => ' re_123 ', 'resend_from' => 'CronWatch <alerts@example.com>', 'resend_to' => 'ops@example.com',
+                'twilio_account_sid' => 'AC1', 'twilio_auth_token' => 't', 'twilio_from' => '+15005550006', 'twilio_to' => '+15551110000',
+            ]);
+            \Drupal::service('cronwatch.recorder')->reset();
+            $out['saved'] = \Drupal::config('cronwatch.settings')->get('resend_api_key');
+            $out['names'] = $names();
+            // Every field emptied (a programmatic submission takes a field it is not given from the form's defaults).
+            $out['cleared'] = $submit(\Cronwatch\Bridge\ChannelSettings::defaults());
+            \Drupal::service('cronwatch.recorder')->reset();
+            $out['clearedNames'] = $names();
+            echo json_encode($out);
+            PHP);
+        $this->assertSame(['resend_from' => 'Resend: From is required, or clear the other Resend fields to turn it off.'], $result['partial']);
+        $this->assertSame('', $result['partialSaved'], 'a form with an error saves nothing');
+        $this->assertSame(['discord_webhook_url' => 'Enter an http or https URL.', 'newrelic_account_id' => 'NewRelic needs a numeric accountId'], $result['bad']);
+        $this->assertSame([], $result['ok']);
+        $this->assertSame('re_123', $result['saved']);
+        $this->assertSame(['discord', 'resend', 'twilio'], $result['names']);
+        $this->assertSame([], $result['cleared']);
+        $this->assertSame([], $result['clearedNames']);
+    }
+
     public function testCronFromItsUrlAndFromAutomatedCron(): void
     {
         $before = count(self::runs('drupal:cron'));

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\cronwatch\Form;
 
+use Cronwatch\Bridge\ChannelSettings;
 use Cronwatch\Bridge\TestAlert;
 use Cronwatch\Duration;
 use Cronwatch\Schedule;
@@ -131,6 +132,8 @@ final class SettingsForm extends ConfigFormBase {
       '#maxlength' => 1024,
     ];
 
+    $this->channelFields($form, $config);
+
     $form['jobs'] = [
       '#type' => 'details',
       '#title' => $this->t('Jobs'),
@@ -180,6 +183,65 @@ final class SettingsForm extends ConfigFormBase {
   }
 
   /**
+   * The other channels' fields, by section, each provider folded away
+   * until one of its fields is set.
+   */
+  private function channelFields(array &$form, $config): void {
+    $sections = [
+      ChannelSettings::CHAT => $this->t('Chat'),
+      ChannelSettings::EMAIL => $this->t('Email through a provider'),
+      ChannelSettings::SMS => $this->t('Text messages'),
+      ChannelSettings::TRACKERS => $this->t('Error trackers'),
+    ];
+    $form['channels'] = [
+      '#type' => 'details',
+      '#title' => $this->t('More channels'),
+      '#open' => TRUE,
+      '#description' => $this->t('Each channel sends once all of its required fields are set. Email alerts to, above, already sends through the site\'s own mail; use a provider when the site cannot send mail reliably.'),
+    ];
+    foreach ($sections as $section => $title) {
+      $form['channels'][$section] = [
+        '#type' => 'fieldset',
+        '#title' => $title,
+      ];
+    }
+    foreach (ChannelSettings::providers() as $provider => $spec) {
+      $set = FALSE;
+      foreach (array_keys($spec['fields']) as $field) {
+        $set = $set || (string) $config->get("{$provider}_{$field}") !== '';
+      }
+      $group = [
+        '#type' => 'details',
+        // A provider's name, the same in every language.
+        '#title' => $spec['label'],
+        '#open' => $set,
+      ];
+      foreach ($spec['fields'] as $field => $f) {
+        $key = "{$provider}_{$field}";
+        $group[$key] = [
+          '#type' => $f['kind'] === 'choice' ? 'select' : 'textfield',
+          // phpcs:ignore Drupal.Semantics.FunctionT.NotLiteralString -- the labels and help ChannelSettings holds, translated where a translation exists.
+          '#title' => $this->t($f['label']),
+          '#default_value' => (string) $config->get($key),
+          '#maxlength' => 2048,
+        ];
+        if (isset($f['help'])) {
+          // phpcs:ignore Drupal.Semantics.FunctionT.NotLiteralString
+          $group[$key]['#description'] = $this->t($f['help']);
+        }
+        if ($f['kind'] === 'choice') {
+          $group[$key]['#options'] = $f['options'] ?? [];
+          unset($group[$key]['#maxlength']);
+        }
+        if (!$f['required'] && $f['kind'] !== 'choice') {
+          $group[$key]['#title'] = $this->t('@label (optional)', ['@label' => $group[$key]['#title']]);
+        }
+      }
+      $form['channels'][$spec['section']][$provider] = $group;
+    }
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function validateForm(array &$form, FormStateInterface $form_state) {
@@ -199,6 +261,10 @@ final class SettingsForm extends ConfigFormBase {
         $form_state->setErrorByName('schedule', $error->getMessage());
       }
     }
+    $problems = ChannelSettings::problems(fn (string $key): string => (string) $form_state->getValue($key));
+    foreach ($problems as $key => $message) {
+      $form_state->setErrorByName($key, $message);
+    }
     foreach (['slack_webhook_url', 'webhook_url'] as $key) {
       $url = trim((string) $form_state->getValue($key));
       if ($url !== '' && preg_match('#^https?://[^/\s]+#i', $url) !== 1) {
@@ -213,7 +279,11 @@ final class SettingsForm extends ConfigFormBase {
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $queues = array_values(array_filter((array) $form_state->getValue('queues'), fn ($value) => is_string($value) && $value !== ''));
     $before = (array) $this->config('cronwatch.settings')->get('queues');
-    $this->config('cronwatch.settings')
+    $config = $this->config('cronwatch.settings');
+    foreach (array_keys(ChannelSettings::defaults()) as $key) {
+      $config->set($key, trim((string) $form_state->getValue($key)));
+    }
+    $config
       ->set('email_to', trim((string) $form_state->getValue('email_to')))
       ->set('slack_webhook_url', trim((string) $form_state->getValue('slack_webhook_url')))
       ->set('webhook_url', trim((string) $form_state->getValue('webhook_url')))

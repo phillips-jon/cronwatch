@@ -7,6 +7,7 @@ namespace Cronwatch\Craft;
 use Cronwatch\Alert;
 use Cronwatch\Alerts\Slack;
 use Cronwatch\Alerts\Webhook;
+use Cronwatch\Bridge\ChannelSettings;
 use Cronwatch\Bridge\JobName;
 use Cronwatch\Bridge\Unscheduled;
 use Cronwatch\CheckResult;
@@ -106,11 +107,12 @@ final class Recorder
     {
         $settings = $this->settings();
         $link = fn (Alert $alert): string => $this->jobUrl($alert->job);
+        $site = (string) (Craft::$app->getSystemName() ?? '');
+        $prefix = $site !== '' ? "[{$site}]" : null;
         $channels = [];
         $email = $settings->value('emailTo');
         if ($email !== '') {
-            $site = (string) (Craft::$app->getSystemName() ?? '');
-            $channels[] = new MailChannel($email, $site !== '' ? "[{$site}]" : null, $link);
+            $channels[] = new MailChannel($email, $prefix, $link);
         }
         $slack = $settings->value('slackWebhookUrl');
         if ($slack !== '') {
@@ -121,6 +123,14 @@ final class Recorder
             $secret = $settings->value('webhookSecret');
             $channels[] = new Webhook($webhook, [], $secret !== '' ? $secret : null);
         }
+        // Discord, the email providers, Twilio and the error trackers, each once its required fields are set.
+        array_push($channels, ...ChannelSettings::channels(
+            fn (string $key): string => $settings->value(ChannelSettings::camel($key)),
+            $link,
+            $prefix,
+            null,
+            fn (\Throwable $error) => $this->report($error, 'settings'),
+        ));
         $event = new AlertsEvent(['channels' => $channels]);
         Event::trigger(Plugin::class, Plugin::EVENT_ALERTS, $event);
         return array_values($event->channels);

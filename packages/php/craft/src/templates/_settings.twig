@@ -41,6 +41,48 @@
   disabled: 'webhookSecret' in overrides,
 }) }}
 
+<h2>{{ 'More channels'|t('cronwatch') }}</h2>
+<p>{{ 'Each channel sends once all of its required fields are set. Put keys and tokens in environment variables ($RESEND_API_KEY) to keep them out of project config.'|t('cronwatch') }}</p>
+
+{% for section in sections %}
+  <h3>{{ section.title|t('cronwatch') }}</h3>
+  {% if section.intro %}<p>{{ section.intro|t('cronwatch') }}</p>{% endif %}
+  {% for provider in section.providers %}
+    <details class="cronwatch-channel"{{ provider.open ? ' open' }}>
+      <summary><strong>{{ provider.label }}</strong></summary>
+      {% for field in provider.fields %}
+        {% set label = field.label|t('cronwatch') ~ (field.required or field.kind == 'choice' ? '' : ' ' ~ '(optional)'|t('cronwatch')) %}
+        {% if field.kind == 'choice' %}
+          {% set options = [] %}
+          {% for value, text in field.options %}
+            {% set options = options|merge([{label: text|t('cronwatch'), value: value}]) %}
+          {% endfor %}
+          {{ forms.selectField({
+            label: label,
+            name: field.name,
+            value: attribute(settings, field.name),
+            options: options,
+            errors: settings.getErrors(field.name),
+            disabled: field.name in overrides,
+          }) }}
+        {% else %}
+          {{ forms.autosuggestField({
+            label: label,
+            instructions: field.help is defined ? field.help|t('cronwatch') : null,
+            name: field.name,
+            value: attribute(settings, field.name),
+            suggestEnvVars: true,
+            errors: settings.getErrors(field.name),
+            disabled: field.name in overrides,
+          }) }}
+        {% endif %}
+      {% endfor %}
+    </details>
+  {% endfor %}
+{% endfor %}
+
+<hr>
+
 {{ forms.textField({
   label: 'Grace'|t('cronwatch'),
   instructions: 'How late a run may be before it is reported missed, such as 10m or 1h.'|t('cronwatch'),
@@ -55,3 +97,10 @@
   file: tag('code', {text: 'config/cronwatch.php'}),
   command: tag('code', {text: 'php craft cronwatch/check'}),
 })|raw }}</p>
+
+<hr>
+
+<div class="field">
+  <button type="button" class="btn formsubmit" data-action="cronwatch/settings/test-alert">{{ 'Send a test alert'|t('cronwatch') }}</button>
+  <p class="light">{{ 'Sends one alert to every channel the saved settings name and shows what each answered. Save your changes first.'|t('cronwatch') }}</p>
+</div>

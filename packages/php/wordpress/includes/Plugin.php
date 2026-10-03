@@ -7,6 +7,7 @@ namespace Cronwatch\WordPress;
 \defined('ABSPATH') || exit;
 
 use Cronwatch\Alerts\Slack;
+use Cronwatch\Bridge\ChannelSettings;
 use Cronwatch\Alerts\Transport;
 use Cronwatch\Alerts\Webhook;
 use Cronwatch\CheckResult;
@@ -30,6 +31,17 @@ final class Plugin
     public const CHECK_SCHEDULE = 'cronwatch_five_minutes';
     public const SETTINGS = 'cronwatch_settings';
     public const DEFAULTS = ['email_to' => '', 'slack_webhook_url' => '', 'webhook_url' => '', 'webhook_secret' => '', 'grace' => '10m', 'api_enabled' => '', 'api_token' => ''];
+
+    /**
+     * Every setting with its default: DEFAULTS and the other channels'
+     * (ChannelSettings: discord_webhook_url, resend_api_key, ...).
+     *
+     * @return array<string, string>
+     */
+    public static function defaults(): array
+    {
+        return self::DEFAULTS + ChannelSettings::defaults();
+    }
 
     private static ?Watcher $watcher = null;
     private static ?Cronwatch $client = null;
@@ -89,7 +101,7 @@ final class Plugin
     {
         global $wpdb;
         (new WpdbStore($wpdb))->install();
-        add_option(self::SETTINGS, self::DEFAULTS, '', false);
+        add_option(self::SETTINGS, self::defaults(), '', false);
         if (!wp_next_scheduled(self::CHECK_HOOK)) {
             add_filter('cron_schedules', [self::class, 'schedules']);
             wp_schedule_event(time() + 60, self::CHECK_SCHEDULE, self::CHECK_HOOK);
@@ -145,7 +157,8 @@ final class Plugin
     public static function settings(): array
     {
         $saved = get_option(self::SETTINGS, []);
-        return array_replace(self::DEFAULTS, is_array($saved) ? array_intersect_key($saved, self::DEFAULTS) : []);
+        $defaults = self::defaults();
+        return array_replace($defaults, is_array($saved) ? array_intersect_key($saved, $defaults) : []);
     }
 
     /**
@@ -159,9 +172,10 @@ final class Plugin
     {
         $settings ??= self::settings();
         $link = fn (\Cronwatch\Alert $alert): string => AdminDashboard::jobUrl($alert->job);
+        $prefix = '[' . wp_specialchars_decode((string) get_bloginfo('name'), ENT_QUOTES) . ']';
         $channels = [];
         if ($settings['email_to'] !== '') {
-            $channels[] = new WpMail($settings['email_to'], null, '[' . wp_specialchars_decode((string) get_bloginfo('name'), ENT_QUOTES) . ']', $link);
+            $channels[] = new WpMail($settings['email_to'], null, $prefix, $link);
         }
         if ($settings['slack_webhook_url'] !== '') {
             $channels[] = new Slack($settings['slack_webhook_url'], $link, new WpHttp());
@@ -169,6 +183,14 @@ final class Plugin
         if ($settings['webhook_url'] !== '') {
             $channels[] = new Webhook($settings['webhook_url'], [], $settings['webhook_secret'] !== '' ? $settings['webhook_secret'] : null, new WpHttp());
         }
+        // Discord, the email providers, Twilio and the error trackers, each once its required fields are set.
+        array_push($channels, ...ChannelSettings::channels(
+            fn (string $key): string => (string) ($settings[$key] ?? ''),
+            $link,
+            $prefix,
+            new WpHttp(),
+            fn (\Throwable $error) => self::report($error, 'settings'),
+        ));
         $channels = apply_filters('cronwatch_alerts', $channels);
         return is_array($channels) ? array_values($channels) : [];
     }

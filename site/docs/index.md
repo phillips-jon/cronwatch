@@ -53,6 +53,33 @@ export const cw = cronwatch({
 
 Without a store, runs live in memory and vanish on restart. Without alerts, they go to the console. Both are fine while trying it out.
 
+### Where alerts go
+
+Slack is only the example. `alerts` takes any number of channels, each its own import, and every alert goes to all of them:
+
+| Channel | Import | What it needs |
+| --- | --- | --- |
+| Slack | `slack` from `@cronwatch/sdk/slack` | an incoming webhook URL |
+| Discord | `discord` from `@cronwatch/sdk/discord` | a channel webhook URL |
+| Webhook | `webhook` from `@cronwatch/sdk/webhook` | your URL, and a secret if requests should be signed |
+| Email | `resend`, `postmark`, `sendgrid`, `mailgun` or `ses` from `@cronwatch/sdk/<name>` | the provider's API key, a `from` address the provider has verified, and `to` |
+| SMS | `twilio` from `@cronwatch/sdk/twilio` | an account SID, an auth token, a from number (or messaging service) and the numbers to text |
+| Error trackers | `sentry`, `honeybadger`, `datadog`, `rollbar`, `bugsnag` or `newrelic` | the project's API key or DSN |
+| Your own | `custom(name, fn)` from `@cronwatch/sdk` | a function that sends the alert |
+
+Email, for instance, through Resend:
+
+```ts
+import { resend } from "@cronwatch/sdk/resend";
+
+alerts: [
+  slack({ webhookUrl: process.env.SLACK_WEBHOOK_URL! }),
+  resend({ apiKey: process.env.RESEND_API_KEY!, from: "CronWatch <alerts@example.com>", to: "ops@example.com" }),
+],
+```
+
+CronWatch sends through your own accounts, so the keys and addresses are yours to create; keep them in the environment, not the code. Every channel's options are in [Alerts](/docs/alerts/).
+
 ## Declare each job
 
 The declaration is the schedule the job is supposed to keep. Declare it once, next to the client, and export the handle.

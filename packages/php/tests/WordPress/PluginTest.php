@@ -145,27 +145,28 @@ final class PluginTest extends TestCase
             $this->assertMatchesRegularExpression('/\bwp_print_styles\(\[self::STYLE\]\);/', $adminDashboard);
             $this->assertMatchesRegularExpression("/new Dashboard\\([^;]*head: \\[self::class, 'head'\\]\\);/", $adminDashboard);
             $this->assertMatchesRegularExpression("/new Dashboard\\([^;]*head: \\[AdminDashboard::class, 'head'\\]\\);/", $api);
-            // The library's files the plugin never runs are left out: no curl, no alert channels but Slack and the
-            // webhook (the ones its settings offer), no AWS signing, no triage, no standalone page head (with its
-            // inline stylesheet and script), no PDO stores, no pg_cron, no PSR adapters, no Laravel or Symfony.
+            // The library's files the plugin never runs are left out: no curl, no triage, no standalone page head
+            // (with its inline stylesheet and script), no PDO stores, no pg_cron, no PSR adapters, no Laravel or
+            // Symfony. Every alert channel ships, since the settings offer each one (ChannelSettings, the one
+            // file of Bridge/ the plugin runs).
             $leftOut = ['Alerts/NativeHttp.php', 'Cli.php', 'Sources/PgCron.php', 'Sources/PgCronPdo.php', 'Store/MysqlStore.php', 'Store/PdoStore.php',
                 'Store/PostgresStore.php', 'Store/SqliteStore.php', 'Web/PsrHandler.php', 'Web/PsrMiddleware.php', 'Web/PsrJobHandler.php',
-                'Store/Migrated.php', 'Watch.php', 'Web/StandaloneHead.php', 'Web/DevelopmentToken.php', 'Alerts/SigV4.php'];
-            foreach (['Bugsnag', 'Datadog', 'Discord', 'Honeybadger', 'Mailgun', 'NewRelic', 'Postmark', 'Resend', 'Rollbar', 'Sendgrid', 'Sentry', 'Ses', 'Twilio'] as $channel) {
-                $leftOut[] = "Alerts/{$channel}.php";
-            }
+                'Store/Migrated.php', 'Watch.php', 'Web/StandaloneHead.php', 'Web/DevelopmentToken.php'];
             $src = dirname(__DIR__, 2) . '/src';
-            // Every channel the library has is either left out or one the plugin runs.
             foreach (glob("{$src}/Alerts/*.php") ?: [] as $file) {
                 $relative = 'Alerts/' . basename($file);
                 if (!in_array($relative, $leftOut, true)) {
-                    $this->assertContains(basename($file, '.php'), ['AlertChannel', 'ChannelContext', 'Console', 'Custom', 'Email', 'Http', 'HttpResponse', 'RequestTimeout', 'Shared', 'Slack', 'Transport', 'Webhook'], "{$relative} is shipped: leave it out, or say why the plugin needs it");
+                    $this->assertContains("cronwatch/lib/src/{$relative}", $names, "{$relative} is a channel the settings can name");
                 }
             }
+            $this->assertContains('cronwatch/lib/src/Bridge/ChannelSettings.php', $names);
             foreach (['Bridge', 'Laravel', 'Symfony', 'Triage'] as $dir) {
                 $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator("{$src}/{$dir}", \FilesystemIterator::SKIP_DOTS));
                 foreach ($files as $file) {
                     $relative = substr($file->getPathname(), strlen($src) + 1);
+                    if ($relative === 'Bridge/ChannelSettings.php') {
+                        continue;
+                    }
                     $this->assertNotContains("cronwatch/lib/src/{$relative}", $names);
                     if (preg_match('#(^|/)[A-Z][A-Za-z]*\.php$#', $relative) === 1) {
                         $leftOut[] = $relative;

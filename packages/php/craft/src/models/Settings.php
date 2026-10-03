@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Cronwatch\Craft\models;
 
+use Cronwatch\Bridge\ChannelSettings;
 use Cronwatch\Duration;
 use craft\base\Model;
 use craft\helpers\App;
@@ -27,6 +28,77 @@ final class Settings extends Model
 
     /** When set, webhook requests are signed (X-CronWatch-Signature). */
     public string $webhookSecret = '';
+
+    /*
+     * Discord, the email providers, Twilio and the error trackers: each
+     * setting of ChannelSettings in camel case (discord_webhook_url is
+     * discordWebhookUrl). A provider sends once its required fields are set.
+     */
+
+    // Discord
+    public string $discordWebhookUrl = '';
+
+    // Resend
+    public string $resendApiKey = '';
+    public string $resendFrom = '';
+    public string $resendTo = '';
+
+    // Postmark
+    public string $postmarkServerToken = '';
+    public string $postmarkFrom = '';
+    public string $postmarkTo = '';
+    public string $postmarkMessageStream = '';
+
+    // SendGrid
+    public string $sendgridApiKey = '';
+    public string $sendgridFrom = '';
+    public string $sendgridTo = '';
+    public string $sendgridRegion = '';
+
+    // Mailgun
+    public string $mailgunApiKey = '';
+    public string $mailgunDomain = '';
+    public string $mailgunFrom = '';
+    public string $mailgunTo = '';
+    public string $mailgunRegion = '';
+
+    // Amazon SES
+    public string $sesRegion = '';
+    public string $sesAccessKeyId = '';
+    public string $sesSecretAccessKey = '';
+    public string $sesFrom = '';
+    public string $sesTo = '';
+
+    // Twilio
+    public string $twilioAccountSid = '';
+    public string $twilioAuthToken = '';
+    public string $twilioFrom = '';
+    public string $twilioTo = '';
+
+    // Sentry
+    public string $sentryDsn = '';
+    public string $sentryEnvironment = '';
+
+    // Honeybadger
+    public string $honeybadgerApiKey = '';
+    public string $honeybadgerEnvironment = '';
+
+    // Datadog
+    public string $datadogApiKey = '';
+    public string $datadogSite = '';
+
+    // Rollbar
+    public string $rollbarAccessToken = '';
+    public string $rollbarEnvironment = '';
+
+    // Bugsnag
+    public string $bugsnagApiKey = '';
+    public string $bugsnagReleaseStage = '';
+
+    // New Relic
+    public string $newrelicAccountId = '';
+    public string $newrelicLicenseKey = '';
+    public string $newrelicRegion = '';
 
     /** How late a run may be before it is reported missed. */
     public string $grace = '10m';
@@ -65,7 +137,7 @@ final class Settings extends Model
     protected function defineRules(): array
     {
         return [
-            [['emailTo', 'slackWebhookUrl', 'webhookUrl', 'webhookSecret', 'grace', 'apiToken'], 'string'],
+            [['emailTo', 'slackWebhookUrl', 'webhookUrl', 'webhookSecret', 'grace', 'apiToken', ...self::channelAttributes()], 'string'],
             [['grace'], 'required'],
             [['grace'], function (string $attribute): void {
                 try {
@@ -80,6 +152,22 @@ final class Settings extends Model
                     $this->addError($attribute, 'Enter an http or https URL.');
                 }
             }],
+            // Each provider partly filled in, or refused by its channel, named beside its field (checked once, on the first).
+            [[self::channelAttributes()[0]], function (): void {
+                foreach (ChannelSettings::problems(fn (string $key): string => $this->value(ChannelSettings::camel($key))) as $key => $message) {
+                    $this->addError(ChannelSettings::camel($key), $message);
+                }
+            }, 'skipOnEmpty' => false],
         ];
+    }
+
+    /**
+     * The other channels' settings, as this model names them.
+     *
+     * @return list<string>
+     */
+    public static function channelAttributes(): array
+    {
+        return array_map(ChannelSettings::camel(...), array_keys(ChannelSettings::defaults()));
     }
 }

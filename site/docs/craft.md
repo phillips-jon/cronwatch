@@ -108,7 +108,10 @@ Settings, Plugins, CronWatch:
 
 - **Email alerts to** (`emailTo`): sent through Craft's mailer, with the library's subject, text and HTML.
 - **Slack incoming webhook URL** (`slackWebhookUrl`), **Webhook URL** (`webhookUrl`) and **Webhook signing secret** (`webhookSecret`): the library's channels; the webhook is signed with the secret in `X-CronWatch-Signature` when there is one.
+- **More channels**, each folded under its name until one of its fields is set: Discord; email through Resend, Postmark, SendGrid, Mailgun or Amazon SES, for a site whose own mail is not reliable; text messages through Twilio; and the error trackers Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic. Each asks for what its provider needs (an API key, a from address on a domain the provider has verified, the addresses or numbers to send to, and the provider's options such as the region) and sends once every required field is set. A provider only partly filled in is refused beside the field it lacks. Their names are the provider and the field in camel case: `discordWebhookUrl`, `resendApiKey`, `resendFrom`, `resendTo`, `sesRegion`, `twilioAccountSid`, `newrelicLicenseKey`.
 - **Grace** (`grace`, 10 minutes by default).
+
+"Send a test alert" sends one to every channel the saved settings name (and any a listener adds) and shows what each answered, including a partial failure (one address of several refused, say); with none set, it says so and sends nothing. It is for admins, as the settings are.
 
 Each field takes an environment variable (`$SLACK_WEBHOOK_URL`), so a credential need not be in project config. Anything set in `config/cronwatch.php` wins over the form, whose fields it sets are shown disabled; Craft keeps plugin settings in project config, so a production site that disallows admin changes sets them there:
 
@@ -116,6 +119,9 @@ Each field takes an environment variable (`$SLACK_WEBHOOK_URL`), so a credential
 return [
     'emailTo' => 'ops@example.com',
     'slackWebhookUrl' => '$SLACK_WEBHOOK_URL',
+    'resendApiKey' => '$RESEND_API_KEY',
+    'resendFrom' => 'CronWatch <alerts@example.com>',
+    'resendTo' => 'ops@example.com',
     'apiToken' => '$CRONWATCH_TOKEN',
     // 'commands' => [...], 'queueJobs' => [...],
 ];
@@ -123,7 +129,7 @@ return [
 
 Alerts link to the job's page in the Control Panel, at `baseCpUrl` when it is set, else at the site's `@web`. Where `@web` is not set in config, Craft takes it from each request, so an alert sent from a web request (a queue job the Control Panel ran) links to the primary site's URL instead, and a site whose URL is `@web` itself sends alerts without a link; set `baseCpUrl` or `@web` for links everywhere.
 
-Nothing leaves the site until a channel is set; with none, alerts go to Craft's log (the `cronwatch` category), as do failures outside jobs. A listener adds channels, any of the library's ([PHP](/docs/php/#email-sms-and-error-trackers)) or a callable taking the `Cronwatch\Alert`:
+Nothing leaves the site until a channel is set; with none, alerts go to Craft's log (the `cronwatch` category), as do failures outside jobs. A listener adds channels beyond the settings', any of the library's with options the form does not offer ([PHP](/docs/php/#email-sms-and-error-trackers)) or a callable taking the `Cronwatch\Alert`:
 
 ```php
 use Cronwatch\Craft\AlertsEvent;

@@ -754,6 +754,65 @@ final class CraftTest extends TestCase
         $this->assertStringNotContainsString('`', $form);
     }
 
+    public function testTheOtherChannelsAndTheTestAlert(): void
+    {
+        self::signIn('admin');
+        self::signIn('viewer');
+        $origin = ['Origin' => 'http://127.0.0.1:' . self::$port, 'Content-Type' => 'application/x-www-form-urlencoded'];
+
+        [$status, , $form] = self::http('GET', '/admin/settings/plugins/cronwatch', 'admin');
+        $this->assertSame(200, $status);
+        $this->assertStringContainsString('More channels', $form);
+        $this->assertStringContainsString('"name":"settings[resendApiKey]"', $form, 'an environment variable field, which Craft draws from JSON');
+        $this->assertStringContainsString('name="settings[newrelicRegion]"', $form);
+        $this->assertStringContainsString('data-action="cronwatch/settings/test-alert"', $form);
+
+        // Half a provider is refused beside its field, and nothing is saved.
+        // Posted to the page, as its form is, so a refused save shows the page again.
+        $save = fn (array $settings): array => self::http('POST', '/admin/settings/plugins/cronwatch', 'admin', $origin, http_build_query([
+            'CRAFT_CSRF_TOKEN' => self::csrf('admin'), 'action' => 'plugins/save-plugin-settings', 'pluginHandle' => 'cronwatch', 'settings' => $settings + ['grace' => '10m'],
+        ]));
+        [$status, , $page] = $save(['resendApiKey' => 're_123', 'resendTo' => 'ops@example.com']);
+        $this->assertSame(200, $status, 'the form is shown again with its errors');
+        $this->assertStringContainsString('Resend: From is required', $page);
+
+        // No channel of the settings': the test goes to the test module's own (an EVENT_ALERTS listener).
+        self::clearAlerts();
+        [$status, $headers] = self::http('POST', '/admin/actions/cronwatch/settings/test-alert', 'admin', $origin, 'CRAFT_CSRF_TOKEN=' . rawurlencode(self::csrf('admin')));
+        $this->assertSame(302, $status);
+        $this->assertStringContainsString('/admin/settings/plugins/cronwatch', $headers['location']);
+        $this->assertSame([['type' => 'failed', 'job' => 'cronwatch-test', 'title' => 'CronWatch test alert']], array_map(fn ($a) => array_intersect_key($a, ['type' => 1, 'job' => 1, 'title' => 1]), self::alerts()));
+        [, , $page] = self::http('GET', '/admin/settings/plugins/cronwatch', 'admin');
+        $this->assertStringContainsString('Sent through custom.', $page);
+
+        // A Discord URL nothing answers (the built-in server takes one request at a time, so not its own): the page
+        // says which channel failed and why.
+        $config = self::$root . '/config/cronwatch.php';
+        $before = (string) file_get_contents($config);
+        file_put_contents($config, str_replace("return [\n", "return [\n    'discordWebhookUrl' => 'http://127.0.0.1:" . self::freePort() . "/cwt-no-hook',\n", $before));
+        self::stopServer();
+        try {
+            [$status, , $form] = self::http('GET', '/admin/settings/plugins/cronwatch', 'admin');
+            $this->assertSame(200, $status);
+            $this->assertSame(1, preg_match('#"inputProps":\{[^}]*"name":"settings\[discordWebhookUrl\]"[^}]*\}#', $form, $props));
+            $this->assertStringContainsString('"disabled":true', $props[0], 'config/cronwatch.php wins over the form');
+            [$status] = self::http('POST', '/admin/actions/cronwatch/settings/test-alert', 'admin', $origin, 'CRAFT_CSRF_TOKEN=' . rawurlencode(self::csrf('admin')));
+            $this->assertSame(302, $status);
+            [, , $page] = self::http('GET', '/admin/settings/plugins/cronwatch', 'admin');
+            $this->assertStringContainsString('Sent through custom.', $page);
+            $this->assertStringContainsString('discord failed: ', $page);
+
+            [$status] = self::http('POST', '/admin/actions/cronwatch/settings/test-alert', 'viewer', $origin, 'CRAFT_CSRF_TOKEN=' . rawurlencode(self::csrf('viewer')));
+            $this->assertSame(403, $status, 'only an admin may');
+            [$status] = self::http('POST', '/admin/actions/cronwatch/settings/test-alert', 'admin', $origin, '');
+            $this->assertSame(400, $status, 'no CSRF token, no alert');
+        } finally {
+            file_put_contents($config, $before);
+            self::stopServer();
+            self::clearAlerts();
+        }
+    }
+
     public function testTheJsonApiNeedsAToken(): void
     {
         [$status] = self::http('GET', '/cronwatch/api/jobs');

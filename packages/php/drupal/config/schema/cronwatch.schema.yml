@@ -14,6 +14,123 @@ cronwatch.settings:
     webhook_secret:
       type: string
       label: 'Webhook signing secret'
+    discord_webhook_url:
+      type: string
+      label: 'Discord: Webhook URL'
+    resend_api_key:
+      type: string
+      label: 'Resend: API key'
+    resend_from:
+      type: string
+      label: 'Resend: From'
+    resend_to:
+      type: string
+      label: 'Resend: To'
+    postmark_server_token:
+      type: string
+      label: 'Postmark: Server token'
+    postmark_from:
+      type: string
+      label: 'Postmark: From'
+    postmark_to:
+      type: string
+      label: 'Postmark: To'
+    postmark_message_stream:
+      type: string
+      label: 'Postmark: Message stream'
+    sendgrid_api_key:
+      type: string
+      label: 'SendGrid: API key'
+    sendgrid_from:
+      type: string
+      label: 'SendGrid: From'
+    sendgrid_to:
+      type: string
+      label: 'SendGrid: To'
+    sendgrid_region:
+      type: string
+      label: 'SendGrid: Region'
+    mailgun_api_key:
+      type: string
+      label: 'Mailgun: API key'
+    mailgun_domain:
+      type: string
+      label: 'Mailgun: Domain'
+    mailgun_from:
+      type: string
+      label: 'Mailgun: From'
+    mailgun_to:
+      type: string
+      label: 'Mailgun: To'
+    mailgun_region:
+      type: string
+      label: 'Mailgun: Region'
+    ses_region:
+      type: string
+      label: 'Amazon SES: Region'
+    ses_access_key_id:
+      type: string
+      label: 'Amazon SES: Access key ID'
+    ses_secret_access_key:
+      type: string
+      label: 'Amazon SES: Secret access key'
+    ses_from:
+      type: string
+      label: 'Amazon SES: From'
+    ses_to:
+      type: string
+      label: 'Amazon SES: To'
+    twilio_account_sid:
+      type: string
+      label: 'Twilio: Account SID'
+    twilio_auth_token:
+      type: string
+      label: 'Twilio: Auth token'
+    twilio_from:
+      type: string
+      label: 'Twilio: From'
+    twilio_to:
+      type: string
+      label: 'Twilio: To'
+    sentry_dsn:
+      type: string
+      label: 'Sentry: DSN'
+    sentry_environment:
+      type: string
+      label: 'Sentry: Environment'
+    honeybadger_api_key:
+      type: string
+      label: 'Honeybadger: API key'
+    honeybadger_environment:
+      type: string
+      label: 'Honeybadger: Environment'
+    datadog_api_key:
+      type: string
+      label: 'Datadog: API key'
+    datadog_site:
+      type: string
+      label: 'Datadog: Site'
+    rollbar_access_token:
+      type: string
+      label: 'Rollbar: Access token'
+    rollbar_environment:
+      type: string
+      label: 'Rollbar: Environment'
+    bugsnag_api_key:
+      type: string
+      label: 'Bugsnag: API key'
+    bugsnag_release_stage:
+      type: string
+      label: 'Bugsnag: Release stage'
+    newrelic_account_id:
+      type: string
+      label: 'New Relic: Account ID'
+    newrelic_license_key:
+      type: string
+      label: 'New Relic: License key'
+    newrelic_region:
+      type: string
+      label: 'New Relic: Region'
     grace:
       type: string
       label: 'Grace'

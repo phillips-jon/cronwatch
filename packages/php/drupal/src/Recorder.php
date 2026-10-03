@@ -7,6 +7,7 @@ namespace Drupal\cronwatch;
 use Cronwatch\Alert;
 use Cronwatch\Alerts\Slack;
 use Cronwatch\Alerts\Webhook;
+use Cronwatch\Bridge\ChannelSettings;
 use Cronwatch\Bridge\JobName;
 use Cronwatch\Bridge\Unscheduled;
 use Cronwatch\CheckResult;
@@ -197,10 +198,11 @@ final class Recorder {
     $settings = $this->settings();
     $link = fn (Alert $alert): string => $this->jobUrl($alert->job);
     $channels = [];
+    $site = (string) $this->configFactory->get('system.site')->get('name');
+    $prefix = $site !== '' ? "[{$site}]" : NULL;
     $email = trim((string) $settings->get('email_to'));
     if ($email !== '') {
-      $site = (string) $this->configFactory->get('system.site')->get('name');
-      $channels[] = new MailChannel($this->mail, $this->languages, $email, $site !== '' ? "[{$site}]" : NULL, $link);
+      $channels[] = new MailChannel($this->mail, $this->languages, $email, $prefix, $link);
     }
     $slack = trim((string) $settings->get('slack_webhook_url'));
     if ($slack !== '') {
@@ -211,6 +213,14 @@ final class Recorder {
       $secret = (string) $settings->get('webhook_secret');
       $channels[] = new Webhook($webhook, [], $secret !== '' ? $secret : NULL);
     }
+    // Discord, the email providers, Twilio and the error trackers, each once its required fields are set.
+    array_push($channels, ...ChannelSettings::channels(
+      fn (string $key): string => (string) $settings->get($key),
+      $link,
+      $prefix,
+      NULL,
+      fn (\Throwable $error) => $this->report($error, 'settings'),
+    ));
     $this->moduleHandler->alter('cronwatch_alerts', $channels);
     return array_values($channels);
   }

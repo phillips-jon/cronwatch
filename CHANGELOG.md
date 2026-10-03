@@ -2,6 +2,15 @@
 
 Every notable change to CronWatch, newest first. All the packages, in every language, share one version, so each release is one section here, with a line per language where it matters. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and from 1.0 the versions follow [Semantic Versioning](https://semver.org) as the [Stability](https://cronwatch.dev/docs/stability/) page describes. The WordPress plugin, the Drupal module and the Craft CMS plugin keep their own changelogs too, for their stores.
 
+## Unreleased
+
+### Added
+
+PHP:
+
+- The WordPress plugin, the Drupal module and the Craft CMS plugin offer every alert channel in their settings, not only email, Slack and the webhook: Discord, email through Resend, Postmark, SendGrid, Mailgun or Amazon SES, text messages through Twilio, and Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic. Each sends once its required fields are set, and a channel only partly filled in is named on save. The WordPress plugin's zip now carries those channels. See [WordPress](https://cronwatch.dev/docs/wordpress/#settings), [Drupal](https://cronwatch.dev/docs/drupal/#settings) and [Craft CMS](https://cronwatch.dev/docs/craft/#settings).
+- The Craft CMS plugin's settings gain "Send a test alert", as WordPress's and Drupal's have.
+
 ## 0.12.0 - 2026-10-01
 
 ### Added

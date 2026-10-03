@@ -1,6 +1,6 @@
 ---
 title: WordPress
-description: The CronWatch plugin for WordPress: every WP-Cron event watched with no code, alerts by email, Slack or webhook, a real cron for quiet sites, the dashboard in wp-admin and the JSON API for agents.
+description: The CronWatch plugin for WordPress: every WP-Cron event watched with no code, alerts by email, Slack, Discord, SMS, a webhook or an error tracker, a real cron for quiet sites, the dashboard in wp-admin and the JSON API for agents.
 order: 3.73
 group: PHP
 ---
@@ -64,6 +64,7 @@ CronWatch, Settings, for administrators (`manage_options`):
 - **Email to**: one address or several, separated by commas, sent with `wp_mail()`, the way the site sends its other mail. The subject starts with the site's name.
 - **Slack webhook URL**: an incoming webhook.
 - **Webhook URL** and **secret**: each alert is posted there as JSON, signed with the secret in `X-CronWatch-Signature` (HMAC-SHA256 of the body) when there is one.
+- **More channels**, each folded under its name until one of its fields is set: Discord; email through Resend, Postmark, SendGrid, Mailgun or Amazon SES, for a site whose own mail is not reliable; text messages through Twilio; and the error trackers Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic. Each asks for what its provider needs (an API key, a from address on a domain the provider has verified, the addresses or numbers to send to, and the provider's options such as the region) and sends once every required field is set. Keys, tokens and the DSN are never shown again once saved: left blank, the saved one is kept, and a "Remove it" box beside it clears it. A provider only partly filled in is saved, and the notice names what it still needs; it sends nothing until then.
 - **Grace**: how late an event may run before it counts as missed, such as `10m` (the default) or `1h`.
 
 Nothing leaves the site until a channel is set; with none, alerts go to the PHP error log. "Send a test alert" sends one where a real alert would go and says what happened:
@@ -71,7 +72,7 @@ Nothing leaves the site until a channel is set; with none, alerts go to the PHP 
 - With no channel set, it is written to the PHP error log, and the notice says so.
 - With channels set, it goes to each one, and a notice per channel says it was sent or why it failed. A channel that sent it but reported a partial failure (one address of several refused, say) has that added to its notice.
 
-A save that refuses the grace or the API token names each one it refused and saves the rest. Below the test button, the watched events are listed with their health, last run and next due time. Email and Slack alerts link to the event's page in wp-admin. Slack and the webhook are sent through `wp_remote_post()`, with no redirects followed and a ten second timeout.
+A save that refuses the grace, a secret (one holding a line break or another control character) or the API token names each one it refused and saves the rest. Below the test button, the watched events are listed with their health, last run and next due time. Alerts link to the event's page in wp-admin. Every channel but email is sent through `wp_remote_post()`, with no redirects followed and a ten second timeout.
 
 ## The dashboard
 
@@ -126,7 +127,7 @@ add_filter( 'cronwatch_client_args', function ( array $args ) {
 } );
 ```
 
-The plugin carries only the channels its settings offer: email through `wp_mail()`, Slack and the webhook. The library's other channels (Discord, Resend, Twilio, Sentry and the rest; see [PHP](/docs/php/#email-sms-and-error-trackers)) and triage come with the Composer package, `composer require cronwatch/cronwatch`, which has them; they send through `wp_remote_post()` here.
+The plugin carries every channel the library has, since its settings offer each one; the filter adds one with options the form does not offer ([PHP](/docs/php/#email-sms-and-error-trackers)), sent through `wp_remote_post()` here. Triage comes with the Composer package, `composer require cronwatch/cronwatch`, which has it.
 
 `cronwatch_reject_unsafe_urls` decides whether an alert URL may reach a private address or an unusual port (WordPress's `reject_unsafe_urls`): true on a multisite network, where a site's administrators may not be the network's, and false otherwise.
 

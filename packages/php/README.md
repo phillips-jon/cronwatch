@@ -174,7 +174,7 @@ Register `Cronwatch\Symfony\CronwatchBundle` (Symfony 6.4, 7.4 and 8.1): every S
 
 ### WordPress
 
-The CronWatch plugin (`wordpress/`) watches every WP-Cron event with no code, with alerts by email, Slack or webhook and the dashboard in wp-admin. See [WordPress](https://cronwatch.dev/docs/wordpress/).
+The CronWatch plugin (`wordpress/`) watches every WP-Cron event with no code, with alerts by email, Slack, a webhook or any of the library's other channels and the dashboard in wp-admin. See [WordPress](https://cronwatch.dev/docs/wordpress/).
 
 ### Drupal
 

@@ -29,7 +29,7 @@ It needs no change to your code or your other plugins. Every scheduled event bec
 
 What a run prints is kept as its output. Your own code can add lines with `do_action( 'cronwatch_log', 'sent 40 emails' );`.
 
-Alerts go by email (through `wp_mail()`, the way the site sends its other mail), to Slack, or to any URL as a signed JSON webhook: set them under CronWatch, Settings, where you can also send a test alert and see each event's health.
+Alerts go by email (through `wp_mail()`, the way the site sends its other mail), to Slack, or to any URL as a signed JSON webhook. If you use them, they can also go to Discord, by email through Resend, Postmark, SendGrid, Mailgun or Amazon SES, by text message through Twilio, or to Sentry, Honeybadger, Datadog, Rollbar, Bugsnag or New Relic. Set them under CronWatch, Settings, where you can also send a test alert and see each event's health.
 
 The CronWatch menu in wp-admin opens the dashboard, for administrators: every event's health at a glance, the last 24 hours as a timeline (when each event was due, when it ran and for how long, and the slots nothing ran in), and for each event its last seven days, its runs with their output and errors, and buttons to silence it, forget it or run the check now.
 
@@ -63,7 +63,7 @@ CronWatch finds missed runs with a check every five minutes, which it schedules 
 
 = For developers =
 
-* `cronwatch_alerts` (filter): the list of alert channels (the email, Slack and webhook ones the settings made). Add any object implementing `Cronwatch\Alerts\AlertChannel`, or a callable taking the `Cronwatch\Alert`.
+* `cronwatch_alerts` (filter): the list of alert channels (the ones the settings made). Add any object implementing `Cronwatch\Alerts\AlertChannel`, or a callable taking the `Cronwatch\Alert`.
 * `cronwatch_watch_event` (filter): return false to leave an event unwatched. Given `true`, the hook, its arguments and its recurrence name (null for a single event).
 * `cronwatch_job_options` (filter): a job's options (`grace`, `timeout`, `maxDuration`, `failuresBeforeAlert`, `description`, `tags`), given the options, the hook, its arguments and its recurrence. Options CronWatch refuses are written to the error log, and the job keeps its own.
 * `cronwatch_client_args` (filter): the arguments the library's client is made with (its store, alert channels, default grace and error handler).
@@ -89,6 +89,13 @@ CronWatch contacts an outside service only to deliver an alert, and only one the
 * Email: sent with `wp_mail()`, the way your site sends its other mail (your host, or an SMTP or mail service plugin you chose), to the addresses you enter, with a link to the event's page in your wp-admin. The plugin itself contacts no mail service.
 * Slack: when you enter a Slack incoming webhook URL, each alert is posted to it as a message, with the alert described above and a link to the event's page in your wp-admin. Slack is a service of Slack Technologies: [terms of service](https://slack.com/main-services-agreement), [privacy policy](https://slack.com/trust/privacy/privacy-policy).
 * Webhook: when you enter a webhook URL, each alert is posted to it as JSON (the alert described above, and the job's definition), signed with the secret you give, if any. The URL is your own endpoint, or a service you chose, whose terms then apply; the plugin sends nothing to it until you enter it.
+
+Under More channels, each of these services is contacted only once you have filled in its fields (your own account's key or token, and where to send), and is then sent each alert described above, with a link to the event's page in your wp-admin. The plugin sends nothing to any of them until then.
+
+* Discord, at the channel webhook URL you enter, as a message: [terms of service](https://discord.com/terms), [privacy policy](https://discord.com/privacy).
+* Resend, Postmark, SendGrid, Mailgun and Amazon SES, through their APIs, as an email from the address and to the addresses you enter: Resend ([terms](https://resend.com/legal/terms-of-service), [privacy](https://resend.com/legal/privacy-policy)), Postmark ([terms](https://postmarkapp.com/terms-of-service), [privacy](https://postmarkapp.com/privacy-policy)), SendGrid, a Twilio service ([terms](https://www.twilio.com/en-us/legal/tos), [privacy](https://www.twilio.com/en-us/legal/privacy)), Mailgun ([terms](https://www.mailgun.com/legal/terms/), [privacy](https://www.mailgun.com/legal/privacy-policy/)) and Amazon SES, an Amazon Web Services service ([terms](https://aws.amazon.com/service-terms/), [privacy](https://aws.amazon.com/privacy/)).
+* Twilio, through its API, as a text message from the number you enter to the numbers you enter (not for recoveries): [terms](https://www.twilio.com/en-us/legal/tos), [privacy](https://www.twilio.com/en-us/legal/privacy).
+* Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic, through their APIs, as an event or error in the project your key belongs to: Sentry ([terms](https://sentry.io/terms/), [privacy](https://sentry.io/privacy/)), Honeybadger ([terms](https://www.honeybadger.io/terms/), [privacy](https://www.honeybadger.io/privacy/)), Datadog ([terms](https://www.datadoghq.com/legal/terms/), [privacy](https://www.datadoghq.com/legal/privacy/)), Rollbar ([terms](https://rollbar.com/terms/), [privacy](https://rollbar.com/privacy/)), Bugsnag, a SmartBear service ([terms](https://smartbear.com/terms-of-use/), [privacy](https://smartbear.com/privacy/)) and New Relic ([terms](https://newrelic.com/termsandconditions/terms), [privacy](https://newrelic.com/termsandconditions/privacy)).
 
 The plugin contacts no other service.
 
@@ -125,7 +132,7 @@ No. It is in wp-admin, for users who may manage options, and every change it mak
 
 1. The dashboard in wp-admin (CronWatch in the admin menu): every WP-Cron event's health at a glance, and the last 24 hours as a timeline of when each event was due, when it ran and for how long.
 2. An event's page on the dashboard: its last seven days, its runs with their output and errors, and the buttons to silence it, forget it or run the check now.
-3. CronWatch, Settings: where alerts go (email, Slack, a webhook), the grace a run is given, and the JSON API with its token.
+3. CronWatch, Settings: where alerts go (email, Slack, a webhook, and more channels below them), the grace a run is given, and the JSON API with its token.
 4. The foot of the settings page: the "Send a test alert" button and the watched events with their health, last run and next due time.
 
 == Changelog ==

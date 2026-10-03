@@ -603,7 +603,7 @@ final class WordPressTest extends TestCase
             $_GET = ['cronwatch_notice' => $out['control']];
             ob_start();
             Admin::render();
-            $out['controlNotice'] = str_contains(ob_get_clean(), 'The webhook signing secret was not saved');
+            $out['controlNotice'] = str_contains(ob_get_clean(), 'A secret was not saved');
             $_GET = [];
             ob_start();
             Admin::render();
@@ -628,7 +628,7 @@ final class WordPressTest extends TestCase
             'grace' => '1h30m',
             'api_enabled' => '',
             'api_token' => '',
-        ], $result['after'], 'the JSON API stays off unless asked for');
+        ] + \Cronwatch\Bridge\ChannelSettings::defaults(), $result['after'], 'the JSON API stays off unless asked for');
         $this->assertStringContainsString('cronwatch_notice=grace', $result['keep']);
         $this->assertSame('shh-its-a-secret', $result['kept']['webhook_secret'], 'a blank secret keeps the saved one');
         $this->assertSame('grace-token', $result['both']);
@@ -642,6 +642,55 @@ final class WordPressTest extends TestCase
         $this->assertFalse($result['pageHasSecret'], 'the secret is never shown');
         $this->assertTrue($result['pageHasNonce']);
         $this->assertTrue($result['pageLinksTheDashboard']);
+    }
+
+    public function testTheOtherChannelsAreSavedMadeIntoChannelsAndTheirKeysNeverShown(): void
+    {
+        $result = self::inWp(<<<'PHP'
+            use Cronwatch\WordPress\Admin;
+            use Cronwatch\WordPress\Plugin;
+            wp_set_current_user(get_user_by('login', 'admin')->ID);
+            remove_all_filters('cronwatch_alerts');
+            $names = fn (): array => array_map(fn ($c) => $c->name(), Plugin::channels());
+            $page = function (string $notice = ''): string {
+                $_GET = $notice === '' ? [] : ['cronwatch_notice' => $notice];
+                ob_start();
+                Admin::render();
+                return (string) ob_get_clean();
+            };
+            $out = [];
+            // Half a provider: saved, but named as sending nothing, and no channel made.
+            $out['partial'] = Admin::saveSettings(['resend_api_key' => ' re_123 ', 'resend_to' => 'ops@example.com', 'grace' => '10m']);
+            $out['partialNames'] = $names();
+            $out['partialNotice'] = str_contains($page($out['partial']), 'Resend: From is required');
+            // Finished, with the key left blank (kept), a from address with a name, Discord, and a key with a newline (refused).
+            $out['done'] = Admin::saveSettings([
+                'resend_api_key' => '', 'resend_from' => 'CronWatch <alerts@example.com>', 'resend_to' => 'ops@example.com, dev@example.com',
+                'discord_webhook_url' => ' https://discord.com/api/webhooks/1/x ', 'sentry_dsn' => "https://k@o1.ingest.sentry.io/2\nx",
+                'sendgrid_region' => 'mars', 'grace' => '10m',
+            ]);
+            $saved = get_option('cronwatch_settings');
+            $out['saved'] = [$saved['resend_api_key'], $saved['resend_from'], $saved['discord_webhook_url'], $saved['sentry_dsn'], $saved['sendgrid_region']];
+            $out['names'] = $names();
+            $html = $page();
+            $out['page'] = [str_contains($html, 'More channels'), str_contains($html, 'id="cronwatch-resend_api_key"'), str_contains($html, 're_123'), str_contains($html, 'name="cronwatch[resend_api_key_clear]"')];
+            // The box beside a saved key clears it, and the provider is off again.
+            $out['cleared'] = Admin::saveSettings(['resend_api_key_clear' => '1', 'resend_from' => 'alerts@example.com', 'resend_to' => 'ops@example.com', 'grace' => '10m']);
+            $out['clearedNames'] = $names();
+            delete_transient('cronwatch_channels_' . get_current_user_id());
+            update_option('cronwatch_settings', Plugin::DEFAULTS);
+            Plugin::reset();
+            echo json_encode($out);
+            PHP);
+        $this->assertSame('channels', $result['partial']);
+        $this->assertSame([], $result['partialNames'], 'a provider missing a required field is no channel');
+        $this->assertTrue($result['partialNotice']);
+        $this->assertSame('secret', $result['done'], 'the DSN with a newline in it is refused');
+        $this->assertSame(['re_123', 'CronWatch <alerts@example.com>', 'https://discord.com/api/webhooks/1/x', '', ''], $result['saved']);
+        $this->assertSame(['discord', 'resend'], $result['names']);
+        $this->assertSame([true, true, false, true], $result['page'], 'the fields are there and the saved key is not');
+        $this->assertSame('channels', $result['cleared']);
+        $this->assertSame([], $result['clearedNames']);
     }
 
     public function testTheTestAlertGoesToEveryChannelAndWpMailReportsAFailure(): void

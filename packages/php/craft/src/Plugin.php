@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Cronwatch\Craft;
 
+use Cronwatch\Bridge\ChannelSettings;
 use Cronwatch\Craft\models\Settings;
 use Craft;
 use craft\base\Model;
@@ -94,11 +95,40 @@ final class Plugin extends BasePlugin
     protected function settingsHtml(): ?string
     {
         $file = Craft::$app->getConfig()->getConfigFromFile($this->handle);
+        $settings = $this->getSettings();
         return Craft::$app->getView()->renderTemplate('cronwatch/_settings.twig', [
-            'settings' => $this->getSettings(),
+            'settings' => $settings,
             // Settings config/cronwatch.php sets win over the form, so their fields are shown disabled.
             'overrides' => is_array($file) ? array_keys($file) : [],
+            'sections' => self::channelSections($settings),
         ]);
+    }
+
+    /**
+     * The other channels for the settings form, by section: each provider
+     * with its fields named as the model names them, open when one is set.
+     *
+     * @return list<array{title: string, intro: ?string, providers: list<array<string, mixed>>}>
+     */
+    private static function channelSections(?Model $settings): array
+    {
+        $sections = [
+            ChannelSettings::CHAT => ['title' => 'Chat', 'intro' => null, 'providers' => []],
+            ChannelSettings::EMAIL => ['title' => 'Email through a provider', 'intro' => 'Email alerts to, above, already sends through Craft’s mailer. Use a provider when the site cannot send mail reliably.', 'providers' => []],
+            ChannelSettings::SMS => ['title' => 'Text messages', 'intro' => null, 'providers' => []],
+            ChannelSettings::TRACKERS => ['title' => 'Error trackers', 'intro' => null, 'providers' => []],
+        ];
+        foreach (ChannelSettings::providers() as $provider => $spec) {
+            $fields = [];
+            $open = false;
+            foreach ($spec['fields'] as $field => $f) {
+                $name = ChannelSettings::camel("{$provider}_{$field}");
+                $open = $open || ($settings !== null && (string) $settings->{$name} !== '');
+                $fields[] = ['name' => $name] + $f;
+            }
+            $sections[$spec['section']]['providers'][] = ['label' => $spec['label'], 'open' => $open, 'fields' => $fields];
+        }
+        return array_values($sections);
     }
 
     public function afterSaveSettings(): void

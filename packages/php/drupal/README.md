@@ -42,7 +42,7 @@ and set the schedule under the settings to match (`*/5 * * * *`). A missed `drup
 
 ## Settings
 
-Configuration, System, CronWatch (`/admin/config/system/cronwatch`), for users with "Administer CronWatch": where alerts go (email through the site's mail system, a Slack incoming webhook, a webhook, signed when given a secret), the grace a run is given (10 minutes by default), cron's schedule, whether the check runs after each cron run, and the watched queues. "Send a test alert" sends one to every channel and says what each answered. Nothing leaves the site until a channel is set; with none, alerts go to the site's log.
+Configuration, System, CronWatch (`/admin/config/system/cronwatch`), for users with "Administer CronWatch": where alerts go (email through the site's mail system, a Slack incoming webhook, a webhook, signed when given a secret, and under More channels Discord, email through Resend, Postmark, SendGrid, Mailgun or Amazon SES, text messages through Twilio, and Sentry, Honeybadger, Datadog, Rollbar, Bugsnag or New Relic, each once its required fields are set), the grace a run is given (10 minutes by default), cron's schedule, whether the check runs after each cron run, and the watched queues. "Send a test alert" sends one to every channel and says what each answered. Nothing leaves the site until a channel is set; with none, alerts go to the site's log.
 
 The settings are configuration, so they are exported with it; keep a credential out of the export by setting it in `settings.php`:
 
