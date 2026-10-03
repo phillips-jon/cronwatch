@@ -1,17 +1,23 @@
 ---
 title: Agent skill
-description: A Claude Code skill so the agent that writes a cron job also writes its monitor.
+description: An agent skill so the agent that writes a cron job also writes its monitor.
 order: 10
 group: Reference
 ---
 
 # Agent skill
 
-The repository ships `skills/cronwatch/SKILL.md`, a skill for Claude Code (and other agents that read the same format). With it installed, asking for "monitor this cron job" or "why did the nightly job fail" gets a workflow instead of a guess.
+The repository ships `skills/cronwatch/SKILL.md`, a skill for Claude Code, Codex, Cursor and the other agents that read the same format. It is listed [on skills.sh](https://www.skills.sh/phillips-jon/cronwatch). With it installed, asking for "monitor this cron job" or "why did the nightly job fail" gets a workflow instead of a guess.
 
 ## Install
 
-Copy the folder into a project or your user skills:
+With the [skills](https://skills.sh) command, which asks which agents to install it for and whether to install it in the project or for every project:
+
+```bash
+npx skills add phillips-jon/cronwatch
+```
+
+Or, for Claude Code alone, copy the file into a project or your user skills:
 
 ```bash
 # in a project
