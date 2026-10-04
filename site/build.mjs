@@ -38,6 +38,27 @@ const escape = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").rep
 const slug = (s) => s.toLowerCase().replace(/<[^>]+>/g, "").replace(/&#?[a-z0-9]+;/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const hash = (buf) => createHash("sha256").update(buf).digest("hex").slice(0, 10);
 
+/* The stylesheet as served: comments dropped and whitespace collapsed,
+   strings copied as written. Space goes only where nothing can need it,
+   beside { } ; and , and before a closing brace's last semicolon. */
+const minifyCss = (src) => {
+  let out = "";
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (c === "/" && src[i + 1] === "*") { i = src.indexOf("*/", i + 2) + 1; continue; }
+    if (c === '"' || c === "'") {
+      let j = i + 1;
+      while (src[j] !== c) j += src[j] === "\\" ? 2 : 1;
+      out += src.slice(i, j + 1); i = j; continue;
+    }
+    if (/\s/.test(c)) { if (!/[\s{};,]$/.test(out) && out) out += " "; continue; }
+    if ("{};,".includes(c)) out = out.replace(/ $/, "");
+    if (c === "}") out = out.replace(/;$/, "");
+    out += c;
+  }
+  return out.trim() + "\n";
+};
+
 /* The footer's columns: the docs to start from, each language's page, the
    registries every package is on, and the project itself. A link off the
    site opens in a new tab. */
@@ -48,7 +69,7 @@ const FOOTER = [
   ["Project", [["GitHub", GITHUB], ["Releases", `${GITHUB}/releases`], ["Changelog", `${GITHUB}/blob/main/CHANGELOG.md`], ["Contact", "/contact/"], ["Terms", "/terms/"], ["Privacy", "/privacy/"]]],
 ];
 const FOOTER_COLUMNS = FOOTER.map(([head, items]) =>
-  `<div><p class="foot-head">${head}</p><ul>${items.map(([label, href]) => `<li><a href="${href}"${href.startsWith("http") ? ` target="_blank" rel="noopener"` : ""}>${label}</a></li>`).join("")}</ul></div>`).join("");
+  `<div><p class="foot-head">${head}</p><ul>${items.map(([label, href]) => `<li><a href="${href}"${href.startsWith("http") ? ` target="_blank" rel="noopener"` : ""}>${label}${head === "Languages" ? `<span class="vh"> docs</span>` : ""}</a></li>`).join("")}</ul></div>`).join("");
 
 /* The theme switch: a moon on light paper, a sun on dark, each drawn in the
    footer's thin lines; the stylesheet shows the one for the paper in use. */
@@ -182,9 +203,9 @@ ${index ? `<meta property="og:url" content="${canonical}">\n` : ""}<meta propert
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
-<link rel="stylesheet" href="https://use.typekit.net/gie6nes.css">
 <script src="${assets.theme}"></script>
 <link rel="stylesheet" href="${assets.css}">
+<link rel="stylesheet" href="https://use.typekit.net/gie6nes.css">
 <script src="${assets.js}" defer></script>
 <script src="${assets.search}" data-index="${assets.index}" defer></script>
 <script defer src="https://t.cronwatch.dev/script.js" data-website-id="4a5d2570-de1e-4c31-b2ad-18a5107ac7f5"></script>
@@ -720,7 +741,7 @@ function build() {
   // JSON Schemas, served at the URL each names as its $id (/schemas/webhook/1.json).
   cpSync(path.join(SRC, "schemas"), path.join(DIST, "schemas"), { recursive: true });
 
-  const css = readFileSync(path.join(SRC, "style.css"), "utf8");
+  const css = minifyCss(readFileSync(path.join(SRC, "style.css"), "utf8"));
   assets.css = `/assets/style.${hash(css)}.css`;
   writeFileSync(path.join(DIST, assets.css), css);
   const js = readFileSync(path.join(SRC, "site.js"), "utf8");
@@ -737,10 +758,8 @@ function build() {
     return { name, route, meta, html: curlyApostrophes(markdown(body)), order: Number(meta.order ?? 999) };
   }).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 
-  // The docs search index is a script, not JSON: the CSP's connect-src
-  // allows only the analytics host, so search.js cannot fetch it, but
-  // script-src 'self' lets it add a script tag the first time the search
-  // opens.
+  // The docs search index is a script, not JSON: search.js adds a script
+  // tag for it the first time the search opens.
   const index = `window.cronwatchSearch=${JSON.stringify(searchIndex(pages))};\n`;
   assets.index = `/assets/search-index.${hash(index)}.js`;
   writeFileSync(path.join(DIST, assets.index), index);
@@ -833,7 +852,32 @@ ${code ? `  <p class="code" aria-hidden="true">${code}</p>\n` : ""}  <h1>${headi
 
   const prompt = versioned(readFileSync(path.join(SRC, "prompt.txt"), "utf8"));
   writeFileSync(path.join(DIST, "prompt.txt"), prompt);
-  writeFileSync(path.join(DIST, "llms.txt"), `# CronWatch\n\n> Open source cron and scheduled-job monitoring as a library: @cronwatch/sdk for TypeScript (Node, Cloudflare Workers, Deno, Bun), the cronwatch gem for Ruby and Rails, cronwatch-sdk for Python (Django, Celery, APScheduler), cronwatch/cronwatch for PHP (Laravel, Symfony, WordPress, Drupal, Craft CMS), cronwatch.dev/go for Go (robfig/cron, gocron, River, Asynq), the cronwatch crate for Rust (tokio-cron-scheduler, apalis), the cronwatch package on Hex for Elixir (Oban, Quantum), dev.cronwatch:cronwatch on Maven Central for Java (Spring Boot, Quartz, JobRunr), and the Cronwatch package on NuGet for .NET (ASP.NET Core, Hangfire, Quartz.NET). Runs inside your app, writes to your own database, alerts when a run is missed, fails, gets stuck, runs slow or goes over budget.\n\nPlatforms: Vercel cron, Next.js, SvelteKit, Nuxt, React Router, NestJS, Strapi, Netlify, Firebase, Convex, Trigger.dev, Inngest, Cloudflare Workers with D1, pg_cron and Supabase Cron, node-cron, BullMQ, GitHub Actions, Rails with ActiveJob, Solid Queue or Sidekiq, Django, Celery and beat, APScheduler, AWS Lambda, Laravel's scheduler and queues, the Symfony Scheduler and Messenger, WordPress's WP-Cron, Drupal cron and queues, Craft CMS console commands and queue jobs, Go's robfig/cron, gocron, River and Asynq, Rust's tokio-cron-scheduler and apalis, Elixir's Oban and Quantum, Java's Spring @Scheduled methods (with ShedLock), Quartz and JobRunr, .NET's Hangfire, Quartz.NET and hosted jobs in the Generic Host.\n\nSetup instructions for an agent: ${SITE}/prompt.txt\nDocs: ${SITE}/docs/\nRails docs: ${SITE}/docs/rails/\nPython docs: ${SITE}/docs/python/, ${SITE}/docs/django/, ${SITE}/docs/celery/\nPHP docs: ${SITE}/docs/php/, ${SITE}/docs/laravel/, ${SITE}/docs/symfony/, ${SITE}/docs/wordpress/, ${SITE}/docs/drupal/, ${SITE}/docs/craft/\nGo docs: ${SITE}/docs/go/, ${SITE}/docs/go-schedulers/\nRust docs: ${SITE}/docs/rust/, ${SITE}/docs/rust-schedulers/\nElixir docs: ${SITE}/docs/elixir/, ${SITE}/docs/elixir-schedulers/\nJava docs: ${SITE}/docs/java/, ${SITE}/docs/java-schedulers/\n.NET docs: ${SITE}/docs/dotnet/, ${SITE}/docs/dotnet-schedulers/\nnpm: npm install @cronwatch/sdk\nRubyGems: bundle add cronwatch\nPyPI: pip install cronwatch-sdk\nPackagist: composer require cronwatch/cronwatch\nGo: go get cronwatch.dev/go\ncrates.io: cargo add cronwatch\nHex: {:cronwatch, \"~> 0.12\"} in mix.exs\nMaven Central: dev.cronwatch:cronwatch:${JAVA_VERSION}, or dev.cronwatch:cronwatch-spring-boot-starter:${JAVA_VERSION} in a Spring Boot app\nNuGet: dotnet add package Cronwatch, or Cronwatch.AspNetCore in an ASP.NET Core app\nWordPress plugin (not in the wordpress.org directory yet): https://github.com/phillips-jon/cronwatch/releases/latest/download/cronwatch.zip, installed with wp plugin install <that url> --activate or uploaded in wp-admin\nMCP server: npx -y @cronwatch/mcp\nMCP docs: ${SITE}/docs/mcp/\n`);
+  // llms.txt in the shape llmstxt.org proposes: a title, a summary, then
+  // sections of links. The docs sections come from each page's front
+  // matter, a section per sidebar group in sidebar order.
+  const llmsGroups = new Map();
+  for (const p of pages) {
+    const group = p.meta.group ?? "TypeScript";
+    if (!llmsGroups.has(group)) llmsGroups.set(group, []);
+    llmsGroups.get(group).push(p);
+  }
+  const llmsLink = (label, url, note) => `- [${label}](${url})${note ? `: ${note}` : ""}`;
+  const llmsDocs = [...llmsGroups].map(([group, list]) =>
+    `## ${group}\n\n${list.map((p) => llmsLink(p.meta.title, SITE + p.route, p.meta.description)).join("\n")}`).join("\n\n");
+  const llmsInstall = [
+    ["npm", "https://www.npmjs.com/package/@cronwatch/sdk", "npm install @cronwatch/sdk"],
+    ["RubyGems", "https://rubygems.org/gems/cronwatch", "bundle add cronwatch"],
+    ["PyPI", "https://pypi.org/project/cronwatch-sdk/", "pip install cronwatch-sdk"],
+    ["Packagist", "https://packagist.org/packages/cronwatch/cronwatch", "composer require cronwatch/cronwatch"],
+    ["pkg.go.dev", "https://pkg.go.dev/cronwatch.dev/go", "go get cronwatch.dev/go"],
+    ["crates.io", "https://crates.io/crates/cronwatch", "cargo add cronwatch"],
+    ["Hex", "https://hex.pm/packages/cronwatch", `{:cronwatch, "~> 0.12"} in mix.exs`],
+    ["Maven Central", "https://central.sonatype.com/artifact/dev.cronwatch/cronwatch", `dev.cronwatch:cronwatch:${JAVA_VERSION}, or dev.cronwatch:cronwatch-spring-boot-starter:${JAVA_VERSION} in a Spring Boot app`],
+    ["NuGet", "https://www.nuget.org/packages/Cronwatch", "dotnet add package Cronwatch, or Cronwatch.AspNetCore in an ASP.NET Core app"],
+    ["WordPress plugin", `${GITHUB}/releases/latest/download/cronwatch.zip`, "not in the wordpress.org directory yet; install with wp plugin install <that url> --activate or upload it in wp-admin"],
+    ["MCP server", "https://www.npmjs.com/package/@cronwatch/mcp", "npx -y @cronwatch/mcp"],
+  ].map(([label, url, note]) => llmsLink(label, url, note)).join("\n");
+  writeFileSync(path.join(DIST, "llms.txt"), `# CronWatch\n\n> Open source cron and scheduled-job monitoring as a library: @cronwatch/sdk for TypeScript (Node, Cloudflare Workers, Deno, Bun), the cronwatch gem for Ruby and Rails, cronwatch-sdk for Python (Django, Celery, APScheduler), cronwatch/cronwatch for PHP (Laravel, Symfony, WordPress, Drupal, Craft CMS), cronwatch.dev/go for Go (robfig/cron, gocron, River, Asynq), the cronwatch crate for Rust (tokio-cron-scheduler, apalis), the cronwatch package on Hex for Elixir (Oban, Quantum), dev.cronwatch:cronwatch on Maven Central for Java (Spring Boot, Quartz, JobRunr), and the Cronwatch package on NuGet for .NET (ASP.NET Core, Hangfire, Quartz.NET). Runs inside your app, writes to your own database, alerts when a run is missed, fails, gets stuck, runs slow or goes over budget.\n\nPlatforms: Vercel cron, Next.js, SvelteKit, Nuxt, React Router, NestJS, Strapi, Netlify, Firebase, Convex, Trigger.dev, Inngest, Cloudflare Workers with D1, pg_cron and Supabase Cron, node-cron, BullMQ, GitHub Actions, Rails with ActiveJob, Solid Queue or Sidekiq, Django, Celery and beat, APScheduler, AWS Lambda, Laravel's scheduler and queues, the Symfony Scheduler and Messenger, WordPress's WP-Cron, Drupal cron and queues, Craft CMS console commands and queue jobs, Go's robfig/cron, gocron, River and Asynq, Rust's tokio-cron-scheduler and apalis, Elixir's Oban and Quantum, Java's Spring @Scheduled methods (with ShedLock), Quartz and JobRunr, .NET's Hangfire, Quartz.NET and hosted jobs in the Generic Host.\n\n## Agent setup\n\n${llmsLink("Setup instructions for an agent", `${SITE}/prompt.txt`, "everything an agent needs to add CronWatch to an app, in one file")}\n\n${llmsDocs}\n\n## Install\n\n${llmsInstall}\n\n## Optional\n\n${llmsLink("Source on GitHub", GITHUB)}\n${llmsLink("Changelog", `${GITHUB}/blob/main/CHANGELOG.md`)}\n`);
 
   const urls = ["/", ...pages.map((p) => p.route), ...extra.indexed];
   writeFileSync(path.join(DIST, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${SITE}${u}</loc></url>`).join("\n")}\n</urlset>\n`);

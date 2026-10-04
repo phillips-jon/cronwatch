@@ -85,7 +85,7 @@ export const VERSIONED = [
   // reads it from the application's spec.
   { file: "packages/elixir/mix.exs", pattern: /^(\s*@version ")([^"]+)(")/m },
   // The install line, "~> X.Y", admits every later release below the next
-  // major. (landing.html escapes the >, and build.mjs's llms.txt the quotes.)
+  // major. (landing.html escapes the >.)
   ...["README.md", "packages/elixir/README.md", "site/docs/elixir.md", "site/src/landing.html", "site/src/prompt.txt", "skills/cronwatch/SKILL.md", "site/build.mjs"].map((file) => (
     { file, pattern: /(\{:cronwatch, \\?"~(?:>|&gt;) )([^"\\]+)(\\?")/g, form: "minor" })),
   // The Maven build's version lives in the parent POM's <revision> alone:

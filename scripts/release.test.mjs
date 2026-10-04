@@ -62,7 +62,7 @@ test("a major release moves the install lines and keeps cronwatch-apalis below 1
     assert.doesNotMatch(after(file), /\{:cronwatch, "~> 0\./, file);
   }
   assert.ok(after("site/src/landing.html").includes(`{:cronwatch, "~&gt; ${M}"}`));
-  assert.ok(after("site/build.mjs").includes(`{:cronwatch, \\"~> ${M}\\"}`));
+  assert.ok(after("site/build.mjs").includes(`{:cronwatch, "~> ${M}"}`));
 });
 
 test("a prerelease leaves the install lines alone", () => {
