@@ -213,7 +213,9 @@ impl Metrics {
         Metrics::from_value(&js::parse(text)?)
     }
 
-    /// Reads a JSON object of numbers; `null` is none.
+    /// Reads a JSON object of finite numbers; `null` is none. A number that
+    /// is not finite (`1e999`) is refused, as `job.metric()` refuses it,
+    /// since it would be written back as `null`.
     pub fn from_value(v: &Value) -> Result<Metrics, JsonError> {
         let o = match v {
             Value::Object(o) => o,
@@ -223,7 +225,10 @@ impl Metrics {
         let mut out = Metrics::new();
         for (k, x) in o.iter() {
             match x {
-                Value::Number(n) => out.set(k, *n),
+                Value::Number(n) if n.is_finite() => out.set(k, *n),
+                Value::Number(_) => {
+                    return Err(JsonError(format!("metric {} must be a finite number", js::quote(k))));
+                }
                 other => {
                     return Err(JsonError(format!("metric {} must be a number, not {}", js::quote(k), other.kind())));
                 }
@@ -1499,5 +1504,13 @@ mod tests {
         m.set("2", 3.0);
         m.set("rows", 4.0);
         assert_eq!(m.to_json(), r#"{"2":3,"10":2,"rows":4}"#);
+    }
+
+    #[test]
+    fn metrics_refuse_a_number_that_is_not_finite() {
+        let err = Metrics::from_json(r#"{"rows":1e999}"#).unwrap_err();
+        assert_eq!(err.to_string(), r#"metric "rows" must be a finite number"#);
+        let run = r#"{"id":"r","job":"j","status":"ok","startedAt":0,"metrics":{"rows":-1e999}}"#;
+        assert_eq!(Run::from_json(run).unwrap_err().to_string(), r#"metric "rows" must be a finite number"#);
     }
 }

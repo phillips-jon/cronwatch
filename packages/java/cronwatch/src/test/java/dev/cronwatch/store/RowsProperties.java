@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import dev.cronwatch.Alert;
 import dev.cronwatch.Channel;
 import dev.cronwatch.Cronwatch;
+import dev.cronwatch.Definition;
 import dev.cronwatch.Gen;
 import dev.cronwatch.JobState;
 import dev.cronwatch.Metrics;
@@ -357,13 +358,17 @@ class RowsProperties {
 
   /**
    * Reads back what was written, but for NULs: every store writes a run's trigger, output, error
-   * and metric names, and every key and string of a definition and a state, without them.
+   * and metric names, and every key and string of a definition and a state, without them. A key
+   * that differed from another only by a NUL then collides with it, and reads back as JSON reads a
+   * repeated key: in the first one's place, with the last one's value.
    */
   private static void readsBackTheSame(Store store, Read read) throws Exception {
     for (StoredJob j : read.jobs()) {
       if (j.name().equals(j.definition().name())) {
         StoredJob back = Objects.requireNonNull(store.getJob(j.name()), j.name());
-        assertEquals(Output.stripJsonNul(j.definition().toJson()), back.definition().toJson());
+        assertEquals(
+            Definition.fromJson(Output.stripJsonNul(j.definition().toJson())).toJson(),
+            back.definition().toJson());
       }
     }
     for (Run r : read.runs()) {
@@ -383,7 +388,7 @@ class RowsProperties {
     }
     for (JobState s : read.states()) {
       assertEquals(
-          Output.stripJsonNul(s.toJson()),
+          JobState.fromJson(Output.stripJsonNul(s.toJson())).toJson(),
           Objects.requireNonNull(store.getState(s.job()), s.job()).toJson());
     }
   }
