@@ -127,13 +127,14 @@ const PUBLISH = [
   // repository's root: pushing the tag starts .github/workflows/php-split.yml,
   // which pushes packages/php and the tag to the split repository Packagist
   // watches, once PHP_SPLIT_ENABLED is on (packages/php/DESIGN.md, Releasing).
-  // The WordPress plugin is not in the plugin directory yet: the same tag
-  // starts .github/workflows/wordpress-zip.yml, which builds its zip and
-  // attaches it to the tag's GitHub release, making the release if needed.
+  // The WordPress plugin: the same tag starts
+  // .github/workflows/wordpress-zip.yml, which builds its zip, attaches it to
+  // the tag's GitHub release (making the release if needed) and commits it to
+  // the plugin directory's SVN, once WPORG_ENABLED is on.
   { dir: "packages/php", commands: (v) => [
     `# packages/php: the pushed tag v${v} is split to its own repository by .github/workflows/php-split.yml (packages/php/DESIGN.md, Releasing)`,
     `# packages/php/drupal and packages/php/craft: the same tag is split to drupal.org's repository (as ${v}) and the Craft plugin's by .github/workflows/php-plugins-split.yml; then make the drupal.org release from the ${v} tag`,
-    `# packages/php/wordpress: the same tag builds the plugin's zip and attaches it to the GitHub release v${v} (made if missing) as cronwatch-${v}.zip and cronwatch.zip, by .github/workflows/wordpress-zip.yml`,
+    `# packages/php/wordpress: the same tag builds the plugin's zip and attaches it to the GitHub release v${v} (made if missing) as cronwatch-${v}.zip and cronwatch.zip, and commits it to wordpress.org's SVN as trunk and tags/${v} (once WPORG_ENABLED is true), by .github/workflows/wordpress-zip.yml`,
   ] },
   // Go modules publish by tag: a module in a subdirectory is versioned by a
   // tag with that prefix, so the release commit also gets packages/go/vX.Y.Z,

@@ -11,11 +11,13 @@ WordPress runs its scheduled events (WP-Cron) only when someone visits the site.
 
 ## Install
 
-The plugin is in review for the wordpress.org plugin directory, and will be there once it is approved. Until it is listed, download `cronwatch.zip` from the [latest release on GitHub](https://github.com/phillips-jon/cronwatch/releases/latest) and upload it in wp-admin under Plugins, Add New, Upload Plugin, or install it with WP-CLI:
+The plugin is [CronWatch in the wordpress.org plugin directory](https://wordpress.org/plugins/cronwatch/). In wp-admin, go to Plugins, Add New Plugin, search for CronWatch, then install and activate it. Or use WP-CLI:
 
 ```bash
-wp plugin install https://github.com/phillips-jon/cronwatch/releases/latest/download/cronwatch.zip --activate
+wp plugin install cronwatch --activate
 ```
+
+Each release's zip is also attached to its [GitHub release](https://github.com/phillips-jon/cronwatch/releases/latest), as `cronwatch.zip`, for a site that installs plugins from a file.
 
 Activating it makes three tables (`wp_cronwatch_jobs`, `wp_cronwatch_runs` and `wp_cronwatch_state`, with your table prefix) and schedules its check. Then, under CronWatch, Settings, enter where alerts go and send a test alert.
 

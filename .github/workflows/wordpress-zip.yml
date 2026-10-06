@@ -1,15 +1,28 @@
-# A release tag -> the WordPress plugin's zip (packages/php/wordpress/build.php)
-# attached to the tag's GitHub release, which this makes when it is not there
-# yet. Until the plugin is in the wordpress.org directory, the release is
-# where people get it. The zip goes up twice: as cronwatch-X.Y.Z.zip, and as
-# cronwatch.zip, so that
-# https://github.com/phillips-jon/cronwatch/releases/latest/download/cronwatch.zip,
-# the link the docs, the setup prompt, llms.txt, the README and the skill
-# give, always serves the newest release's plugin. Uploads replace a file of
-# the same name, so a rerun is safe. Can also be started by hand for a tag.
+# A release tag -> the WordPress plugin (packages/php/wordpress/build.php),
+# in two jobs.
 #
-# Needs no repository variable or secret: it writes only to this
-# repository's releases, with the workflow's own token.
+# "attach" puts the zip on the tag's GitHub release, making the release when
+# it is not there yet. The zip goes up twice: as cronwatch-X.Y.Z.zip, and as
+# cronwatch.zip, so that
+# https://github.com/phillips-jon/cronwatch/releases/latest/download/cronwatch.zip
+# always serves the newest release's plugin, for a site that installs from a
+# file. Uploads replace a file of the same name, so a rerun is safe. It needs
+# no repository variable or secret: it writes only to this repository's
+# releases, with the workflow's own token.
+#
+# "svn" commits the same build to the plugin's SVN repository on
+# wordpress.org (https://plugins.svn.wordpress.org/cronwatch), which is what
+# the plugin directory serves: trunk/ becomes the build, tags/X.Y.Z a copy of
+# it, and assets/ the banners, icons and screenshots from
+# packages/php/wordpress/assets. A prerelease is never committed, and a tag
+# already in SVN is left alone, so a rerun is safe. Stays off until the
+# repository variable WPORG_ENABLED is "true". Before that: on
+# wordpress.org, Profile, Account & Security, generate an SVN password; then
+# here, create the environment "wordpress-org" (Settings, Environments),
+# optionally with required reviewers, and add the environment secrets
+# SVN_USERNAME (joncphillips) and SVN_PASSWORD.
+#
+# Can also be started by hand for a tag.
 name: WordPress zip
 
 on:
@@ -92,6 +105,63 @@ jobs:
                 ;;
             esac
             gh release create "$TAG" --verify-tag "$@" --latest="$latest" --title "CronWatch $version" \
-              --notes "CronWatch $version. Docs: https://cronwatch.dev/docs/. The WordPress plugin's zip is attached below until it is listed in the WordPress plugin directory."
+              --notes "CronWatch $version. Docs: https://cronwatch.dev/docs/. The WordPress plugin is in the plugin directory (https://wordpress.org/plugins/cronwatch/); its zip is also attached below."
           fi
           gh release upload "$TAG" "$zip" "$out/cronwatch.zip" --clobber
+
+  svn:
+    needs: ci
+    if: vars.WPORG_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: wordpress-org
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.ci.outputs.sha }}
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: "8.2"
+          extensions: zip
+          coverage: none
+          tools: none
+      - name: Commit the plugin to wordpress.org's SVN
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+          SVN_URL: https://plugins.svn.wordpress.org/cronwatch
+        run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "not a release tag: $TAG"; exit 1 ;; esac
+          version="${TAG#v}"
+          case "$version" in *-*) echo "$TAG is a prerelease; the directory gets stable releases only"; exit 0 ;; esac
+          plugin="$(sed -n 's/^ \* Version: *\([^ ]*\)$/\1/p' packages/php/wordpress/cronwatch.php)"
+          if [ "$plugin" != "$version" ]; then echo "the plugin is $plugin, the tag is $TAG"; exit 1; fi
+          if [ -z "$SVN_USERNAME" ] || [ -z "$SVN_PASSWORD" ]; then echo "SVN_USERNAME and SVN_PASSWORD must be set in the wordpress-org environment"; exit 1; fi
+          command -v svn >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q subversion; }
+          if svn ls "$SVN_URL/tags/$version" >/dev/null 2>&1; then echo "tags/$version is already in SVN"; exit 0; fi
+          out="$RUNNER_TEMP/wordpress"
+          mkdir -p "$out"
+          php packages/php/wordpress/build.php "$out"
+          (cd "$out" && unzip -q "cronwatch-$version.zip")
+          # Only trunk and assets are checked out: tags/ holds every release.
+          co="$RUNNER_TEMP/svn"
+          svn co -q --depth immediates "$SVN_URL" "$co"
+          svn update -q --set-depth infinity "$co/trunk" "$co/assets"
+          rsync -a --delete --exclude .svn "$out/cronwatch/" "$co/trunk/"
+          for f in banner-1544x500.png banner-772x250.png icon-128x128.png icon-256x256.png icon.svg screenshot-1.png screenshot-2.png screenshot-3.png screenshot-4.png; do
+            cp "packages/php/wordpress/assets/$f" "$co/assets/$f"
+          done
+          cd "$co"
+          svn add -q --force trunk assets
+          # Files the build no longer has are removed from trunk.
+          svn st | sed -n 's/^! *//p' | while IFS= read -r f; do svn rm -q "$f"; done
+          for f in assets/*.png; do svn propset -q svn:mime-type image/png "$f"; done
+          svn propset -q svn:mime-type image/svg+xml assets/icon.svg 2>/dev/null
+          svn cp -q trunk "tags/$version"
+          svn st
+          svn ci -m "CronWatch $version" --non-interactive --no-auth-cache \
+            --username "$SVN_USERNAME" --password "$SVN_PASSWORD"

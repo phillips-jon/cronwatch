@@ -284,13 +284,13 @@ PHP (PHP 8.2 or newer)
 1. Pick the steps for the framework. Each records every run in the app's own
    database, and needs no other service.
 
-   - WordPress: the plugin is not in the wordpress.org directory yet; it is
-     attached to the GitHub release. Install and activate it with
-     wp plugin install https://github.com/phillips-jon/cronwatch/releases/latest/download/cronwatch.zip --activate
-     or upload that zip under Plugins, Add New Plugin in wp-admin. Every
-     WP-Cron event is watched
-     with no code. Set the alert channel under CronWatch, Settings. If the
-     site is not visited every few minutes, add define('DISABLE_WP_CRON',
+   - WordPress: the plugin is CronWatch in the wordpress.org plugin
+     directory (https://wordpress.org/plugins/cronwatch/). Install and
+     activate it with wp plugin install cronwatch --activate, or search for
+     CronWatch under Plugins, Add New Plugin in wp-admin. Every WP-Cron
+     event is watched with no code. Set the alert channel under CronWatch,
+     Settings. If the site is not visited every few minutes, add
+     define('DISABLE_WP_CRON',
      true) to wp-config.php and crontab lines running
      wp cron event run --due-now and wp cronwatch check every 5 minutes.
      Stop there: skip steps 2 to 5.
