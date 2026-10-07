@@ -98,7 +98,7 @@ module Cronwatch
         .signin{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;margin:28px auto 0;max-width:420px}
         .signin label{font:500 11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
         .signin input{flex:1 1 180px;min-width:0;font:400 16px/1.2 var(--mono);color:var(--ink);background:var(--sheet);border:1px solid var(--rule-2);border-radius:3px;height:32px;padding:0 10px}
-        footer{display:flex;flex-wrap:wrap;gap:6px 18px;padding:20px 0 40px;border-top:1px solid var(--rule);font:400 12px/1.5 var(--mono);color:var(--muted)}
+        footer{display:flex;flex-wrap:wrap;gap:6px 18px;padding:20px 0 40px;border-top:1px solid var(--rule);font:400 12px/1.5 var(--mono);color:var(--muted)}footer .version{margin-left:auto}
         .timeline{margin:18px 0 0}
         .timeline .axis,.timeline .under,.timeline .over,.timeline .lane{display:grid;grid-template-columns:var(--who) minmax(0,1fr)}
         .timeline .hours{position:relative;height:22px;font:400 11px/1 var(--mono);color:var(--muted);letter-spacing:.04em}
@@ -442,7 +442,7 @@ module Cronwatch
           </section>
           #{sections}
           </main>
-          <footer><span>Refreshes every minute. Times are UTC.</span><a href="#{h(base)}/api/jobs">JSON</a></footer>
+          <footer><span>Refreshes every minute. Times are UTC.</span><a href="#{h(base)}/api/jobs">JSON</a><a class="version" href="https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md">cronwatch #{Cronwatch::VERSION}</a></footer>
         BODY
         layout("CronWatch", body, base, refresh: 60)
       end
@@ -570,7 +570,7 @@ module Cronwatch
             </div>
           </section>
           </main>
-          <footer><span>Refreshes every minute. Times are UTC.</span><a href="#{h(base)}/api/jobs/#{encode_uri_component(job.name)}">JSON</a></footer>
+          <footer><span>Refreshes every minute. Times are UTC.</span><a href="#{h(base)}/api/jobs/#{encode_uri_component(job.name)}">JSON</a><a class="version" href="https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md">cronwatch #{Cronwatch::VERSION}</a></footer>
         BODY
         layout("#{job.name}: CronWatch", body, base, refresh: 60)
       end

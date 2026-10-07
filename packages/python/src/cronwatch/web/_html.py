@@ -29,6 +29,13 @@ from . import _timeline as timeline
 from ._escape import encode_uri_component, entries, h, name_html, text, to_fixed, truthy
 from ._pwa import THEME_COLOR, THEME_COLOR_DARK
 
+
+def _version_link() -> str:
+    """The footer's note of what is serving the page, linked to the changelog. Nothing is fetched to compare it."""
+    from .. import __version__
+
+    return f'<a class="version" href="https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md">cronwatch-sdk {__version__}</a>'
+
 __all__ = ["CSS", "DECLARE_ONE", "HEALTH", "MARK", "SHOWN_BY_HEALTH", "dashboard_page", "job_page", "layout", "message_page"]
 
 CSS = r"""
@@ -105,7 +112,7 @@ dl.def dd{margin:0;font:400 13.5px/1.7 var(--mono);color:var(--body);overflow-wr
 .signin{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;margin:28px auto 0;max-width:420px}
 .signin label{font:500 11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .signin input{flex:1 1 180px;min-width:0;font:400 16px/1.2 var(--mono);color:var(--ink);background:var(--sheet);border:1px solid var(--rule-2);border-radius:3px;height:32px;padding:0 10px}
-footer{display:flex;flex-wrap:wrap;gap:6px 18px;padding:20px 0 40px;border-top:1px solid var(--rule);font:400 12px/1.5 var(--mono);color:var(--muted)}
+footer{display:flex;flex-wrap:wrap;gap:6px 18px;padding:20px 0 40px;border-top:1px solid var(--rule);font:400 12px/1.5 var(--mono);color:var(--muted)}footer .version{margin-left:auto}
 .timeline{margin:18px 0 0}
 .timeline .axis,.timeline .under,.timeline .over,.timeline .lane{display:grid;grid-template-columns:var(--who) minmax(0,1fr)}
 .timeline .hours{position:relative;height:22px;font:400 11px/1 var(--mono);color:var(--muted);letter-spacing:.04em}
@@ -386,7 +393,7 @@ def dashboard_page(
 </section>
 {sections}
 </main>
-<footer><span>Refreshes every minute. Times are UTC.</span><a href="{h(base)}/api/jobs">JSON</a></footer>"""
+<footer><span>Refreshes every minute. Times are UTC.</span><a href="{h(base)}/api/jobs">JSON</a>{_version_link()}</footer>"""
     return layout("CronWatch", body, base, refresh=60)
 
 
@@ -537,7 +544,7 @@ def job_page(job: JobSummary, runs: Sequence[Run], now: int, base: str, complete
   </div>
 </section>
 </main>
-<footer><span>Refreshes every minute. Times are UTC.</span><a href="{h(base)}/api/jobs/{encode_uri_component(job.name)}">JSON</a></footer>"""
+<footer><span>Refreshes every minute. Times are UTC.</span><a href="{h(base)}/api/jobs/{encode_uri_component(job.name)}">JSON</a>{_version_link()}</footer>"""
     return layout(f"{job.name}: CronWatch", body, base, refresh=60)
 
 

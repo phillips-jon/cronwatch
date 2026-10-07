@@ -137,6 +137,10 @@ No. It is in wp-admin, for users who may manage options, and every change it mak
 
 == Changelog ==
 
+= Unreleased =
+
+* From the library: the dashboard's footer names the CronWatch version serving it, linked to the changelog. Nothing is fetched to check for a newer release.
+
 = 0.12.2 =
 
 * From the library: on an event's page in the dashboard, Silence opens the choice of how long, and one click silences it; Forget is now Delete history, at the foot of the page, with a warning that it cannot be undone.

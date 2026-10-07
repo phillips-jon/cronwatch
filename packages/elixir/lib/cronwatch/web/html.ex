@@ -264,7 +264,9 @@ defmodule Cronwatch.Web.HTML do
         sections,
         "\n</main>\n<footer><span>Refreshes every minute. Times are UTC.</span><a href=\"",
         h(base),
-        "/api/jobs\">JSON</a></footer>"
+        "/api/jobs\">JSON</a><a class=\"version\" href=\"https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md\">cronwatch ",
+        Cronwatch.version(),
+        "</a></footer>"
       ])
 
     layout("CronWatch", body, base, 60)
@@ -499,7 +501,9 @@ defmodule Cronwatch.Web.HTML do
         h(base),
         "/api/jobs/",
         encode_uri_component(job.name),
-        "\">JSON</a></footer>"
+        "\">JSON</a><a class=\"version\" href=\"https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md\">cronwatch ",
+        Cronwatch.version(),
+        "</a></footer>"
       ])
 
     layout("#{job.name}: CronWatch", body, base, 60)

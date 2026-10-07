@@ -231,13 +231,15 @@ for (const [method, template, headers = {}, body] of requests) {
 }
 
 /**
- * GET /api names the library, its language and its version, which differ
- * from port to port: the fixture holds <library>, <language> and <version>
- * in their place, and each port's replay puts in its own.
+ * GET /api names the library, its language and its version, and a page's
+ * footer the library and its version, which differ from port to port: the
+ * fixture holds <library>, <language> and <version> in their place, and each
+ * port's replay puts in its own.
  */
 function about(text) {
   const prefix = `{"ok":true,"library":${JSON.stringify(LIBRARY)},"language":"typescript","version":${JSON.stringify(VERSION)},`;
-  return text.startsWith(prefix) ? `{"ok":true,"library":"<library>","language":"<language>","version":"<version>",${text.slice(prefix.length)}` : text;
+  if (text.startsWith(prefix)) return `{"ok":true,"library":"<library>","language":"<language>","version":"<version>",${text.slice(prefix.length)}`;
+  return text.replace(`<a class="version" href="https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md">${LIBRARY} ${VERSION}</a>`, `<a class="version" href="https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md"><library> <version></a>`);
 }
 
 if (errors.length) {

@@ -2,11 +2,15 @@ import { beyondDates, formatDuration, formatRelative, isoTime } from "../duratio
 import type { JobSummary, Run } from "../types.js";
 import { escapeHtml, escapeName } from "./escape.js";
 import { THEME_COLOR, THEME_COLOR_DARK } from "./pwa.js";
+import { VERSION } from "../version.js";
 import { BOARD_LANES, BOARD_AHEAD_MS, BOARD_BEHIND_MS, clock, dayTimeline, laneNote, missedAt, parsedSchedule, weekTimeline, when, type LaneInput } from "./timeline.js";
 
 export { escapeHtml };
 
 const h = escapeHtml;
+
+/** The footer's note of what is serving the page, linked to the changelog. Nothing is fetched to compare it. */
+const VERSION_LINK = `<a class="version" href="https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md">@cronwatch/sdk ${VERSION}</a>`;
 
 /*
  * Set like cronwatch.dev: a printed sheet on grey paper, a serif for what a
@@ -99,7 +103,7 @@ dl.def dd{margin:0;font:400 13.5px/1.7 var(--mono);color:var(--body);overflow-wr
 .signin{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;margin:28px auto 0;max-width:420px}
 .signin label{font:500 11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .signin input{flex:1 1 180px;min-width:0;font:400 16px/1.2 var(--mono);color:var(--ink);background:var(--sheet);border:1px solid var(--rule-2);border-radius:3px;height:32px;padding:0 10px}
-footer{display:flex;flex-wrap:wrap;gap:6px 18px;padding:20px 0 40px;border-top:1px solid var(--rule);font:400 12px/1.5 var(--mono);color:var(--muted)}
+footer{display:flex;flex-wrap:wrap;gap:6px 18px;padding:20px 0 40px;border-top:1px solid var(--rule);font:400 12px/1.5 var(--mono);color:var(--muted)}footer .version{margin-left:auto}
 .timeline{margin:18px 0 0}
 .timeline .axis,.timeline .under,.timeline .over,.timeline .lane{display:grid;grid-template-columns:var(--who) minmax(0,1fr)}
 .timeline .hours{position:relative;height:22px;font:400 11px/1 var(--mono);color:var(--muted);letter-spacing:.04em}
@@ -334,7 +338,7 @@ ${jobs.length ? `<section class="sec" aria-label="Last 24 hours">
 <tbody>${rows}</tbody></table></div>
 </section>` : ""}
 </main>
-<footer><span>Refreshes every minute. Times are UTC.</span><a href="${h(base)}/api/jobs">JSON</a></footer>`;
+<footer><span>Refreshes every minute. Times are UTC.</span><a href="${h(base)}/api/jobs">JSON</a>${VERSION_LINK}</footer>`;
   return layout("CronWatch", body, base, { refresh: 60 });
 }
 
@@ -430,7 +434,7 @@ export function jobPage(job: JobSummary, runs: Run[], now: number, base: string,
   </div>
 </section>
 </main>
-<footer><span>Refreshes every minute. Times are UTC.</span><a href="${h(base)}/api/jobs/${encodeURIComponent(job.name)}">JSON</a></footer>`;
+<footer><span>Refreshes every minute. Times are UTC.</span><a href="${h(base)}/api/jobs/${encodeURIComponent(job.name)}">JSON</a>${VERSION_LINK}</footer>`;
   return layout(`${job.name}: CronWatch`, body, base, { refresh: 60 });
 }
 

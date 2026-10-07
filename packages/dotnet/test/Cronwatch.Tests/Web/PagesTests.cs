@@ -25,7 +25,9 @@ public class PagesTests
             .Where(c => Fixtures.String(c, "method") == method && Fixtures.String(c, "path") == path)
             .ElementAt(nth);
 
-    private static string Body(JsObject capture) => Fixtures.String(capture, "responseBody")!;
+    // A page's footer names the library and its version, which the fixture holds as placeholders.
+    private static string Body(JsObject capture) => Fixtures.String(capture, "responseBody")!
+        .Replace("><library> <version></a>", ">Cronwatch " + CronwatchClient.Version + "</a>", StringComparison.Ordinal);
 
     private static JobSummary Summary(JsObject o)
     {

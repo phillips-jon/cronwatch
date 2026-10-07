@@ -69,11 +69,14 @@ func readGolden(t *testing.T) goldenFile {
 	if len(g.Captures) != 82 {
 		t.Fatalf("golden.json has %d captures, not 82", len(g.Captures))
 	}
-	// GET /api names the library, its language and its version, which the
-	// fixture holds as placeholders for each port to fill in with its own.
+	// GET /api names the library, its language and its version, and a page's
+	// footer the library and its version, which the fixture holds as
+	// placeholders for each port to fill in with its own.
 	about := strings.NewReplacer(
 		`{"ok":true,"library":"<library>","language":"<language>","version":"<version>",`,
 		`{"ok":true,"library":"cronwatch.dev/go","language":"go","version":"`+cronwatch.Version+`",`,
+		`><library> <version></a>`,
+		`>cronwatch.dev/go `+cronwatch.Version+`</a>`,
 	)
 	for i := range g.Captures {
 		g.Captures[i].ResponseBody = about.Replace(g.Captures[i].ResponseBody)

@@ -66,7 +66,8 @@ fn read_golden() -> Vec<Capture> {
                 response_body: text(c.get("responseBody").unwrap())
                     .replace("\"<library>\"", "\"cronwatch\"")
                     .replace("\"<language>\"", "\"rust\"")
-                    .replace("\"<version>\"", &format!("\"{}\"", cronwatch::VERSION)),
+                    .replace("\"<version>\"", &format!("\"{}\"", cronwatch::VERSION))
+                    .replace("><library> <version></a>", &format!(">cronwatch {}</a>", cronwatch::VERSION)),
             }
         })
         .collect();

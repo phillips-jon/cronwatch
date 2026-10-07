@@ -130,6 +130,8 @@ The timeline draws the first thirty jobs and says so when there are more; the ta
 
 A job page's Silence button opens the lengths to silence it for (an hour, four hours, a day, or a week), and one click on a length silences it; while silenced, the button is Unsilence, with when the silence ends. Delete history, at the foot of the page, removes the job and all its runs from the store after a second click on Delete. It cannot be undone, and a job still declared in code comes back on its next run with no history.
 
+Each page's footer names the library serving it and its version (`@cronwatch/sdk`, then the version, in Node; the `cronwatch` gem in Ruby; and so on), linked to the [changelog](https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md). Nothing is fetched to compare it with the newest release: the dashboard never calls out.
+
 Times on the pages are UTC: without script a page cannot know your time zone. Pages refresh every minute and are marked `noindex`. They follow the system's light or dark setting, need no JavaScript, and load nothing from anywhere but the dashboard itself. Marks arrive in time order when a page loads and open problems pulse slowly; with reduced motion turned on in the system settings nothing moves.
 
 ## Install it as an app

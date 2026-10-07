@@ -311,7 +311,9 @@ pub(crate) fn dashboard_page(
         &sections,
         "\n</main>\n<footer><span>Refreshes every minute. Times are UTC.</span><a href=\"",
         &h(base),
-        "/api/jobs\">JSON</a></footer>",
+        "/api/jobs\">JSON</a><a class=\"version\" href=\"https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md\">cronwatch ",
+        crate::VERSION,
+        "</a></footer>",
     ]
     .concat();
     layout("CronWatch", &body, base, 60)
@@ -493,7 +495,9 @@ pub(crate) fn job_page(job: &JobSummary, runs: &[Run], now: i64, base: &str, com
         &h(base),
         "/api/jobs/",
         &encode_uri_component(&job.name),
-        "\">JSON</a></footer>",
+        "\">JSON</a><a class=\"version\" href=\"https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md\">cronwatch ",
+        crate::VERSION,
+        "</a></footer>",
     ]
     .concat();
     layout(&format!("{}: CronWatch", job.name), &body, base, 60)

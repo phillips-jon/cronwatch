@@ -2,6 +2,11 @@
 
 All notable changes to the CronWatch module for Drupal, newest first. Each release carries the CronWatch library (`cronwatch/cronwatch`) of the same version.
 
+## Unreleased
+
+### Added
+- From the library: the dashboard's footer names the CronWatch version serving it, linked to the changelog. Nothing is fetched to check for a newer release.
+
 ## 0.12.2 - 2026-10-06
 
 ### Changed
