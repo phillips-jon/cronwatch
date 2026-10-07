@@ -1,6 +1,6 @@
 {
   "generatedBy": "scripts/conformance.mjs",
-  "sdkVersion": "0.12.1",
+  "sdkVersion": "0.12.2",
   "contexts": [
     {
       "name": "a failure with earlier runs",

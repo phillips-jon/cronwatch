@@ -2,7 +2,7 @@
 
 All notable changes to the CronWatch module for Drupal, newest first. Each release carries the CronWatch library (`cronwatch/cronwatch`) of the same version.
 
-## Unreleased
+## 0.12.2 - 2026-10-06
 
 ### Changed
 - From the library: on a job's page in the dashboard, Silence opens the choice of how long, and one click silences it; Forget is now Delete history, at the foot of the page, with a warning that it cannot be undone.
