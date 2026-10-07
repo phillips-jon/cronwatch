@@ -57,7 +57,7 @@ public function behaviors(): array
 }
 ```
 
-`config/cronwatch.php` wins over the behavior for a route both name. A behavior's job is declared when its command runs, so a behavior removed leaves its job's schedule behind: forget the job from the dashboard then.
+`config/cronwatch.php` wins over the behavior for a route both name. A behavior's job is declared when its command runs, so a behavior removed leaves its job's schedule behind: delete it then with "Delete history" at the bottom of its page on the dashboard.
 
 A command writes to the terminal, which PHP cannot read back, so its run's output is what it logs:
 

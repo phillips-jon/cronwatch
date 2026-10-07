@@ -713,7 +713,7 @@ final class WebTest extends TestCase
             $this->assertSame(1, preg_match_all('/<script/i', $res->body));
             $this->assertDoesNotMatchRegularExpression('/\son[a-z]+=/i', $res->body, 'no inline event handlers');
         }
-        $this->assertStringContainsString('<details class="confirm"><summary>Forget</summary><form', self::send($web, 'GET', '/cronwatch/jobs/h', self::BEARER)->body);
+        $this->assertStringContainsString('<details class="confirm"><summary>Delete history</summary><form', self::send($web, 'GET', '/cronwatch/jobs/h', self::BEARER)->body);
         $api = self::send($web, 'GET', '/cronwatch/api/jobs', self::BEARER);
         $this->assertSame('nosniff', $api->header('x-content-type-options'));
         $this->assertSame('no-store', $api->header('cache-control'));

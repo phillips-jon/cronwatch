@@ -284,7 +284,7 @@ pub(crate) fn dashboard_page(
             "  <div class=\"wide\">",
             &day_timeline(lanes, sp, base, jobs.len()),
             "</div>\n</section>\n<section class=\"sec\" aria-label=\"Jobs\">\n  <h2>Jobs</h2>\n",
-            "  <p class=\"lede\">Every job in the store. Open one for its week, its runs and their output.</p>\n",
+            "  <p class=\"lede\">Every job in the store. Open one for its week, its runs, and their output.</p>\n",
             "  <div class=\"wide\"><table class=\"board\">\n",
             "<thead><tr><th>Job</th><th>Health</th><th class=\"hide-sm\">Schedule</th><th>Last run</th><th class=\"hide-sm\">Next due</th><th class=\"hide-sm\">Recent runs</th></tr></thead>\n",
             "<tbody>",
@@ -405,7 +405,7 @@ pub(crate) fn job_page(job: &JobSummary, runs: &[Run], now: i64, base: &str, com
             h(&format_relative(until, now))
         ),
         _ => format!(
-            r#"<form class="inline" method="post" action="{path}/silence"><select name="for" aria-label="Silence for"><option value="1h">1 hour</option><option value="4h">4 hours</option><option value="1d">1 day</option><option value="7d">1 week</option></select><button type="submit">Silence</button></form>"#
+            r#"<details class="confirm"><summary>Silence</summary><form class="inline" method="post" action="{path}/silence"><span>for</span> <button type="submit" name="for" value="1h">1 hour</button><button type="submit" name="for" value="4h">4 hours</button><button type="submit" name="for" value="1d">1 day</button><button type="submit" name="for" value="7d">1 week</button></form></details>"#
         ),
     };
     let last_run = job.last_run.as_ref().map_or("never".to_string(), |r| h(&format_relative(r.started_at, now)));
@@ -443,10 +443,7 @@ pub(crate) fn job_page(job: &JobSummary, runs: &[Run], now: i64, base: &str, com
         &why_html,
         "</p>\n    <div class=\"actions\">\n      ",
         &silence,
-        "\n      <details class=\"confirm\"><summary>Forget</summary><form class=\"inline\" method=\"post\" action=\"",
-        &path,
-        "/forget\"><span>Remove this job and its runs from the store?</span> <button type=\"submit\">Forget</button></form></details>\n",
-        "    </div>\n    <dl class=\"figures\">\n      <div><dt>Last run</dt><dd>",
+        "\n    </div>\n    <dl class=\"figures\">\n      <div><dt>Last run</dt><dd>",
         &last_run,
         "</dd></div>\n      <div><dt>Next due</dt><dd>",
         &next_due,
@@ -488,7 +485,11 @@ pub(crate) fn job_page(job: &JobSummary, runs: &[Run], now: i64, base: &str, com
         &open_row(job),
         "\n  ",
         &failures_row(job),
-        "\n  </dl>\n</section>\n</main>\n<footer><span>Refreshes every minute. Times are UTC.</span><a href=\"",
+        "\n  </dl>\n</section>\n<section class=\"sec delete\" aria-label=\"Delete\">\n  <h2>Delete</h2>\n  <div>\n  <p class=\"lede\">Removes this job and all its runs from the store, which cannot be undone. A job still in your code comes back on its next run, with no history.</p>\n  <details class=\"confirm\"><summary>Delete history</summary><form class=\"inline\" method=\"post\" action=\"",
+        &path,
+        "/forget\"><span>Delete this job and all its runs?</span> <button class=\"danger\" type=\"submit\">Delete</button><a class=\"button\" href=\"",
+        &path,
+        "\">Cancel</a></form></details>\n  </div>\n</section>\n</main>\n<footer><span>Refreshes every minute. Times are UTC.</span><a href=\"",
         &h(base),
         "/api/jobs/",
         &encode_uri_component(&job.name),

@@ -2,6 +2,14 @@
 
 Every notable change to CronWatch, newest first. All the packages, in every language, share one version, so each release is one section here, with a line per language where it matters. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and from 1.0 the versions follow [Semantic Versioning](https://semver.org) as the [Stability](https://cronwatch.dev/docs/stability/) page describes. The WordPress plugin, the Drupal module and the Craft CMS plugin keep their own changelogs too, for their stores.
 
+## Unreleased
+
+### Changed
+
+Every language:
+
+- On a job's page in the dashboard, Silence opens the choice of how long (an hour, four hours, a day, or a week), and one click silences the job; before, a menu of lengths sat beside the button and choosing one did nothing until Silence was pressed. Forget is now Delete history, in a Delete section at the foot of the page that says what it removes and that it cannot be undone, with Delete and Cancel. The buttons share one height. The routes and the JSON API are unchanged.
+
 ## 0.12.1 - 2026-10-03
 
 ### Added

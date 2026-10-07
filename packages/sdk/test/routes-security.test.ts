@@ -178,7 +178,7 @@ test("pages carry a strict CSP and security headers, and need no script of their
     assert.doesNotMatch(html, /\son[a-z]+=/i, "no inline event handlers");
   }
   const page = await (await send("GET", "/cronwatch/jobs/h", bearer)).text();
-  assert.match(page, /<details class="confirm"><summary>Forget<\/summary><form/, "forget confirms without script");
+  assert.match(page, /<details class="confirm"><summary>Delete history<\/summary><form/, "forget confirms without script");
   const api = await send("GET", "/cronwatch/api/jobs", bearer);
   assert.equal(api.headers.get("x-content-type-options"), "nosniff");
   assert.equal(api.headers.get("cache-control"), "no-store");

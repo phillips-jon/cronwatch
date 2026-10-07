@@ -78,7 +78,7 @@ A save that refuses the grace, a secret (one holding a line break or another con
 
 ## The dashboard
 
-The CronWatch menu in wp-admin opens the dashboard, for administrators: every event's health, the last 24 hours as a lane per event (when each was due, when it ran and for how long, and the slots nothing ran in), and for each event its last seven days, its runs with their output and errors, and buttons to silence it, forget it or run the check now. Before anything is recorded, the board says that WP-Cron's events appear after the first check, which runs every five minutes, and that "Run check now" or `wp cronwatch check` runs it at once.
+The CronWatch menu in wp-admin opens the dashboard, for administrators: every event's health, the last 24 hours as a lane per event (when each was due, when it ran and for how long, and the slots nothing ran in), and for each event its last seven days, its runs with their output and errors, a button to silence it for a while, and, at the foot of its page, Delete history. "Run check now" is on the board. Before anything is recorded, the board says that WP-Cron's events appear after the first check, which runs every five minutes, and that "Run check now" or `wp cronwatch check` runs it at once.
 
 These are the library's pages ([Dashboard and API](/docs/dashboard/)), shown inside wp-admin and never at a public URL; WordPress's sign-in stands for the dashboard's token, and every change carries a WordPress nonce.
 

@@ -1,5 +1,10 @@
 # Release Notes for CronWatch
 
+## Unreleased
+
+### Changed
+- From the library: on a job's page in the dashboard, Silence opens the choice of how long, and one click silences it; Forget is now Delete history, at the foot of the page, with a warning that it cannot be undone.
+
 ## 0.12.1 - 2026-10-03
 
 ### Added

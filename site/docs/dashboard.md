@@ -106,7 +106,7 @@ The first value of each comma-separated header is used, and whichever header is 
 | Path | What |
 |---|---|
 | `/` | counts by health, a timeline of the last day, and every job: health, schedule, last run, next due, recent runs |
-| `/jobs/:name` | one job: its state and figures, its last seven days, the last fifty runs with errors, output and metrics, and its definition |
+| `/jobs/:name` | one job: its state and figures, its last seven days, the last fifty runs with errors, output and metrics, its definition, and Delete history |
 
 The board opens with how many jobs there are and how many need attention (any health but healthy), then a count for each health: failing, stuck, late, healthy, silenced and never ran.
 
@@ -127,6 +127,8 @@ Under it is the day. Each job gets a lane across the last 24 hours and the next 
 The empty part of a lane carries a short note about anything open, such as `due 22:36, nothing ran`, `failed at 03:00, 2 in a row` or `running since 22:40`.
 
 The timeline draws the first thirty jobs and says so when there are more; the table below lists every job. Hovering a mark shows what it was, and a visually hidden list says the same for screen readers. A job page draws the same thing for that job, one lane per UTC day for the last seven days, today first, and reads as many runs as that takes (up to 500).
+
+A job page's Silence button opens the lengths to silence it for (an hour, four hours, a day, or a week), and one click on a length silences it; while silenced, the button is Unsilence, with when the silence ends. Delete history, at the foot of the page, removes the job and all its runs from the store after a second click on Delete. It cannot be undone, and a job still declared in code comes back on its next run with no history.
 
 Times on the pages are UTC: without script a page cannot know your time zone. Pages refresh every minute and are marked `noindex`. They follow the system's light or dark setting, need no JavaScript, and load nothing from anywhere but the dashboard itself. Marks arrive in time order when a page loads and open problems pulse slowly; with reduced motion turned on in the system settings nothing moves.
 

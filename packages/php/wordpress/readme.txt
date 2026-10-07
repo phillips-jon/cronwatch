@@ -31,7 +31,7 @@ What a run prints is kept as its output. Your own code can add lines with `do_ac
 
 Alerts go by email (through `wp_mail()`, the way the site sends its other mail), to Slack, or to any URL as a signed JSON webhook. If you use them, they can also go to Discord, by email through Resend, Postmark, SendGrid, Mailgun or Amazon SES, by text message through Twilio, or to Sentry, Honeybadger, Datadog, Rollbar, Bugsnag or New Relic. Set them under CronWatch, Settings, where you can also send a test alert and see each event's health.
 
-The CronWatch menu in wp-admin opens the dashboard, for administrators: every event's health at a glance, the last 24 hours as a timeline (when each event was due, when it ran and for how long, and the slots nothing ran in), and for each event its last seven days, its runs with their output and errors, and buttons to silence it, forget it or run the check now.
+The CronWatch menu in wp-admin opens the dashboard, for administrators: every event's health at a glance, the last 24 hours as a timeline (when each event was due, when it ran and for how long, and the slots nothing ran in), and for each event its last seven days, its runs with their output and errors, a button to silence it for a while, and, at the foot of its page, Delete history. "Run check now" is on the board.
 
 = Ask Claude about your cron =
 
@@ -131,11 +131,15 @@ No. It is in wp-admin, for users who may manage options, and every change it mak
 == Screenshots ==
 
 1. The dashboard in wp-admin (CronWatch in the admin menu): every WP-Cron event's health at a glance, and the last 24 hours as a timeline of when each event was due, when it ran and for how long.
-2. An event's page on the dashboard: its last seven days, its runs with their output and errors, and the buttons to silence it, forget it or run the check now.
+2. An event's page on the dashboard: its last seven days, its runs with their output and errors, the button to silence it, and Delete history.
 3. CronWatch, Settings: where alerts go (email, Slack, a webhook, and more channels below them), the grace a run is given, and the JSON API with its token.
 4. The foot of the settings page: the "Send a test alert" button and the watched events with their health, last run and next due time.
 
 == Changelog ==
+
+= Unreleased =
+
+* From the library: on an event's page in the dashboard, Silence opens the choice of how long, and one click silences it; Forget is now Delete history, at the foot of the page, with a warning that it cannot be undone.
 
 = 0.12.1 =
 

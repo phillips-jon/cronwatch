@@ -269,7 +269,7 @@ func dashboardPage(jobs []JobSummary, runsByJob map[string][]Run, now int64, bas
 </section>
 <section class="sec" aria-label="Jobs">
   <h2>Jobs</h2>
-  <p class="lede">Every job in the store. Open one for its week, its runs and their output.</p>
+  <p class="lede">Every job in the store. Open one for its week, its runs, and their output.</p>
   <div class="wide"><table class="board">
 <thead><tr><th>Job</th><th>Health</th><th class="hide-sm">Schedule</th><th>Last run</th><th class="hide-sm">Next due</th><th class="hide-sm">Recent runs</th></tr></thead>
 <tbody>` + strings.Join(rows, "\n") + `</tbody></table></div>
@@ -372,7 +372,7 @@ func jobPage(job JobSummary, runs []Run, now int64, base string, complete bool) 
 	if silenced {
 		silence = `<form class="inline" method="post" action="` + path + `/unsilence"><button type="submit">Unsilence (until ` + h(schedule.FormatRelative(*job.SilencedUntil, now)) + `)</button></form>`
 	} else {
-		silence = `<form class="inline" method="post" action="` + path + `/silence"><select name="for" aria-label="Silence for"><option value="1h">1 hour</option><option value="4h">4 hours</option><option value="1d">1 day</option><option value="7d">1 week</option></select><button type="submit">Silence</button></form>`
+		silence = `<details class="confirm"><summary>Silence</summary><form class="inline" method="post" action="` + path + `/silence"><span>for</span> <button type="submit" name="for" value="1h">1 hour</button><button type="submit" name="for" value="4h">4 hours</button><button type="submit" name="for" value="1d">1 day</button><button type="submit" name="for" value="7d">1 week</button></form></details>`
 	}
 	lastRun := "never"
 	if job.LastRun != nil {
@@ -414,7 +414,6 @@ func jobPage(job JobSummary, runs []Run, now int64, base string, complete bool) 
     <p class="stateline">` + healthState(job) + whyHTML + `</p>
     <div class="actions">
       ` + silence + `
-      <details class="confirm"><summary>Forget</summary><form class="inline" method="post" action="` + path + `/forget"><span>Remove this job and its runs from the store?</span> <button type="submit">Forget</button></form></details>
     </div>
     <dl class="figures">
       <div><dt>Last run</dt><dd>` + lastRun + `</dd></div>
@@ -448,6 +447,13 @@ func jobPage(job JobSummary, runs []Run, now int64, base string, complete bool) 
   ` + openRow(job) + `
   ` + failuresRow(job) + `
   </dl>
+</section>
+<section class="sec delete" aria-label="Delete">
+  <h2>Delete</h2>
+  <div>
+  <p class="lede">Removes this job and all its runs from the store, which cannot be undone. A job still in your code comes back on its next run, with no history.</p>
+  <details class="confirm"><summary>Delete history</summary><form class="inline" method="post" action="` + path + `/forget"><span>Delete this job and all its runs?</span> <button class="danger" type="submit">Delete</button><a class="button" href="` + path + `">Cancel</a></form></details>
+  </div>
 </section>
 </main>
 <footer><span>Refreshes every minute. Times are UTC.</span><a href="` + h(base) + `/api/jobs/` + encodeURIComponent(job.Name) + `">JSON</a></footer>`

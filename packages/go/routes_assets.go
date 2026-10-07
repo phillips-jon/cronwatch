@@ -21,14 +21,14 @@ code,pre,.mono{font-family:var(--mono)}
 .brand .crumb{font:500 15px/1.2 var(--mono);color:var(--body);overflow-wrap:anywhere}.brand .slash{color:var(--rule-2);font-weight:400}
 .actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .meta{font:400 12px/1.4 var(--mono);color:var(--muted)}
-button,select,details.confirm>summary{font:500 12.5px/1 var(--mono);color:var(--ink);background:var(--sheet);border:1px solid var(--rule-2);border-radius:3px;padding:8px 11px;cursor:pointer}
-select{padding:7px 8px}
-button:hover,select:hover,details.confirm>summary:hover{border-color:var(--muted)}
-button.primary{background:var(--ink);border-color:var(--ink);color:var(--sheet)}button.primary:hover{opacity:.86}
+button,a.button,details.confirm>summary{font:500 12.5px/1 var(--mono);color:var(--ink);background:var(--sheet);border:1px solid var(--rule-2);border-radius:3px;height:32px;padding:0 11px;cursor:pointer}
+a.button{display:inline-flex;align-items:center;text-decoration:none}
+button:hover,a.button:hover,details.confirm>summary:hover{border-color:var(--muted)}
+button.primary{background:var(--ink);border-color:var(--ink);color:var(--sheet)}button.primary:hover{opacity:.86}button.danger{color:var(--bad)}button.danger:hover{border-color:var(--bad)}
 form.inline{display:inline-flex;align-items:center;gap:6px;margin:0}
-details.confirm{display:inline-flex;align-items:center;gap:8px;margin:0}details.confirm>summary{list-style:none;display:inline-block}
+details.confirm{display:inline-flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0}details.confirm>summary{list-style:none;display:inline-flex;align-items:center}
 details.confirm>summary::-webkit-details-marker{display:none}details.confirm[open]>summary{border-color:var(--muted)}
-details.confirm form{margin-left:8px;font-size:14px;color:var(--muted)}
+details.confirm form{flex-wrap:wrap;font-size:14px;color:var(--muted)}.delete details{margin-top:16px}
 .sec{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px 40px;padding:30px 0;border-top:1px solid var(--rule)}
 .top+main>.sec:first-child{border-top:0}
 .sec>h2{margin:0;font:500 11px/1.5 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding-top:5px}
@@ -77,7 +77,7 @@ dl.def dd{margin:0;font:400 13.5px/1.7 var(--mono);color:var(--body);overflow-wr
 .message p{margin:14px auto 0;max-width:52ch;color:var(--muted);text-wrap:pretty}
 .signin{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;margin:28px auto 0;max-width:420px}
 .signin label{font:500 11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.signin input{flex:1 1 180px;min-width:0;font:400 16px/1.2 var(--mono);color:var(--ink);background:var(--sheet);border:1px solid var(--rule-2);border-radius:3px;padding:8px 10px}
+.signin input{flex:1 1 180px;min-width:0;font:400 16px/1.2 var(--mono);color:var(--ink);background:var(--sheet);border:1px solid var(--rule-2);border-radius:3px;height:32px;padding:0 10px}
 footer{display:flex;flex-wrap:wrap;gap:6px 18px;padding:20px 0 40px;border-top:1px solid var(--rule);font:400 12px/1.5 var(--mono);color:var(--muted)}
 .timeline{margin:18px 0 0}
 .timeline .axis,.timeline .under,.timeline .over,.timeline .lane{display:grid;grid-template-columns:var(--who) minmax(0,1fr)}

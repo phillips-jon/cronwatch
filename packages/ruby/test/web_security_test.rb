@@ -183,7 +183,7 @@ class WebSecurityTest < Minitest::Test
       refute_match(/\son[a-z]+=/i, res.body, "no inline event handlers")
     end
     page = send.call("GET", "/cronwatch/jobs/h", BEARER).body
-    assert_match(%r{<details class="confirm"><summary>Forget</summary><form}, page, "forget confirms without script")
+    assert_match(%r{<details class="confirm"><summary>Delete history</summary><form}, page, "forget confirms without script")
     api = send.call("GET", "/cronwatch/api/jobs", BEARER)
     assert_equal "nosniff", api.headers["x-content-type-options"]
     assert_equal "no-store", api.headers["cache-control"]

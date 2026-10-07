@@ -460,7 +460,7 @@ def test_pages_carry_a_strict_csp_and_security_headers_and_need_no_script_of_the
         assert len(re.findall(r"<script", html, re.I)) == 1
         assert not re.search(r"\son[a-z]+=", html, re.I), "no inline event handlers"
     page = send(web, "GET", "/cronwatch/jobs/h", BEARER).text
-    assert '<details class="confirm"><summary>Forget</summary><form' in page
+    assert '<details class="confirm"><summary>Delete history</summary><form' in page
     api = send(web, "GET", "/cronwatch/api/jobs", BEARER)
     assert api.headers["x-content-type-options"] == "nosniff"
     assert api.headers["cache-control"] == "no-store"
