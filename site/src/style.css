@@ -88,6 +88,34 @@ pre b.bad { color: var(--bad); } pre b.warn { color: var(--warn); } pre b.ok { c
 .opening .say b { font-weight: 600; }
 .opening .say i { font-style: italic; color: var(--muted); }
 .opening .then { margin-top: 24px; color: var(--ink); max-width: 52ch; text-wrap: pretty; }
+/* The opening's illustration: an astrolabe larger than anything else
+   on the sheet, centred near its right edge so it runs out past the border
+   into the paper and down behind the next section. Behind the text, never in
+   the way of it, and left out on a narrow sheet. Drawn by hand, in the same
+   thin lines and state colours as the other illustrations; its title names
+   it as an illustration. */
+.hero-ill { display: none; margin: 0; }
+@media (min-width: 1000px) {
+  html, body { overflow-x: clip; }
+  .opening { position: relative; }
+  .opening > :not(.hero-ill) { position: relative; z-index: 1; }
+  .opening .say { max-width: 15.5em; }
+  .hero-ill { display: block; position: absolute; z-index: 0; width: 640px; top: 60px; right: calc(-220px - clamp(20px, 4vw, 56px)); pointer-events: none; }
+}
+.hero-ill svg { display: block; width: 100%; height: auto; overflow: visible; }
+.astro .band { fill: none; stroke: var(--sunk); stroke-width: 22; }
+.astro .orbit { fill: none; stroke: var(--rule-2); stroke-width: 1; }
+.astro .maj { stroke: var(--tick); stroke-width: 1.2; }
+.astro .min { stroke: var(--rule-2); stroke-width: 1; }
+.astro .num { fill: var(--muted); font: 400 9.5px/1 var(--mono); letter-spacing: .06em; text-anchor: middle; dominant-baseline: middle; }
+.astro .index { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 2 3; }
+.astro .pointer { fill: var(--ink); }
+.astro .hub { fill: var(--sheet); stroke: var(--ink); stroke-width: 1; }
+.astro .expr { fill: var(--ink); font: 500 11px/1 var(--mono); text-anchor: middle; }
+.astro .sub { fill: var(--muted); font: italic 400 9.5px/1 var(--serif); text-anchor: middle; }
+.astro .run.ok { fill: var(--ok); } .astro .run.warn { fill: var(--warn); }
+.astro .run.bad { fill: none; stroke: var(--bad); stroke-width: 1.3; stroke-dasharray: 2 1.6; }
+.astro .ring { transform-box: view-box; transform-origin: 220px 220px; }
 .install { display: inline-flex; align-items: center; gap: 14px; margin-top: 26px; background: var(--sunk); border: 1px solid var(--rule); border-radius: 3px; padding: 10px 10px 10px 14px; font: 400 14px/1.4 var(--mono); }
 .install code { min-width: 0; overflow-wrap: anywhere; }
 .install code::before { content: "$ "; color: var(--muted); }
@@ -368,6 +396,13 @@ details.peek .out pre { max-height: 360px; overflow-y: auto; }
    reader asked for less motion. Without script, everything simply sits in
    its final place. */
 @media (prefers-reduced-motion: no-preference) {
+  .hero-ill.play svg { animation: cw-float 7s ease-in-out infinite; }
+  .hero-ill.play .r-min { animation: cw-turn 240s linear infinite; }
+  .hero-ill.play .r-hour { animation: cw-turn-back 180s linear infinite; }
+  .hero-ill.play .r-dom { animation: cw-turn 140s linear infinite; }
+  .hero-ill.play .r-mon { animation: cw-turn-back 110s linear infinite; }
+  .hero-ill.play .r-dow { animation: cw-turn 80s linear infinite; }
+  .hero-ill.play .run.bad { animation: cw-dim 2.6s ease-in-out infinite; }
   .armed:not(.play) .tl .marks > :not(.base), .armed:not(.play) .tl .note, .armed:not(.play) .tl .now, .armed:not(.play) .tl .nowlabel { opacity: 0; }
   .armed.play .tl .marks > * { animation: cw-fade .45s ease-out both; }
   .armed.play .tl .marks > .base { animation: none; }
@@ -447,6 +482,10 @@ details.peek .out pre { max-height: 360px; overflow-y: auto; }
   .pair.armed.play .chan .msg { animation: cw-arrive .6s 1.8s cubic-bezier(.2, .8, .2, 1) both; }
   .pair.armed.play .quiet { animation: cw-fade .9s 2.9s ease-out both; }
 }
+@keyframes cw-turn { to { transform: rotate(360deg); } }
+@keyframes cw-turn-back { to { transform: rotate(-360deg); } }
+@keyframes cw-float { 50% { transform: translateY(-8px); } }
+@keyframes cw-dim { 50% { opacity: .35; } }
 @keyframes cw-blink { 50% { opacity: 0; } }
 @keyframes cw-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 @keyframes cw-arrive { from { opacity: 0; transform: translateY(10px); } }

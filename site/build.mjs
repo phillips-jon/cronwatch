@@ -462,6 +462,60 @@ function checksSvg(narrow) {
 }
 
 /**
+ * The opening's illustration, an astrolabe for a cron expression: one ring
+ * per field (minute, hour, day of month, month, weekday), turning at their
+ * own speeds, with the job's recent runs read off along the top.
+ */
+function astrolabeSvg() {
+  const C = 220, rad = (d) => ((d - 90) * Math.PI) / 180;
+  const pt = (r, d) => [f1(C + r * Math.cos(rad(d))), f1(C + r * Math.sin(rad(d)))];
+  const rings = [
+    { key: "min", r: 196, n: 60, major: 5, labels: (i) => (i % 15 === 0 ? String(i).padStart(2, "0") : "") },
+    { key: "hour", r: 160, n: 24, major: 6, labels: (i) => (i % 6 === 0 ? String(i).padStart(2, "0") : "") },
+    { key: "dom", r: 126, n: 31, major: 31, labels: (i) => (i === 0 ? "1" : i === 14 ? "15" : "") },
+    { key: "mon", r: 94, n: 12, major: 3, labels: (i) => ["JAN", "", "", "APR", "", "", "JUL", "", "", "OCT", "", ""][i] },
+    { key: "dow", r: 70, n: 7, major: 7, labels: (i) => ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][i] },
+  ];
+  let s = `<svg class="astro" viewBox="-24 -24 488 488" role="img" aria-labelledby="hero-t"><title id="hero-t">Illustration: an astrolabe for a cron expression, one ring for each field, with a job's recent runs marked along the top, one of them missed.</title>`;
+  // A band under the hour ring, for weight.
+  s += `<circle class="band" cx="${C}" cy="${C}" r="151"/>`;
+  for (const ring of rings) {
+    s += `<g class="ring r-${ring.key}"><circle class="orbit" cx="${C}" cy="${C}" r="${ring.r}"/>`;
+    for (let i = 0; i < ring.n; i++) {
+      const d = (360 / ring.n) * i, major = i % ring.major === 0;
+      const [x1, y1] = pt(ring.r, d), [x2, y2] = pt(ring.r - (major ? 9 : 4), d);
+      s += `<line class="${major ? "maj" : "min"}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+      const label = ring.labels(i);
+      if (label) {
+        const [lx, ly] = pt(ring.r - 19, d);
+        s += `<text class="num" x="${lx}" y="${ly}" transform="rotate(${f1(d)} ${lx} ${ly})">${label}</text>`;
+      }
+    }
+    s += `</g>`;
+  }
+  // A fixed scale outside the rings, and the index at the top where the
+  // fields are read.
+  s += `<circle class="orbit" cx="${C}" cy="${C}" r="212"/>`;
+  for (let i = 0; i < 120; i++) { const [x1, y1] = pt(212, i * 3), [x2, y2] = pt(i % 10 === 0 ? 220 : 216, i * 3); s += `<line class="${i % 10 === 0 ? "maj" : "min"}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`; }
+  s += `<line class="index" x1="${C}" y1="${C - 48}" x2="${C}" y2="${C - 212}"/><path class="pointer" d="M${C - 6} ${C - 236}L${C + 6} ${C - 236}L${C} ${C - 224}Z"/>`;
+  s += `<circle class="hub" cx="${C}" cy="${C}" r="42"/><text class="expr" x="${C}" y="${C - 2}">0 3 * * *</text><text class="sub" x="${C}" y="${C + 14}">nightly-backup</text>`;
+  // The job's last runs, read off along an arc outside the rings.
+  const runs = ["ok", "ok", "ok", "warn", "ok", "ok", "ok", "bad", "ok"];
+  runs.forEach((state, i) => {
+    const [x, y] = pt(232, -96 + i * 10);
+    s += state === "bad"
+      ? `<circle class="run bad r${i}" cx="${x}" cy="${y}" r="4"/>`
+      : `<circle class="run ${state} r${i}" cx="${x}" cy="${y}" r="3.2"/>`;
+  });
+  return `${s}</svg>`;
+}
+
+/** The opening's illustration; its title names it as one. */
+function heroIll() {
+  return `<figure class="hero-ill play-on-view">${astrolabeSvg()}</figure>`;
+}
+
+/**
  * Where the records go, as a flat diagram: a hosted monitor, where your app
  * sends pings and output to their servers and they alert you, against
  * CronWatch, where the library in your app writes to your own database and
@@ -795,6 +849,7 @@ function build() {
       },
     ],
   }).replace(/</g, "\\u003c");
+  landing = landing.replace("{{HERO}}", () => heroIll());
   writeFileSync(path.join(DIST, "index.html"), layout({
     title: "CronWatch",
     description: landingDescription,
