@@ -1,6 +1,6 @@
 {
   "generatedBy": "scripts/conformance.mjs",
-  "sdkVersion": "0.12.2",
+  "sdkVersion": "0.12.3",
   "prune": [
     {
       "name": "prune keeps each job's newest run, and running runs",

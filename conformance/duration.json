@@ -1,6 +1,6 @@
 {
   "generatedBy": "scripts/conformance.mjs",
-  "sdkVersion": "0.12.2",
+  "sdkVersion": "0.12.3",
   "parse": [
     {
       "input": "15m",
