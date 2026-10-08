@@ -32,4 +32,4 @@ These terms may change as the project does. The date at the top says when they l
 
 ## Questions
 
-Use the [contact page](/contact/). cronwatch.dev and CronWatch are maintained by Jon Phillips.
+Use the [contact page](/contact/). cronwatch.dev and CronWatch are maintained by Jon C. Phillips.

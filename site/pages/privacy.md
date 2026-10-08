@@ -40,4 +40,4 @@ You can ask what the maintainer holds about you, or ask for your messages and an
 
 ## Changes and questions
 
-If this page changes, the date at the top will too. Questions go to the [contact page](/contact/). cronwatch.dev is run by Jon Phillips.
+If this page changes, the date at the top will too. Questions go to the [contact page](/contact/). cronwatch.dev is run by Jon C. Phillips.

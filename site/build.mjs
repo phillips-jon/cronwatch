@@ -66,7 +66,7 @@ const FOOTER = [
   ["Docs", [["Getting started", "/docs/"], ["Schedules", "/docs/schedules/"], ["Alerts", "/docs/alerts/"], ["Dashboard", "/docs/dashboard/"], ["MCP server", "/docs/mcp/"], ["Agent skill", "/docs/agent-skill/"], ["Stability", "/docs/stability/"]]],
   ["Languages", [["TypeScript", "/docs/node/"], ["Ruby", "/docs/ruby/"], ["Python", "/docs/python/"], ["PHP", "/docs/php/"], ["Go", "/docs/go/"], ["Rust", "/docs/rust/"], ["Elixir", "/docs/elixir/"], ["Java", "/docs/java/"], [".NET", "/docs/dotnet/"]]],
   ["Packages", [["npm", "https://www.npmjs.com/package/@cronwatch/sdk"], ["RubyGems", "https://rubygems.org/gems/cronwatch"], ["PyPI", "https://pypi.org/project/cronwatch-sdk/"], ["Packagist", "https://packagist.org/packages/cronwatch/cronwatch"], ["pkg.go.dev", "https://pkg.go.dev/cronwatch.dev/go"], ["crates.io", "https://crates.io/crates/cronwatch"], ["Hex", "https://hex.pm/packages/cronwatch"], ["Maven Central", "https://central.sonatype.com/artifact/dev.cronwatch/cronwatch"], ["NuGet", "https://www.nuget.org/packages/Cronwatch"], ["drupal.org", "https://www.drupal.org/project/cronwatch"], ["Craft Plugin Store", "https://plugins.craftcms.com/cronwatch"]]],
-  ["Project", [["GitHub", GITHUB], ["Releases", `${GITHUB}/releases`], ["Changelog", `${GITHUB}/blob/main/CHANGELOG.md`], ["Contact", "/contact/"], ["Terms", "/terms/"], ["Privacy", "/privacy/"]]],
+  ["Project", [["About", "/about/"], ["GitHub", GITHUB], ["Releases", `${GITHUB}/releases`], ["Changelog", `${GITHUB}/blob/main/CHANGELOG.md`], ["Contact", "/contact/"], ["Terms", "/terms/"], ["Privacy", "/privacy/"]]],
 ];
 const FOOTER_COLUMNS = FOOTER.map(([head, items]) =>
   `<div><p class="foot-head">${head}</p><ul>${items.map(([label, href]) => `<li><a href="${href}"${href.startsWith("http") ? ` target="_blank" rel="noopener"` : ""}>${label}${head === "Languages" ? `<span class="vh"> docs</span>` : ""}</a></li>`).join("")}</ul></div>`).join("");
@@ -79,6 +79,7 @@ const LINKS = [
   { label: "Docs", href: "/docs/" },
   { label: "MCP", href: "/docs/mcp/" },
   { label: "Agent Skill", href: "/docs/agent-skill/" },
+  { label: "About", href: "/about/" },
   { label: "GitHub", href: GITHUB },
 ];
 
@@ -230,7 +231,7 @@ ${body}
       <nav class="foot-cols" aria-label="Footer">${FOOTER_COLUMNS}</nav>
     </div>
     <div class="foot-end">
-      <p class="rights">© ${new Date().getFullYear()} CronWatch. MIT licensed. Made by <a href="https://joncphillips.com" rel="me noopener" target="_blank">Jon Phillips</a>.</p>
+      <p class="rights">© ${new Date().getFullYear()} CronWatch. MIT licensed. Made by <a href="https://joncphillips.com" rel="me noopener" target="_blank">Jon C. Phillips</a>.</p>
       <button class="theme" type="button" title="Switch between light and dark (Shift+Cmd+D, or Shift+Ctrl+D)" aria-label="Switch to light">${THEME_ICONS}</button>
     </div>
   </footer>
