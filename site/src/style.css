@@ -628,6 +628,8 @@ dialog.search::backdrop { background: rgba(9, 9, 11, .42); }
 .doc { min-width: 0; max-width: 66ch; }
 .doc > * + * { margin-top: 16px; }
 .doc .label { font: 500 11.5px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+.doc .doc-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 12px; }
+.doc .doc-head .label { margin: 0; }
 .doc h1 { font-size: clamp(1.9rem, 3.2vw, 2.5rem); line-height: 1.18; letter-spacing: -0.014em; }
 .doc h2 { font-size: 1.45rem; margin-top: 38px; scroll-margin-top: 24px; }
 .doc h3 { font-size: 1.15rem; margin-top: 26px; scroll-margin-top: 24px; }

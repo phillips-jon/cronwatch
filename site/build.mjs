@@ -810,7 +810,7 @@ function build() {
     const { meta, body } = frontmatter(versioned(readFileSync(path.join(DOCS, file), "utf8")));
     const name = file.replace(/\.md$/, "");
     const route = name === "index" ? "/docs/" : `/docs/${name}/`;
-    return { name, route, meta, html: curlyApostrophes(markdown(body)), order: Number(meta.order ?? 999) };
+    return { name, route, meta, body, html: curlyApostrophes(markdown(body)), order: Number(meta.order ?? 999) };
   }).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 
   // The docs search index is a script, not JSON: search.js adds a script
@@ -880,9 +880,17 @@ function build() {
     const html = page.html;
     const prev = pages[i - 1], next = pages[i + 1];
     const pager = `<nav class="pager" aria-label="Previous and next">${prev ? `<a class="prev" href="${prev.route}"><small>Previous</small>${escape(prev.meta.title)}</a>` : "<span></span>"}${next ? `<a class="next" href="${next.route}"><small>Next</small>${escape(next.meta.title)}</a>` : ""}</nav>`;
-    const body = `<div class="docs"><aside class="docs-side" aria-label="Documentation">${SEARCH_OPEN}<div class="docs-scroll"><p>Documentation</p>${docList(page.route)}</div></aside><details class="docs-menu"><summary>Documentation</summary>${SEARCH_OPEN}${docList(page.route)}</details><article class="doc"><p class="label">${escape(page.meta.title)}</p>${html}${pager}</article></div>`;
+    // Each page as markdown beside it, for pasting into an agent: the source
+    // without its front matter, the site's own links made absolute so they
+    // still resolve once pasted. The button copies it; without script it
+    // stays hidden.
+    const mdPath = `/docs/${page.name}.md`;
+    const md = `${page.body.trim().replace(/\]\(\//g, () => `](${SITE}/`)}\n\nSource: ${SITE}${page.route}\n`;
+    const copyMd = `<button class="copy copy-md" type="button" data-md="${mdPath}" hidden>Copy as Markdown</button>`;
+    const body = `<div class="docs"><aside class="docs-side" aria-label="Documentation">${SEARCH_OPEN}<div class="docs-scroll"><p>Documentation</p>${docList(page.route)}</div></aside><details class="docs-menu"><summary>Documentation</summary>${SEARCH_OPEN}${docList(page.route)}</details><article class="doc"><div class="doc-head"><p class="label">${escape(page.meta.title)}</p>${copyMd}</div>${html}${pager}</article></div>`;
     const dir = path.join(DIST, page.route);
     mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(DIST, mdPath), md);
     writeFileSync(path.join(dir, "index.html"), layout({ title: page.meta.title, description: page.meta.description ?? "", body, path: page.route, kind: "docs" }));
   }
 
@@ -910,7 +918,8 @@ ${code ? `  <p class="code" aria-hidden="true">${code}</p>\n` : ""}  <h1>${headi
   writeFileSync(path.join(DIST, "prompt.txt"), prompt);
   // llms.txt in the shape llmstxt.org proposes: a title, a summary, then
   // sections of links. The docs sections come from each page's front
-  // matter, a section per sidebar group in sidebar order.
+  // matter, a section per sidebar group in sidebar order, each linking the
+  // page's markdown copy, as the proposal asks.
   const llmsGroups = new Map();
   for (const p of pages) {
     const group = p.meta.group ?? "TypeScript";
@@ -919,7 +928,7 @@ ${code ? `  <p class="code" aria-hidden="true">${code}</p>\n` : ""}  <h1>${headi
   }
   const llmsLink = (label, url, note) => `- [${label}](${url})${note ? `: ${note}` : ""}`;
   const llmsDocs = [...llmsGroups].map(([group, list]) =>
-    `## ${group}\n\n${list.map((p) => llmsLink(p.meta.title, SITE + p.route, p.meta.description)).join("\n")}`).join("\n\n");
+    `## ${group}\n\n${list.map((p) => llmsLink(p.meta.title, `${SITE}/docs/${p.name}.md`, p.meta.description)).join("\n")}`).join("\n\n");
   const llmsInstall = [
     ["npm", "https://www.npmjs.com/package/@cronwatch/sdk", "npm install @cronwatch/sdk"],
     ["RubyGems", "https://rubygems.org/gems/cronwatch", "bundle add cronwatch"],

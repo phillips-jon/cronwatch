@@ -119,7 +119,25 @@
     });
   });
 
-  document.querySelectorAll(".copy").forEach(function (button) {
+  // A docs page's markdown, fetched from beside it. Safari only writes to the
+  // clipboard within the click, so where it can the fetch goes inside the
+  // clipboard item rather than before it.
+  document.querySelectorAll(".copy-md").forEach(function (button) {
+    var label = button.textContent;
+    var src = button.getAttribute("data-md");
+    var text = function () { return fetch(src).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }); };
+    var say = function (what) { return function () { button.textContent = what; setTimeout(function () { button.textContent = label; }, 1800); }; };
+    button.hidden = !navigator.clipboard;
+    button.addEventListener("click", function () {
+      var write = window.ClipboardItem && navigator.clipboard.write
+        ? navigator.clipboard.write([new ClipboardItem({ "text/plain": text().then(function (t) { return new Blob([t], { type: "text/plain" }); }) })])
+            .catch(function () { return text().then(function (t) { return navigator.clipboard.writeText(t); }); })
+        : text().then(function (t) { return navigator.clipboard.writeText(t); });
+      write.then(say("Copied"), say("Could not copy"));
+    });
+  });
+
+  document.querySelectorAll(".copy:not(.copy-md)").forEach(function (button) {
     button.addEventListener("click", function () {
       var box = button.closest(".install, .out");
       var code = box ? box.querySelector("code") : null;
