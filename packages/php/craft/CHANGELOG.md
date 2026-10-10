@@ -1,6 +1,6 @@
 # Release Notes for CronWatch
 
-## Unreleased
+## 0.12.4 - 2026-10-10
 
 ### Changed
 - From the library: the source moved to the CronWatch organisation on GitHub, github.com/cronwatchdev/cronwatch, and the links to it, the issue tracker and the changelog point there. The old addresses redirect.

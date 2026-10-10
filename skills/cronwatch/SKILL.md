@@ -1,7 +1,7 @@
 ---
 name: cronwatch
 description: This skill should be used when the user asks to "monitor a cron job", "add CronWatch", "watch this scheduled job", "alert me if this job fails or doesn't run", "check on my cron jobs", "why did the nightly job fail", or mentions @cronwatch/sdk, the cronwatch gem, cronwatch-sdk (Python), cronwatch/cronwatch (PHP), the CronWatch WordPress plugin, cronwatch.dev/go (Go), the cronwatch crate (Rust), the cronwatch package on Hex (Elixir), dev.cronwatch:cronwatch (Java), the Cronwatch package on NuGet (.NET), cronwatch.dev or the cronwatch MCP server.
-version: 0.12.3
+version: 0.12.4
 ---
 
 # CronWatch
