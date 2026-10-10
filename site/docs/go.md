@@ -156,7 +156,7 @@ default:
 }
 ```
 
-[`examples/crontab`](https://github.com/phillips-jon/cronwatch/tree/main/packages/go/examples/crontab) in the repository is this program, with a test that runs its two commands on one SQLite file. `Check` returns a `*CheckResult` with `CheckedAt`, `Jobs`, `Alerts` and `Pruned`; its error is for the store failing as the check starts. Calls at the same time share one check, which runs to the end even when the first caller's context is cancelled, while each caller stops waiting when its own context ends.
+[`examples/crontab`](https://github.com/cronwatchdev/cronwatch/tree/main/packages/go/examples/crontab) in the repository is this program, with a test that runs its two commands on one SQLite file. `Check` returns a `*CheckResult` with `CheckedAt`, `Jobs`, `Alerts` and `Pruned`; its error is for the store failing as the check starts. Calls at the same time share one check, which runs to the end even when the first caller's context is cancelled, while each caller stops waiting when its own context ends.
 
 ## The dashboard
 
@@ -480,4 +480,4 @@ These still work, each marked `Deprecated:` in its doc comment so editors and `s
 
 ## Kept in step
 
-The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, redaction, each channel's requests, stats and health) into `conformance/` in the repository, and the Go tests replay every one, as the Ruby gem's and the Python, PHP, Rust, Elixir, Java and .NET packages' do; the dashboard is checked against the SDK's pages byte for byte. Cron parsing is also checked against croner itself on thousands of generated expressions. A change of behaviour lands in TypeScript first, the cases are regenerated, and the port is fixed until they pass. Where they disagree, the port is wrong: [open an issue](https://github.com/phillips-jon/cronwatch/issues).
+The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, redaction, each channel's requests, stats and health) into `conformance/` in the repository, and the Go tests replay every one, as the Ruby gem's and the Python, PHP, Rust, Elixir, Java and .NET packages' do; the dashboard is checked against the SDK's pages byte for byte. Cron parsing is also checked against croner itself on thousands of generated expressions. A change of behaviour lands in TypeScript first, the cases are regenerated, and the port is fixed until they pass. Where they disagree, the port is wrong: [open an issue](https://github.com/cronwatchdev/cronwatch/issues).

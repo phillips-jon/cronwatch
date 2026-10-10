@@ -10,7 +10,7 @@ These are the terms for cronwatch.dev and the CronWatch software. They are short
 
 ## The software
 
-CronWatch (the `@cronwatch/sdk` and `@cronwatch/mcp` packages on npm, the `cronwatch` gem on RubyGems, and the code on GitHub) is released under the [MIT License](https://github.com/phillips-jon/cronwatch/blob/main/LICENSE). That license, not this page, governs how you use, copy, change and share the code.
+CronWatch (the `@cronwatch/sdk` and `@cronwatch/mcp` packages on npm, the `cronwatch` gem on RubyGems, and the code on GitHub) is released under the [MIT License](https://github.com/cronwatchdev/cronwatch/blob/main/LICENSE). That license, not this page, governs how you use, copy, change and share the code.
 
 The software is provided as is, without warranty of any kind. It is a library that runs inside your own application and writes its records to your own database. You decide where it runs, what it stores and who it alerts, and you are responsible for that setup, for the data in your database, and for any services (email, Slack, AI providers and so on) you connect it to.
 

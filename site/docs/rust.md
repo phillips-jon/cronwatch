@@ -144,7 +144,7 @@ async fn main() -> Result<(), cronwatch::BoxError> {
 }
 ```
 
-[`examples/crontab`](https://github.com/phillips-jon/cronwatch/tree/main/packages/rust/examples/crontab) in the repository is this program, with a test that runs its two commands on one SQLite file. `check()` returns a `CheckResult` with `checked_at`, `jobs`, `alerts` and `pruned`; its error is for the store failing as the check starts. Calls at the same time share one check, which runs in a task of its own to the end even when a caller's future is dropped.
+[`examples/crontab`](https://github.com/cronwatchdev/cronwatch/tree/main/packages/rust/examples/crontab) in the repository is this program, with a test that runs its two commands on one SQLite file. `check()` returns a `CheckResult` with `checked_at`, `jobs`, `alerts` and `pruned`; its error is for the store failing as the check starts. Calls at the same time share one check, which runs in a task of its own to the end even when a caller's future is dropped.
 
 ## The blocking client
 
@@ -471,4 +471,4 @@ The public types write the SDK's JSON with `to_json()`, not serde_json, whose nu
 
 ## Kept in step
 
-The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, redaction, each channel's requests, stats and health) into `conformance/` in the repository, and the Rust tests replay every one, as the Ruby gem's and the Python, PHP, Go, Elixir, Java and .NET packages' do; the dashboard is checked against the SDK's pages byte for byte, straight, through tower and nested in axum. Cron parsing is also checked against croner itself on thousands of generated expressions. A change of behaviour lands in TypeScript first, the cases are regenerated, and the port is fixed until they pass. Where they disagree, the port is wrong: [open an issue](https://github.com/phillips-jon/cronwatch/issues).
+The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, redaction, each channel's requests, stats and health) into `conformance/` in the repository, and the Rust tests replay every one, as the Ruby gem's and the Python, PHP, Go, Elixir, Java and .NET packages' do; the dashboard is checked against the SDK's pages byte for byte, straight, through tower and nested in axum. Cron parsing is also checked against croner itself on thousands of generated expressions. A change of behaviour lands in TypeScript first, the cases are regenerated, and the port is fixed until they pass. Where they disagree, the port is wrong: [open an issue](https://github.com/cronwatchdev/cronwatch/issues).

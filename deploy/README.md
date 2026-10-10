@@ -25,7 +25,7 @@ As joncphillips:
 
 4. The bare clone. The repository is public, so HTTPS works without a key. A bare clone has no fetch refspec, and `release-deploy` reads `refs/remotes/origin/main`, so add one and fetch once:
    ```
-   git clone --bare https://github.com/phillips-jon/cronwatch.git /var/www/cronwatch.dev-repo.git
+   git clone --bare https://github.com/cronwatchdev/cronwatch.git /var/www/cronwatch.dev-repo.git
    git -C /var/www/cronwatch.dev-repo.git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
    git -C /var/www/cronwatch.dev-repo.git fetch origin
    git -C /var/www/cronwatch.dev-repo.git rev-parse refs/remotes/origin/main   # prints a commit

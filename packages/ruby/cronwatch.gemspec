@@ -14,9 +14,9 @@ Gem::Specification.new do |spec|
   spec.required_ruby_version = ">= 3.2"
   spec.metadata = {
     "homepage_uri" => spec.homepage,
-    "source_code_uri" => "https://github.com/phillips-jon/cronwatch/tree/main/packages/ruby",
-    "changelog_uri" => "https://github.com/phillips-jon/cronwatch/releases",
-    "bug_tracker_uri" => "https://github.com/phillips-jon/cronwatch/issues",
+    "source_code_uri" => "https://github.com/cronwatchdev/cronwatch/tree/main/packages/ruby",
+    "changelog_uri" => "https://github.com/cronwatchdev/cronwatch/releases",
+    "bug_tracker_uri" => "https://github.com/cronwatchdev/cronwatch/issues",
     "documentation_uri" => "https://cronwatch.dev/docs/ruby/",
     "rubygems_mfa_required" => "true",
   }

@@ -353,7 +353,7 @@ internal static class Html
             + "\n</main>\n<footer><span>Refreshes every minute. Times are UTC.</span><a href=\""
             + H(basePath)
             + "/api/jobs\">JSON</a><a class=\"version\""
-            + " href=\"https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md\">Cronwatch "
+            + " href=\"https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md\">Cronwatch "
             + CronwatchClient.Version
             + "</a></footer>";
         return Layout("CronWatch", body, basePath, 60);
@@ -537,7 +537,7 @@ internal static class Html
             + "/api/jobs/"
             + WebText.EncodeUriComponent(job.Name)
             + "\">JSON</a><a class=\"version\""
-            + " href=\"https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md\">Cronwatch "
+            + " href=\"https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md\">Cronwatch "
             + CronwatchClient.Version
             + "</a></footer>";
         return Layout(job.Name + ": CronWatch", body, basePath, 60);

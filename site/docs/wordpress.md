@@ -17,7 +17,7 @@ The plugin is [CronWatch in the wordpress.org plugin directory](https://wordpres
 wp plugin install cronwatch --activate
 ```
 
-Each release's zip is also attached to its [GitHub release](https://github.com/phillips-jon/cronwatch/releases/latest), as `cronwatch.zip`, for a site that installs plugins from a file.
+Each release's zip is also attached to its [GitHub release](https://github.com/cronwatchdev/cronwatch/releases/latest), as `cronwatch.zip`, for a site that installs plugins from a file.
 
 Activating it makes three tables (`wp_cronwatch_jobs`, `wp_cronwatch_runs` and `wp_cronwatch_state`, with your table prefix) and schedules its check. Then, under CronWatch, Settings, enter where alerts go and send a test alert.
 

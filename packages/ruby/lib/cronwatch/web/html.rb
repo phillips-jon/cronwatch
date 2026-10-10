@@ -442,7 +442,7 @@ module Cronwatch
           </section>
           #{sections}
           </main>
-          <footer><span>Refreshes every minute. Times are UTC.</span><a href="#{h(base)}/api/jobs">JSON</a><a class="version" href="https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md">cronwatch #{Cronwatch::VERSION}</a></footer>
+          <footer><span>Refreshes every minute. Times are UTC.</span><a href="#{h(base)}/api/jobs">JSON</a><a class="version" href="https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md">cronwatch #{Cronwatch::VERSION}</a></footer>
         BODY
         layout("CronWatch", body, base, refresh: 60)
       end
@@ -570,7 +570,7 @@ module Cronwatch
             </div>
           </section>
           </main>
-          <footer><span>Refreshes every minute. Times are UTC.</span><a href="#{h(base)}/api/jobs/#{encode_uri_component(job.name)}">JSON</a><a class="version" href="https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md">cronwatch #{Cronwatch::VERSION}</a></footer>
+          <footer><span>Refreshes every minute. Times are UTC.</span><a href="#{h(base)}/api/jobs/#{encode_uri_component(job.name)}">JSON</a><a class="version" href="https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md">cronwatch #{Cronwatch::VERSION}</a></footer>
         BODY
         layout("#{job.name}: CronWatch", body, base, refresh: 60)
       end

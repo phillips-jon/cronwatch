@@ -10,8 +10,8 @@
     ],
     "support": {
         "docs": "https://cronwatch.dev/docs/",
-        "issues": "https://github.com/phillips-jon/cronwatch/issues",
-        "source": "https://github.com/phillips-jon/cronwatch"
+        "issues": "https://github.com/cronwatchdev/cronwatch/issues",
+        "source": "https://github.com/cronwatchdev/cronwatch"
     },
     "require": {
         "php": ">=8.2",

@@ -17,7 +17,7 @@
 #
 # Stays off until the repository variable CRATES_ENABLED is "true". Before
 # that, on crates.io, for each of the four crates: Settings, Trusted
-# Publishing, add a GitHub publisher with owner phillips-jon, repository
+# Publishing, add a GitHub publisher with owner cronwatchdev, repository
 # cronwatch, workflow crates.yml and environment crates; and here, create the
 # environment "crates" (Settings, Environments), optionally with required
 # reviewers so each publish waits for a click.

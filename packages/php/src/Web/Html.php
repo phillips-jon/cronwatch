@@ -411,7 +411,7 @@ CSS;
             . "</section>\n"
             . "{$sections}\n"
             . "</main>\n"
-            . "<footer><span>Refreshes every minute. Times are UTC.</span><a href=\"{$b}/api/jobs\">JSON</a><a class=\"version\" href=\"https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md\">cronwatch/cronwatch " . \Cronwatch\Cronwatch::VERSION . '</a></footer>';
+            . "<footer><span>Refreshes every minute. Times are UTC.</span><a href=\"{$b}/api/jobs\">JSON</a><a class=\"version\" href=\"https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md\">cronwatch/cronwatch " . \Cronwatch\Cronwatch::VERSION . '</a></footer>';
         return self::layout('CronWatch', $body, $base, 60, $head);
     }
 
@@ -552,7 +552,7 @@ CSS;
             . "  </div>\n"
             . "</section>\n"
             . "</main>\n"
-            . "<footer><span>Refreshes every minute. Times are UTC.</span><a href=\"{$b}/api/jobs/" . Text::encodeUriComponent($job->name) . '">JSON</a><a class="version" href="https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md">cronwatch/cronwatch ' . \Cronwatch\Cronwatch::VERSION . '</a></footer>';
+            . "<footer><span>Refreshes every minute. Times are UTC.</span><a href=\"{$b}/api/jobs/" . Text::encodeUriComponent($job->name) . '">JSON</a><a class="version" href="https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md">cronwatch/cronwatch ' . \Cronwatch\Cronwatch::VERSION . '</a></footer>';
         return self::layout("{$job->name}: CronWatch", $body, $base, 60, $head);
     }
 

@@ -4,7 +4,7 @@
 # "attach" puts the zip on the tag's GitHub release, making the release when
 # it is not there yet. The zip goes up twice: as cronwatch-X.Y.Z.zip, and as
 # cronwatch.zip, so that
-# https://github.com/phillips-jon/cronwatch/releases/latest/download/cronwatch.zip
+# https://github.com/cronwatchdev/cronwatch/releases/latest/download/cronwatch.zip
 # always serves the newest release's plugin, for a site that installs from a
 # file. Uploads replace a file of the same name, so a rerun is safe. It needs
 # no repository variable or secret: it writes only to this repository's

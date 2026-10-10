@@ -7,14 +7,14 @@ group: Reference
 
 # Agent skill
 
-The repository ships `skills/cronwatch/SKILL.md`, a skill for Claude Code, Codex, Cursor and the other agents that read the same format. It is listed [on skills.sh](https://www.skills.sh/phillips-jon/cronwatch). With it installed, asking for "monitor this cron job" or "why did the nightly job fail" gets a workflow instead of a guess.
+The repository ships `skills/cronwatch/SKILL.md`, a skill for Claude Code, Codex, Cursor and the other agents that read the same format. It is listed [on skills.sh](https://www.skills.sh/cronwatchdev/cronwatch). With it installed, asking for "monitor this cron job" or "why did the nightly job fail" gets a workflow instead of a guess.
 
 ## Install
 
 With the [skills](https://skills.sh) command, which asks which agents to install it for and whether to install it in the project or for every project:
 
 ```bash
-npx skills add phillips-jon/cronwatch
+npx skills add cronwatchdev/cronwatch
 ```
 
 Or, for Claude Code alone, copy the file into a project or your user skills:
@@ -22,11 +22,11 @@ Or, for Claude Code alone, copy the file into a project or your user skills:
 ```bash
 # in a project
 mkdir -p .claude/skills
-curl -sL https://raw.githubusercontent.com/phillips-jon/cronwatch/main/skills/cronwatch/SKILL.md \
+curl -sL https://raw.githubusercontent.com/cronwatchdev/cronwatch/main/skills/cronwatch/SKILL.md \
   -o .claude/skills/cronwatch/SKILL.md --create-dirs
 
 # or for every project
-curl -sL https://raw.githubusercontent.com/phillips-jon/cronwatch/main/skills/cronwatch/SKILL.md \
+curl -sL https://raw.githubusercontent.com/cronwatchdev/cronwatch/main/skills/cronwatch/SKILL.md \
   -o ~/.claude/skills/cronwatch/SKILL.md --create-dirs
 ```
 

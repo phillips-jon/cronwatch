@@ -24,7 +24,7 @@ The owner settled the draft's open questions before phase 1, taking every recomm
 
 ## Coordinates and releases
 
-The group is `dev.cronwatch`, verified on the Central Publisher Portal by a DNS TXT record on `cronwatch.dev`: the Portal gives a verification key, the owner adds it as a TXT record at the domain's DNS, and the Portal checks the exact domain. A namespace under a domain is granted only to whoever proves the domain, so no one else can hold it, and it covers every group beneath it (`dev.cronwatch.*`). The record is the owner's to add, at the registrar, and changes nothing the site serves. The fallback, if the owner would rather not, is `io.github.phillips-jon`, which the Portal verifies through the GitHub account; it names a personal account in every app's build file forever, as the Go design said of a GitHub module path, so it is only the fallback.
+The group is `dev.cronwatch`, verified on the Central Publisher Portal by a DNS TXT record on `cronwatch.dev`: the Portal gives a verification key, the owner adds it as a TXT record at the domain's DNS, and the Portal checks the exact domain. A namespace under a domain is granted only to whoever proves the domain, so no one else can hold it, and it covers every group beneath it (`dev.cronwatch.*`). The record is the owner's to add, at the registrar, and changes nothing the site serves. The fallback, if the owner would rather not, is `io.github.cronwatchdev`, which the Portal verifies through the GitHub account; it names a personal account in every app's build file forever, as the Go design said of a GitHub module path, so it is only the fallback.
 
 The artifacts, all released together at the release's version:
 
@@ -371,7 +371,7 @@ What is known before any code, mostly shared with the Go, Rust and Elixir ports;
 
 The owner settled the draft's open questions before phase 1, taking each recommendation:
 
-1. **The coordinates** are the group `dev.cronwatch`, verified on the Central Publisher Portal by a DNS TXT record on `cronwatch.dev` that the owner adds, with the artifact ids `cronwatch`, `cronwatch-servlet`, `cronwatch-spring-boot-starter`, `cronwatch-quartz` (and `cronwatch-jobrunr` if kept), claimed by the first batched release after phase 1 works. The fallback, if the owner would rather not touch the DNS, is `io.github.phillips-jon`.
+1. **The coordinates** are the group `dev.cronwatch`, verified on the Central Publisher Portal by a DNS TXT record on `cronwatch.dev` that the owner adds, with the artifact ids `cronwatch`, `cronwatch-servlet`, `cronwatch-spring-boot-starter`, `cronwatch-quartz` (and `cronwatch-jobrunr` if kept), claimed by the first batched release after phase 1 works. The fallback, if the owner would rather not touch the DNS, is `io.github.cronwatchdev`.
 2. **Maven**, with the wrapper committed; not Gradle.
 3. **The floor is Java 21**, tested on 21 and the newest release (and 25 for the tests alone, when the phase that needs it adds the entry).
 4. **The JDBC store lives in the core** (`dev.cronwatch.store`, beside `MemoryStore`, since 1.0; `dev.cronwatch.jdbc.SqlStore`, its package before, is a deprecated alias that hands every call to it), not in a `cronwatch-jdbc` artifact; the servlet adapter is an artifact of its own.

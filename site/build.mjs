@@ -22,7 +22,7 @@ const PAGES = path.join(here, "pages");
 const DEMO = path.join(SRC, "demo");
 const DIST = path.join(here, "dist");
 const SITE = "https://cronwatch.dev";
-const GITHUB = "https://github.com/phillips-jon/cronwatch";
+const GITHUB = "https://github.com/cronwatchdev/cronwatch";
 /**
  * Maven has no version range an install line can use, so the Java install
  * lines name the release: {{JAVA_VERSION}} in the landing page, the prompt

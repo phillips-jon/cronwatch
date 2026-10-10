@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/phillips-jon/cronwatch.git",
+    "url": "git+https://github.com/cronwatchdev/cronwatch.git",
     "directory": "packages/mcp"
   },
   "homepage": "https://cronwatch.dev/docs/mcp",

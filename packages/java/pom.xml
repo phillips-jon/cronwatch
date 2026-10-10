@@ -35,9 +35,9 @@
   </developers>
 
   <scm>
-    <connection>scm:git:https://github.com/phillips-jon/cronwatch.git</connection>
-    <developerConnection>scm:git:git@github.com:phillips-jon/cronwatch.git</developerConnection>
-    <url>https://github.com/phillips-jon/cronwatch/tree/main/packages/java</url>
+    <connection>scm:git:https://github.com/cronwatchdev/cronwatch.git</connection>
+    <developerConnection>scm:git:git@github.com:cronwatchdev/cronwatch.git</developerConnection>
+    <url>https://github.com/cronwatchdev/cronwatch/tree/main/packages/java</url>
     <tag>v${revision}</tag>
   </scm>
 

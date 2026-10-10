@@ -235,15 +235,15 @@ Adds two to four sentences from Claude (likely cause, first thing to check) to e
 
 ## Sharing a database with a Node app
 
-The ActiveRecord store writes the same three tables as `@cronwatch/sdk/postgres` and `@cronwatch/sdk/sqlite`: same names, columns and indexes, epoch milliseconds in the time columns, the SDK's camelCase JSON in the JSON columns. [`test/active_record/node_compat_test.rb`](https://github.com/phillips-jon/cronwatch/blob/main/packages/ruby/test/active_record/node_compat_test.rb) runs the SDK's stores in Node beside this one, on SQLite and Postgres, and checks that each reads what the other wrote, that the tables are the same whoever creates them, and that the rows are the same bytes. Use the same prefix on both sides and give each job a name only one side uses. Then one dashboard, Rails or Node, shows every job, and one MCP server reads them all. The Python, PHP, Go and Rust ports keep the same tables too, so a process in any of them can share the database the same way.
+The ActiveRecord store writes the same three tables as `@cronwatch/sdk/postgres` and `@cronwatch/sdk/sqlite`: same names, columns and indexes, epoch milliseconds in the time columns, the SDK's camelCase JSON in the JSON columns. [`test/active_record/node_compat_test.rb`](https://github.com/cronwatchdev/cronwatch/blob/main/packages/ruby/test/active_record/node_compat_test.rb) runs the SDK's stores in Node beside this one, on SQLite and Postgres, and checks that each reads what the other wrote, that the tables are the same whoever creates them, and that the rows are the same bytes. Use the same prefix on both sides and give each job a name only one side uses. Then one dashboard, Rails or Node, shows every job, and one MCP server reads them all. The Python, PHP, Go and Rust ports keep the same tables too, so a process in any of them can share the database the same way.
 
 ## Kept in step with the TypeScript SDK
 
 The TypeScript SDK is the source of truth. `npm run conformance` at the repository root runs it and writes JSON cases to `conformance/`: duration parsing and formatting, schedules including daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, stats and health. This gem's tests replay every case, and the SDK's own check fails when the files are stale. A change of behaviour lands in TypeScript first, the cases are regenerated, and the gem is fixed until its tests pass. When the two disagree, the Ruby side is wrong.
 
-The dashboard is held to the SDK the same way: [`test/web/golden.json`](https://github.com/phillips-jon/cronwatch/blob/main/packages/ruby/test/web/golden.json) records what the SDK's routes answer to a fixed set of requests, and [`test/web_golden_test.rb`](https://github.com/phillips-jon/cronwatch/blob/main/packages/ruby/test/web_golden_test.rb) makes `Cronwatch::Web` answer them byte for byte.
+The dashboard is held to the SDK the same way: [`test/web/golden.json`](https://github.com/cronwatchdev/cronwatch/blob/main/packages/ruby/test/web/golden.json) records what the SDK's routes answer to a fixed set of requests, and [`test/web_golden_test.rb`](https://github.com/cronwatchdev/cronwatch/blob/main/packages/ruby/test/web_golden_test.rb) makes `Cronwatch::Web` answer them byte for byte.
 
-The design of the port is in [DESIGN.md](https://github.com/phillips-jon/cronwatch/blob/main/packages/ruby/DESIGN.md).
+The design of the port is in [DESIGN.md](https://github.com/cronwatchdev/cronwatch/blob/main/packages/ruby/DESIGN.md).
 
 ## Testing
 
@@ -264,7 +264,7 @@ The node compatibility tests run the built SDK and its drivers, and skip themsel
 npm ci && npm run build
 ```
 
-The default Gemfile tests Rails 8.1. Each supported Rails series has its own Gemfile, with its own lockfile, in [`test/rails/gemfiles`](https://github.com/phillips-jon/cronwatch/tree/main/packages/ruby/test/rails/gemfiles):
+The default Gemfile tests Rails 8.1. Each supported Rails series has its own Gemfile, with its own lockfile, in [`test/rails/gemfiles`](https://github.com/cronwatchdev/cronwatch/tree/main/packages/ruby/test/rails/gemfiles):
 
 ```sh
 BUNDLE_GEMFILE=test/rails/gemfiles/rails_7_2.gemfile bundle install
@@ -281,7 +281,7 @@ npm run build --workspace packages/sdk && TZ=UTC node packages/ruby/test/web/gol
 
 `npm run check` fails while `test/web/golden.json` or `conformance/` is stale.
 
-The MCP server's tests can also drive this gem's `Cronwatch::Web` over HTTP ([`test/web/server.rb`](https://github.com/phillips-jon/cronwatch/blob/main/packages/ruby/test/web/server.rb)). They need `fugit`, `rack` and a server rackup can start (puma, or webrick, which the Gemfile's test group has) in the Ruby they run, and only run when asked, from `packages/mcp`:
+The MCP server's tests can also drive this gem's `Cronwatch::Web` over HTTP ([`test/web/server.rb`](https://github.com/cronwatchdev/cronwatch/blob/main/packages/ruby/test/web/server.rb)). They need `fugit`, `rack` and a server rackup can start (puma, or webrick, which the Gemfile's test group has) in the Ruby they run, and only run when asked, from `packages/mcp`:
 
 ```sh
 CRONWATCH_TEST_RUBY=1 CRONWATCH_RUBY="rbenv exec ruby" npm test

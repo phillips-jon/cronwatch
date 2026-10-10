@@ -7,7 +7,7 @@ group: Reference
 
 # Stability
 
-From 1.0, every CronWatch package follows [semantic versioning](https://semver.org), with one version number shared by every package in every language. A 1.x release, minor or patch, does not break anything this page promises. Anything that would is held for a major release (2.0), and gets a warning first. Releases before 1.0 promised nothing; 1.0 itself carries the changes that prepared for the promise, listed in [the changelog](https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md).
+From 1.0, every CronWatch package follows [semantic versioning](https://semver.org), with one version number shared by every package in every language. A 1.x release, minor or patch, does not break anything this page promises. Anything that would is held for a major release (2.0), and gets a warning first. Releases before 1.0 promised nothing; 1.0 itself carries the changes that prepared for the promise, listed in [the changelog](https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md).
 
 ## What 1.x promises
 

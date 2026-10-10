@@ -239,7 +239,7 @@ for (const [method, template, headers = {}, body] of requests) {
 function about(text) {
   const prefix = `{"ok":true,"library":${JSON.stringify(LIBRARY)},"language":"typescript","version":${JSON.stringify(VERSION)},`;
   if (text.startsWith(prefix)) return `{"ok":true,"library":"<library>","language":"<language>","version":"<version>",${text.slice(prefix.length)}`;
-  return text.replace(`<a class="version" href="https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md">${LIBRARY} ${VERSION}</a>`, `<a class="version" href="https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md"><library> <version></a>`);
+  return text.replace(`<a class="version" href="https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md">${LIBRARY} ${VERSION}</a>`, `<a class="version" href="https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md"><library> <version></a>`);
 }
 
 if (errors.length) {

@@ -12,7 +12,7 @@ Every name that is deprecated today, in every language, with its replacement and
 Two kinds of name are deprecated while preparing 1.0, and they go at different times:
 
 - **Renames of documented API** (a class, method or option the docs showed, renamed so the names agree across languages) keep their old name as a deprecated alias through every 1.x release, and go in 2.0. So 1.0 breaks nothing the docs showed.
-- **Names that were public by accident** (helpers, constants, the JSON and pg_cron helpers, the store test kits' internals) are deprecated now, still work, and go in 1.0 itself, as the [changelog](https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md) will list.
+- **Names that were public by accident** (helpers, constants, the JSON and pg_cron helpers, the store test kits' internals) are deprecated now, still work, and go in 1.0 itself, as the [changelog](https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md) will list.
 
 Two Rust names go in 1.0 for a reason of their own: `Routes::into_router()` and `ReqwestTransport::with_client` hand out types of axum and reqwest, both below 1.0, which no 1.x promise could hold. A few internals were made internal outright, with no deprecation; they are [listed at the end](#hidden-in-1-0-without-a-deprecation).
 

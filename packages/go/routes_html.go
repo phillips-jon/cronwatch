@@ -293,7 +293,7 @@ func dashboardPage(jobs []JobSummary, runsByJob map[string][]Run, now int64, bas
 </section>
 ` + sections + `
 </main>
-<footer><span>Refreshes every minute. Times are UTC.</span><a href="` + h(base) + `/api/jobs">JSON</a><a class="version" href="https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md">` + apiLibrary + ` ` + Version + `</a></footer>`
+<footer><span>Refreshes every minute. Times are UTC.</span><a href="` + h(base) + `/api/jobs">JSON</a><a class="version" href="https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md">` + apiLibrary + ` ` + Version + `</a></footer>`
 	return layout("CronWatch", body, base, 60)
 }
 
@@ -456,7 +456,7 @@ func jobPage(job JobSummary, runs []Run, now int64, base string, complete bool) 
   </div>
 </section>
 </main>
-<footer><span>Refreshes every minute. Times are UTC.</span><a href="` + h(base) + `/api/jobs/` + encodeURIComponent(job.Name) + `">JSON</a><a class="version" href="https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md">` + apiLibrary + ` ` + Version + `</a></footer>`
+<footer><span>Refreshes every minute. Times are UTC.</span><a href="` + h(base) + `/api/jobs/` + encodeURIComponent(job.Name) + `">JSON</a><a class="version" href="https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md">` + apiLibrary + ` ` + Version + `</a></footer>`
 	return layout(job.Name+": CronWatch", body, base, 60)
 }
 

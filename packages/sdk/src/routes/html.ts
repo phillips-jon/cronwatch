@@ -10,7 +10,7 @@ export { escapeHtml };
 const h = escapeHtml;
 
 /** The footer's note of what is serving the page, linked to the changelog. Nothing is fetched to compare it. */
-const VERSION_LINK = `<a class="version" href="https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md">@cronwatch/sdk ${VERSION}</a>`;
+const VERSION_LINK = `<a class="version" href="https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md">@cronwatch/sdk ${VERSION}</a>`;
 
 /*
  * Set like cronwatch.dev: a printed sheet on grey paper, a serif for what a

@@ -7,7 +7,7 @@
     <Copyright>Copyright (c) Jon C. Phillips</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://cronwatch.dev</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/phillips-jon/cronwatch</RepositoryUrl>
+    <RepositoryUrl>https://github.com/cronwatchdev/cronwatch</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>cron;monitoring;scheduled-jobs;alerts</PackageTags>
   </PropertyGroup>

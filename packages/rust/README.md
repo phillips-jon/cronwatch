@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your Rust service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
 
-This is the Rust port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Rust process and a Node, Ruby, Python, PHP or Go process can share one database, and every port reads the tables the others write. It has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook), the memory store, the blocking client, the SQL store in `cronwatch-sqlx` (SQLite, Postgres, MySQL and MariaDB) with the pg_cron source, the alert channels, Claude triage, the dashboard and its JSON API, and a job's HTTP handler for a platform cron, each framework-free with tower and axum adapters, and the scheduler integrations for tokio-cron-scheduler and apalis ([DESIGN.md](https://github.com/phillips-jon/cronwatch/blob/main/packages/rust/DESIGN.md) has how each part works).
+This is the Rust port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Rust process and a Node, Ruby, Python, PHP or Go process can share one database, and every port reads the tables the others write. It has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook), the memory store, the blocking client, the SQL store in `cronwatch-sqlx` (SQLite, Postgres, MySQL and MariaDB) with the pg_cron source, the alert channels, Claude triage, the dashboard and its JSON API, and a job's HTTP handler for a platform cron, each framework-free with tower and axum adapters, and the scheduler integrations for tokio-cron-scheduler and apalis ([DESIGN.md](https://github.com/cronwatchdev/cronwatch/blob/main/packages/rust/DESIGN.md) has how each part works).
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
@@ -166,7 +166,7 @@ A service that runs its jobs from a scheduler watches them through the scheduler
 
 Both are built on `cronwatch::bridge`, which is for integration authors and outside the 1.x promise.
 
-A program a crontab runs needs neither: [`examples/crontab`](https://github.com/phillips-jon/cronwatch/tree/main/packages/rust/examples/crontab) is a job and its check from two crontab lines on one SQLite file.
+A program a crontab runs needs neither: [`examples/crontab`](https://github.com/cronwatchdev/cronwatch/tree/main/packages/rust/examples/crontab) is a job and its check from two crontab lines on one SQLite file.
 
 ## Changes for 1.0
 

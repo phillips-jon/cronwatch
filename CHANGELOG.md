@@ -192,4 +192,4 @@ Every deprecated name, with its replacement and the release it goes in, is on th
 
 ## 0.10.0 and earlier
 
-Releases up to 0.10.0 (2026-09-30) are described in their [GitHub releases](https://github.com/phillips-jon/cronwatch/releases), and the plugins' in their own changelogs.
+Releases up to 0.10.0 (2026-09-30) are described in their [GitHub releases](https://github.com/cronwatchdev/cronwatch/releases), and the plugins' in their own changelogs.

@@ -15,6 +15,6 @@ The same library ships for TypeScript, Ruby, Python, PHP, Go, Rust, Elixir, Java
 
 CronWatch is made and maintained by [Jon C. Phillips](https://joncphillips.com), a product designer and developer who has spent over twenty years launching web products.
 
-Questions, bug reports, and ideas are welcome on [GitHub](https://github.com/phillips-jon/cronwatch/issues) or through the [contact form](/contact/).
+Questions, bug reports, and ideas are welcome on [GitHub](https://github.com/cronwatchdev/cronwatch/issues) or through the [contact form](/contact/).
 
-[Read the docs](/docs/) · [View on GitHub](https://github.com/phillips-jon/cronwatch)
+[Read the docs](/docs/) · [View on GitHub](https://github.com/cronwatchdev/cronwatch)

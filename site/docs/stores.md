@@ -115,7 +115,7 @@ To prevent that the state carries a `version`, inside its JSON, that goes up by 
 
 The built-in stores do this with one conditional statement and no schema change: SQLite and D1 compare `json_extract(state, '$.version')`, Postgres `(state->>'version')::bigint`, each treating a missing version as 0; expecting 0 is an upsert, so the first write for a job inserts its row. Every port's SQL stores read and write the same three tables with the same bytes (the same JSON, the same `version`), and take the same conditional path: the Ruby gem's ActiveRecord store, the Python package's, the PHP package's (whose MySQL store keeps the same columns in MySQL's dialect), the Go module's, the Rust crate's, the Elixir package's, the Java library's and the .NET package's. So a Rails app, a Django worker and a Node service can share one database and keep each other's updates. Use the same prefix everywhere.
 
-The built-in stores pass the same conformance test, in [`packages/sdk/test/store-conformance.ts`](https://github.com/phillips-jon/cronwatch/blob/main/packages/sdk/test/store-conformance.ts) in the repository (D1 runs it in Miniflare). It is not shipped in the npm package; copy it from there to check your own store.
+The built-in stores pass the same conformance test, in [`packages/sdk/test/store-conformance.ts`](https://github.com/cronwatchdev/cronwatch/blob/main/packages/sdk/test/store-conformance.ts) in the repository (D1 runs it in Miniflare). It is not shipped in the npm package; copy it from there to check your own store.
 
 ## Other languages
 

@@ -10,8 +10,8 @@
     ],
     "support": {
         "docs": "https://cronwatch.dev/docs/craft/",
-        "issues": "https://github.com/phillips-jon/cronwatch/issues",
-        "source": "https://github.com/phillips-jon/cronwatch/tree/main/packages/php/craft"
+        "issues": "https://github.com/cronwatchdev/cronwatch/issues",
+        "source": "https://github.com/cronwatchdev/cronwatch/tree/main/packages/php/craft"
     },
     "require": {
         "php": ">=8.2",

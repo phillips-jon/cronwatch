@@ -34,7 +34,7 @@ def _version_link() -> str:
     """The footer's note of what is serving the page, linked to the changelog. Nothing is fetched to compare it."""
     from .. import __version__
 
-    return f'<a class="version" href="https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md">cronwatch-sdk {__version__}</a>'
+    return f'<a class="version" href="https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md">cronwatch-sdk {__version__}</a>'
 
 __all__ = ["CSS", "DECLARE_ONE", "HEALTH", "MARK", "SHOWN_BY_HEALTH", "dashboard_page", "job_page", "layout", "message_page"]
 

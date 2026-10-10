@@ -13,7 +13,7 @@
 #
 # Stays off until the repository variable NUGET_ENABLED is "true". Before
 # that, on nuget.org (the account menu, Trusted Publishing): add a policy
-# with repository owner phillips-jon, repository cronwatch, workflow file
+# with repository owner cronwatchdev, repository cronwatch, workflow file
 # nuget.yml (the file name only) and environment nuget, whose scope allows
 # pushing new packages and new versions of packages matching Cronwatch and
 # Cronwatch.*; and here, create the environment "nuget" (Settings,

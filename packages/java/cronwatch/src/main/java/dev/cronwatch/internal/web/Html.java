@@ -408,7 +408,7 @@ public final class Html {
             + "\n</main>\n<footer><span>Refreshes every minute. Times are UTC.</span><a href=\""
             + escapeHtml(base)
             + "/api/jobs\">JSON</a><a class=\"version\""
-            + " href=\"https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md\">dev.cronwatch:cronwatch "
+            + " href=\"https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md\">dev.cronwatch:cronwatch "
             + dev.cronwatch.Cronwatch.VERSION
             + "</a></footer>";
     return layout("CronWatch", body, base, 60);
@@ -621,7 +621,7 @@ public final class Html {
             + "/api/jobs/"
             + encodeUriComponent(job.name())
             + "\">JSON</a><a class=\"version\""
-            + " href=\"https://github.com/phillips-jon/cronwatch/blob/main/CHANGELOG.md\">dev.cronwatch:cronwatch "
+            + " href=\"https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md\">dev.cronwatch:cronwatch "
             + dev.cronwatch.Cronwatch.VERSION
             + "</a></footer>";
     return layout(job.name() + ": CronWatch", body, base, 60);

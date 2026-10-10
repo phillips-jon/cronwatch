@@ -11,7 +11,7 @@
 #
 # Stays off until the repository variable PYPI_ENABLED is "true". Before
 # that, on pypi.org: add a pending trusted publisher for the project
-# cronwatch-sdk with owner phillips-jon, repository cronwatch, workflow
+# cronwatch-sdk with owner cronwatchdev, repository cronwatch, workflow
 # pypi.yml and environment pypi; and here, create the environment "pypi"
 # (Settings, Environments), optionally with required reviewers so each
 # upload waits for a click.

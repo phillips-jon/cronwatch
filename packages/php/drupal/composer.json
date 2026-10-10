@@ -7,8 +7,8 @@
     "homepage": "https://cronwatch.dev",
     "support": {
         "docs": "https://cronwatch.dev/docs/drupal/",
-        "issues": "https://github.com/phillips-jon/cronwatch/issues",
-        "source": "https://github.com/phillips-jon/cronwatch/tree/main/packages/php/drupal"
+        "issues": "https://github.com/cronwatchdev/cronwatch/issues",
+        "source": "https://github.com/cronwatchdev/cronwatch/tree/main/packages/php/drupal"
     },
     "require": {
         "php": ">=8.2",

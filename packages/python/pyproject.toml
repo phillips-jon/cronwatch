@@ -52,8 +52,8 @@ apscheduler = ["apscheduler>=3.10,<4"]
 [project.urls]
 Homepage = "https://cronwatch.dev"
 Documentation = "https://cronwatch.dev/docs/"
-Source = "https://github.com/phillips-jon/cronwatch/tree/main/packages/python"
-Issues = "https://github.com/phillips-jon/cronwatch/issues"
+Source = "https://github.com/cronwatchdev/cronwatch/tree/main/packages/python"
+Issues = "https://github.com/cronwatchdev/cronwatch/issues"
 
 [dependency-groups]
 # psycopg for the Postgres and pg_cron tests (run when CRONWATCH_TEST_PG or
