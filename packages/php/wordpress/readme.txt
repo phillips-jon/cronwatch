@@ -137,6 +137,11 @@ No. It is in wp-admin, for users who may manage options, and every change it mak
 
 == Changelog ==
 
+= Unreleased =
+
+* From the library: alert text, the dashboard, and messages use the serial (Oxford) comma in lists of three or more, and a recovery alert names what closed as a list ("succeeded after: missed, failed, and over budget"). A filter that matches alert text word for word may need updating.
+* Settings and notice text use the serial comma too.
+
 = 0.12.4 =
 
 * From the library: the source moved to the CronWatch organisation on GitHub, github.com/cronwatchdev/cronwatch, and the links to it, the issue tracker and the changelog point there. The old addresses redirect.

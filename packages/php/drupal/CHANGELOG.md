@@ -2,6 +2,12 @@
 
 All notable changes to the CronWatch module for Drupal, newest first. Each release carries the CronWatch library (`cronwatch/cronwatch`) of the same version.
 
+## Unreleased
+
+### Changed
+- From the library: alert text, the dashboard, and messages use the serial (Oxford) comma in lists of three or more, and a recovery alert names what closed as a list ("succeeded after: missed, failed, and over budget"). A filter that matches alert text word for word may need updating.
+- Settings, help, and permission text use the serial comma too.
+
 ## 0.12.4 - 2026-10-10
 
 ### Changed
