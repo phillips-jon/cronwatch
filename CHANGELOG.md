@@ -10,6 +10,10 @@ Every language:
 
 - Alert text, the dashboard, and error and log messages use the serial (Oxford) comma in lists of three or more, and a recovery names what closed as a list ("succeeded after: failed and slow", "after: missed, failed, and over budget"), so a filter that matches alert text word for word may need updating.
 
+Go:
+
+- `triage.System`, the exported Claude triage prompt, carries the same wording change; the constant's value changed, which Go's API check reports as incompatible, accepted here as the packages are below 1.0.
+
 ## 0.12.4 - 2026-10-10
 
 ### Changed
