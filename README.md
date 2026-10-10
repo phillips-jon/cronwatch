@@ -77,7 +77,7 @@ The SDK depends only on `croner`. The core, the D1 store, the pg_cron source and
 |---|---|
 | `@cronwatch/sdk/sqlite` | `better-sqlite3` (and `@types/better-sqlite3` for TypeScript) |
 | `@cronwatch/sdk/postgres` | `pg` (and `@types/pg` for TypeScript) |
-| `@cronwatch/sdk/anthropic` | `@anthropic-ai/sdk` 0.115 or newer |
+| `@cronwatch/sdk/anthropic` | `@anthropic-ai/sdk` 0.115 up to (not including) 0.129 |
 | `@cronwatch/sdk/pg-cron` | nothing: it queries through the `pg` Pool (or anything with `query()`) you pass it |
 | `@cronwatch/sdk/d1`, `/node`, and the channels (`/slack`, `/discord`, `/webhook`, `/resend`, `/postmark`, `/sendgrid`, `/mailgun`, `/ses`, `/twilio`, `/sentry`, `/honeybadger`, `/datadog`, `/rollbar`, `/bugsnag`, `/newrelic`) | nothing |
 

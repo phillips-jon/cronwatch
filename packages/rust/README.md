@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your Rust service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
 
-This is the Rust port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Rust process and a Node, Ruby, Python, PHP or Go process can share one database, and every port reads the tables the others write. It has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook), the memory store, the blocking client, the SQL store in `cronwatch-sqlx` (SQLite, Postgres, MySQL and MariaDB) with the pg_cron source, the alert channels, Claude triage, the dashboard and its JSON API, and a job's HTTP handler for a platform cron, each framework-free with tower and axum adapters, and the scheduler integrations for tokio-cron-scheduler and apalis ([DESIGN.md](https://github.com/cronwatchdev/cronwatch/blob/main/packages/rust/DESIGN.md) has how each part works).
+This is the Rust port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Rust process and a Node, Ruby, Python, PHP, Go, Elixir, Java or .NET process can share one database, and every port reads the tables the others write. It has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook), the memory store, the blocking client, the SQL store in `cronwatch-sqlx` (SQLite, Postgres, MySQL and MariaDB) with the pg_cron source, the alert channels, Claude triage, the dashboard and its JSON API, and a job's HTTP handler for a platform cron, each framework-free with tower and axum adapters, and the scheduler integrations for tokio-cron-scheduler and apalis ([DESIGN.md](https://github.com/cronwatchdev/cronwatch/blob/main/packages/rust/DESIGN.md) has how each part works).
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .run(|job| async move {
             let path = build_report(job.clone()).await?; // job.cancelled() resolves at the timeout
             job.log(format!("Report written: {path}")); // kept with the run, shown in alerts
-            job.metric("cost", 1.2)?; // watched against budgets and baselines
+            job.metric("cost", 1.2)?; // watched against budgets, floors and baselines
             Ok::<_, cronwatch::BoxError>(())
         })
         .await?;
@@ -109,7 +109,7 @@ Every request refuses redirects, reads at most 1 MiB of an answer, and names onl
 
 ## Dashboard
 
-`cw.routes(options)` is the dashboard and a small JSON API (the SDK's `cw.routes()`): the board with every job's last day, a page per job with its week, runs and output, silence, forget and a check, and the API `@cronwatch/mcp` talks to. It is installable as an app (a manifest, icons, a service worker and an offline page), needs no script of its own, and sends a strict Content Security Policy. With the `axum` feature, nest it anywhere and it finds its base path from the mount:
+`cw.routes(options)` is the dashboard and a small JSON API (the SDK's `cw.routes()`): the board with every job's last day, a page per job with its week, runs and output, silence, forget and a check, and the API `@cronwatch/mcp` talks to. It is installable as an app (a manifest, icons, a service worker and an offline page), needs no script from you, and sends a strict Content Security Policy. With the `axum` feature, nest it anywhere and it finds its base path from the mount:
 
 ```rust
 use cronwatch::web::RoutesOptions;
@@ -170,7 +170,7 @@ A program a crontab runs needs neither: [`examples/crontab`](https://github.com/
 
 ## Changes for 1.0
 
-1.0 promises the names this README and the [Rust docs](https://cronwatch.dev/docs/rust/) document, the stored data, the dashboard's JSON API and the webhook's payload. Getting there changed a few things in this release.
+1.0 promises the names this README and the [Rust docs](https://cronwatch.dev/docs/rust/) document, the stored data, the dashboard's JSON API and the webhook's payload. Getting there changed a few things in 0.11.0.
 
 **Breaking, for code that builds these types with a struct literal.** They are `#[non_exhaustive]` now, so a later 1.x can add a field without breaking your build:
 

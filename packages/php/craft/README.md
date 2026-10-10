@@ -70,7 +70,7 @@ Settings, Plugins, CronWatch: where alerts go (email through Craft's mailer, a S
 
 ## The dashboard
 
-CronWatch in the Control Panel's navigation, for users with access to the plugin: the jobs' health, the last day as a timeline, each job's runs and output. Silencing, forgetting and "Run check now" need the "Silence, forget and check jobs" permission as well, and carry Craft's CSRF token.
+CronWatch in the Control Panel's navigation, for users with access to the plugin: the jobs' health, the last day as a timeline, each job's runs and output. Silencing, forgetting and "Run check now" need the "Silence, forget and check jobs from the dashboard" permission as well, and carry Craft's CSRF token.
 
 The JSON API that [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) talks to is off until a token is set (`'apiToken' => '$CRONWATCH_TOKEN'` in `config/cronwatch.php`, or the `CRONWATCH_TOKEN` environment variable); it is then at `https://example.com/cronwatch/api`, with the token as a bearer token.
 

@@ -41,7 +41,7 @@ module Cronwatch
     end
 
     # The trigger of a run an ActiveJob perform records, through
-    # Cronwatch::ActiveJob or a scheduler's entry. Runs recorded before 1.0
+    # Cronwatch::ActiveJob or a scheduler's entry. Runs recorded before 0.11
     # carry "active_job".
     ACTIVE_JOB_TRIGGER = "active-job"
 

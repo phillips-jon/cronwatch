@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your PHP app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or falls short. No server to run, no account to make.
 
-This is the PHP port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text, the same requests to every alert channel and the same stored rows, so a PHP process can share one database with a Node, Ruby, Python, Go or Rust process, and every port reads the tables the others write. It has the core, the stores (memory, SQLite, MySQL, MariaDB and Postgres), every alert channel, Claude triage, the pg_cron source, a `vendor/bin/cronwatch check` command, the dashboard and JSON API, a job handler for crons that call a URL, the Laravel and Symfony integrations, a WordPress plugin, a Drupal module and a Craft CMS plugin ([DESIGN.md](DESIGN.md) has how each works).
+This is the PHP port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text, the same requests to every alert channel and the same stored rows, so a PHP process can share one database with a Node, Ruby, Python, Go, Rust, Elixir, Java or .NET process, and every port reads the tables the others write. It has the core, the stores (memory, SQLite, MySQL, MariaDB and Postgres), every alert channel, Claude triage, the pg_cron source, a `vendor/bin/cronwatch check` command, the dashboard and JSON API, a job handler for crons that call a URL, the Laravel and Symfony integrations, a WordPress plugin, a Drupal module and a Craft CMS plugin ([DESIGN.md](DESIGN.md) has how each works).
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
@@ -78,18 +78,18 @@ A run that is never finished is marked stuck by the first check after the job's 
 
 Public means documented here or on the [PHP page of the docs](https://cronwatch.dev/docs/php/); every other class and method is marked `@internal`.
 
-### Changed in 1.0, and deprecated
+### Changed in 0.11, and deprecated
 
-`cronSecret`, the dashboard's `token` and a handler's `secret` read `null` as every other language does: off. In 0.x `null` was the default and read the environment, and `false` turned them off. Leaving the argument out, or passing `Cronwatch\FromEnv::Read`, still reads `CRON_SECRET` or `CRONWATCH_TOKEN`.
+`cronSecret`, the dashboard's `token` and a handler's `secret` read `null` as every other language does: off. Before 0.11 `null` was the default and read the environment, and `false` turned them off. Leaving the argument out, or passing `Cronwatch\FromEnv::Read`, still reads `CRON_SECRET` or `CRONWATCH_TOKEN`.
 
-Deprecated, working through 1.x and gone in 2.0: `false` for those three (use `null`) and `$job->wrap($fn)` (use `$job->monitor($fn)`). Deprecated and gone in 1.0, since they were public by accident: `Alerts\Webhook::hmacSha256Hex()` (use `Webhook::signature()`) and the Twilio, Sentry and Discord channels' and the pg_cron source's static helpers and constants.
+Deprecated, working through 1.x and gone in 2.0: `false` for those three (use `null`) and `$job->wrap($fn)` (use `$job->monitor($fn)`). Deprecated and to be removed in 1.0, since they were public by accident: `Alerts\Webhook::hmacSha256Hex()` (use `Webhook::signature()`) and the Twilio, Sentry and Discord channels' and the pg_cron source's static helpers and constants.
 
 ### Stores
 
 - `Cronwatch\Store\MemoryStore`, the default: forgets when the process ends.
 - `Cronwatch\Store\SqliteStore($path, prefix: 'cronwatch_')`: one file, WAL mode. The tables, statements and JSON are the SDK's SQLite store's, byte for byte, so a Node process using `@cronwatch/sdk/sqlite` on the same file sees the same jobs, runs and state.
-- `Cronwatch\Store\MysqlStore($url, prefix: 'cronwatch_')`: MySQL 8.0.13 or newer, or MariaDB 10.6 or newer, from a `mysql://` URL, a PDO DSN, the app's `PDO`, or `DATABASE_URL`. The same tables in MySQL's dialect (see DESIGN.md), with the SDK's JSON kept byte for byte. It writes through a connection of its own, so a run recorded inside the app's transaction survives a rollback.
-- `Cronwatch\Store\PostgresStore($url, prefix: 'cronwatch_')`: Postgres from a `postgres://` URL, a PDO DSN, the app's `PDO`, or `DATABASE_URL`. The SDK's tables and statements, so a process in any other language can share the database. It writes through a connection of its own, so a run recorded inside the app's transaction survives a rollback.
+- `Cronwatch\Store\MysqlStore($url, prefix: 'cronwatch_')`: MySQL 8.0.13 or newer, or MariaDB 10.6 or newer, from a `mysql://` URL, a PDO DSN, the app's `PDO`, or `DATABASE_URL`. The same tables in MySQL's dialect (see DESIGN.md), with the SDK's JSON kept byte for byte. Given a URL or DSN, it writes through a connection of its own, so a run recorded inside the app's transaction survives a rollback.
+- `Cronwatch\Store\PostgresStore($url, prefix: 'cronwatch_')`: Postgres from a `postgres://` URL, a PDO DSN, the app's `PDO`, or `DATABASE_URL`. The SDK's tables and statements, so a process in any other language can share the database. Given a URL or DSN, it writes through a connection of its own, so a run recorded inside the app's transaction survives a rollback.
 
 ### Alert channels
 
@@ -142,7 +142,7 @@ $app->add(new Cronwatch\Web\PsrMiddleware($cw->routes(), $factory, $factory));  
 
 `routes(token:, basePath:, origin:, trustProxy:)`:
 
-- `token`: everything needs it, as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps the browser signed in. Defaults to `CRONWATCH_TOKEN` (leave it out, or pass `Cronwatch\FromEnv::Read`); an empty value or one of only whitespace counts as unset, given or read. With none, the dashboard answers 503, except in development (`CRONWATCH_ENV`, `APP_ENV` or `WP_ENVIRONMENT_TYPE` set to `development`, `dev`, `local`, `test` or `testing`), where it makes one, keeps it in a file in the system's temporary directory so every request asks for the same one, and writes a sign-in link to the server log (naming the host only when `origin` is set or the request's host is loopback, since a client chooses it). `null` serves it open, for behind your own auth (in 0.x `null` read `CRONWATCH_TOKEN` and `false` served it open; `false` still does, deprecated). `/api/check` also takes the client's `cronSecret`, for a platform cron.
+- `token`: everything needs it, as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps the browser signed in. Defaults to `CRONWATCH_TOKEN` (leave it out, or pass `Cronwatch\FromEnv::Read`); an empty value or one of only whitespace counts as unset, given or read. With none, the dashboard answers 503, except in development (`CRONWATCH_ENV`, `APP_ENV` or `WP_ENVIRONMENT_TYPE` set to `development`, `dev`, `local`, `test` or `testing`), where it makes one, keeps it in a file in the system's temporary directory so every request asks for the same one, and writes a sign-in link to the server log (naming the host only when `origin` is set or the request's host is loopback, since a client chooses it). `null` serves it open, for behind your own auth (before 0.11 `null` read `CRONWATCH_TOKEN` and `false` served it open; `false` still does, deprecated). `/api/check` also takes the client's `cronSecret`, for a platform cron.
 - `basePath`: where it is mounted. Default: the script, for a path-info URL like `/cronwatch.php/`, else `/cronwatch`.
 - `origin` (`https://app.example.com`) or `trustProxy: true`: the public origin, for an app behind a proxy, used for the same-origin check on changes, the cookie's `Secure` flag and the redirects.
 
@@ -162,7 +162,7 @@ return $cron($request);                                      // a Symfony (or La
 $psr = new Cronwatch\Web\PsrJobHandler($cron, $f, $f);       // PSR-15, with a PSR-17 factory
 ```
 
-The caller must send `Authorization: Bearer <secret>`: the handler's `secret:`, else the client's `cronSecret` (`CRON_SECRET` by default). With no secret at all it answers 503 outside development; `secret: null` lets anyone run the job (`false`, deprecated, does the same; in 0.x `null` meant the client's secret). Each request is a recorded run, answered with `{"ok","job","run","status","durationMs"}` and 200 or 500. A function that returns a response is answered with it, and a status of 400 or more fails the run, from any job: a PSR-7 response, Symfony's or Laravel's, Laravel's HTTP client response, a `Cronwatch\Web\Response`, or an array such as `['status' => 503, 'body' => 'down']`.
+The caller must send `Authorization: Bearer <secret>`: the handler's `secret:`, else the client's `cronSecret` (`CRON_SECRET` by default). With no secret at all it answers 503 outside development; `secret: null` lets anyone run the job (`false`, deprecated, does the same; before 0.11 `null` meant the client's secret). Each request is a recorded run, answered with `{"ok","job","run","status","durationMs"}` and 200 or 500. A function that returns a response is answered with it, and a status of 400 or more fails the run, from any job: a PSR-7 response, Symfony's or Laravel's, Laravel's HTTP client response, a `Cronwatch\Web\Response`, or an array such as `['status' => 503, 'body' => 'down']`.
 
 ### Laravel
 

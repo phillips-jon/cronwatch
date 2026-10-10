@@ -65,12 +65,12 @@ CronWatch finds missed runs with a check every five minutes, which it schedules 
 
 * `cronwatch_alerts` (filter): the list of alert channels (the ones the settings made). Add any object implementing `Cronwatch\Alerts\AlertChannel`, or a callable taking the `Cronwatch\Alert`.
 * `cronwatch_watch_event` (filter): return false to leave an event unwatched. Given `true`, the hook, its arguments and its recurrence name (null for a single event).
-* `cronwatch_job_options` (filter): a job's options (`grace`, `timeout`, `maxDuration`, `failuresBeforeAlert`, `description`, `tags`), given the options, the hook, its arguments and its recurrence. Options CronWatch refuses are written to the error log, and the job keeps its own.
+* `cronwatch_job_options` (filter): a job's options (`grace`, `timeout`, `maxDuration`, `budget`, `floor`, `failuresBeforeAlert`, `description`, `tags`), given the options, the hook, its arguments and its recurrence. Options CronWatch refuses are written to the error log, and the job keeps its own.
 * `cronwatch_client_args` (filter): the arguments the library's client is made with (its store, alert channels, default grace and error handler).
 * `cronwatch_reject_unsafe_urls` (filter): whether an alert URL may not reach a private address or an unusual port (WordPress's `reject_unsafe_urls`). True on a multisite network, where a site's administrators may not be the network's, and false otherwise; given the URL's origin.
 * `cronwatch_log` (action): `do_action( 'cronwatch_log', ...$parts )` adds a line for the output of the event running now, the parts joined with spaces and anything not a string written as JSON. With the plugin inactive it does nothing, so the code needs no check for it.
 
-The plugin carries only the alert channels its settings offer. Developers who need other channels or AI triage of alerts can install [the cronwatch/cronwatch Composer package](https://packagist.org/packages/cronwatch/cronwatch), which has them, and add them with these filters.
+The plugin leaves out Claude triage of alerts. Developers who want it can install [the cronwatch/cronwatch Composer package](https://packagist.org/packages/cronwatch/cronwatch), which has it, and add it with the `cronwatch_client_args` filter.
 
 = Privacy =
 

@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your Python app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make.
 
-This is the Python port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Python process can share one database with a Node, Ruby, PHP, Go or Rust process, and [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) works against any of them.
+This is the Python port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Python process can share one database with a Node, Ruby, PHP, Go, Rust, Elixir, Java or .NET process, and [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) works against any of them.
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 

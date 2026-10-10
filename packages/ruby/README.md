@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your Ruby or Rails app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make.
 
-This is the Ruby port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Ruby process can share one database with a Node, Python, PHP, Go or Rust process, and [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) works against any of them.
+This is the Ruby port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Ruby process can share one database with a Node, Python, PHP, Go, Rust, Elixir, Java or .NET process, and [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) works against any of them.
 
 Docs: [cronwatch.dev/docs/rails](https://cronwatch.dev/docs/rails/) and [cronwatch.dev/docs/ruby](https://cronwatch.dev/docs/ruby/)
 
@@ -101,7 +101,7 @@ class NightlyReportJob < ApplicationJob
 end
 ```
 
-Every `perform` is recorded as a run with the trigger `"active-job"` (runs recorded before 1.0 carry `"active_job"`). The name defaults to the class name without `Job`, dasherized, with `::` as `:` (`Reports::NightlyJob` is `reports:nightly`); pass `name:` to choose another. Jobs are declared once the app has booted, so a check knows a job that has never run. A job that raises still raises after the run is recorded, so ActiveJob retries and your error reporter see it as before.
+Every `perform` is recorded as a run with the trigger `"active-job"` (runs recorded before 0.11 carry `"active_job"`). The name defaults to the class name without `Job`, dasherized, with `::` as `:` (`Reports::NightlyJob` is `reports:nightly`); pass `name:` to choose another. Jobs are declared once the app has booted, so a check knows a job that has never run. A job that raises still raises after the run is recorded, so ActiveJob retries and your error reporter see it as before.
 
 ### Sidekiq
 
@@ -188,7 +188,7 @@ Public means what this README and the docs at cronwatch.dev name. Everything els
 
 ### Deprecated
 
-These still work through every 1.x release and go in 2.0, each with a warning in Ruby's deprecation category (shown under `ruby -w` or `-W:deprecated`): `Cronwatch::Web.new(client, **options)` (use `client.routes(**options)`), `client.start(every)` (use `client.start_checking(every)`), `client.run(id)` without a block (use `client.get_run(id)`) and `client.silence(name, "2h")` (use `client.silence(name, for: "2h")`). The ActiveJob trigger is `active-job` from 1.0; runs recorded before keep `active_job`.
+These still work through every 1.x release and go in 2.0, each with a warning in Ruby's deprecation category (shown under `ruby -w` or `-W:deprecated`): `Cronwatch::Web.new(client, **options)` (use `client.routes(**options)`), `client.start(every)` (use `client.start_checking(every)`), `client.run(id)` without a block (use `client.get_run(id)`) and `client.silence(name, "2h")` (use `client.silence(name, for: "2h")`). The ActiveJob trigger has been `active-job` since 0.11; runs recorded before keep `active_job`.
 
 ## Stores
 
@@ -235,7 +235,7 @@ Adds two to four sentences from Claude (likely cause, first thing to check) to e
 
 ## Sharing a database with a Node app
 
-The ActiveRecord store writes the same three tables as `@cronwatch/sdk/postgres` and `@cronwatch/sdk/sqlite`: same names, columns and indexes, epoch milliseconds in the time columns, the SDK's camelCase JSON in the JSON columns. [`test/active_record/node_compat_test.rb`](https://github.com/cronwatchdev/cronwatch/blob/main/packages/ruby/test/active_record/node_compat_test.rb) runs the SDK's stores in Node beside this one, on SQLite and Postgres, and checks that each reads what the other wrote, that the tables are the same whoever creates them, and that the rows are the same bytes. Use the same prefix on both sides and give each job a name only one side uses. Then one dashboard, Rails or Node, shows every job, and one MCP server reads them all. The Python, PHP, Go and Rust ports keep the same tables too, so a process in any of them can share the database the same way.
+The ActiveRecord store writes the same three tables as `@cronwatch/sdk/postgres` and `@cronwatch/sdk/sqlite`: same names, columns and indexes, epoch milliseconds in the time columns, the SDK's camelCase JSON in the JSON columns. [`test/active_record/node_compat_test.rb`](https://github.com/cronwatchdev/cronwatch/blob/main/packages/ruby/test/active_record/node_compat_test.rb) runs the SDK's stores in Node beside this one, on SQLite and Postgres, and checks that each reads what the other wrote, that the tables are the same whoever creates them, and that the rows are the same bytes. Use the same prefix on both sides and give each job a name only one side uses. Then one dashboard, Rails or Node, shows every job, and one MCP server reads them all. The other ports (Python, PHP, Go, Rust, Elixir, Java and .NET) keep the same tables too, so a process in any of them can share the database the same way.
 
 ## Kept in step with the TypeScript SDK
 
@@ -264,7 +264,7 @@ The node compatibility tests run the built SDK and its drivers, and skip themsel
 npm ci && npm run build
 ```
 
-The default Gemfile tests Rails 8.1. Each supported Rails series has its own Gemfile, with its own lockfile, in [`test/rails/gemfiles`](https://github.com/cronwatchdev/cronwatch/tree/main/packages/ruby/test/rails/gemfiles):
+The default Gemfile tests Rails 8.1. Each supported Rails series has its own Gemfile (its lockfile is made locally, not committed) in [`test/rails/gemfiles`](https://github.com/cronwatchdev/cronwatch/tree/main/packages/ruby/test/rails/gemfiles):
 
 ```sh
 BUNDLE_GEMFILE=test/rails/gemfiles/rails_7_2.gemfile bundle install

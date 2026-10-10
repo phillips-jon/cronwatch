@@ -2,9 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your .NET service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
 
-This is the .NET port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a .NET process and a Node, Ruby, Python, PHP, Go, Rust, Elixir or Java process can share one database, and every port reads the tables the others write. It is built in phases ([DESIGN.md](DESIGN.md) has the plan and how each part works). Phase 1 has the core: jobs, runs in the caller's flow, runs that span calls, checks, silences, sources, deferred delivery and the triage hook, the current run across tasks and threads, the process-exit hook, the memory store, and the SQL store over ADO.NET on SQLite. Phase 2 adds the SQL store on Postgres, MySQL and MariaDB, the SDK's fifteen alert channels, Claude triage and the pg_cron source. Phase 3 adds the dashboard and a job's handler, framework-free in the core, `Cronwatch.Hosting` (the client in the Generic Host's container) and `Cronwatch.AspNetCore` (the dashboard and handler on ASP.NET Core). Phase 4 adds the bridge the scheduler integrations share, `Cronwatch.Hangfire`, `Cronwatch.Quartz`, hosted jobs (`AddCronwatchJob`) and `cronwatch check` from a crontab.
-
-It is not on NuGet yet. The first release will be the `Cronwatch` package:
+This is the .NET port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a .NET process and a Node, Ruby, Python, PHP, Go, Rust, Elixir or Java process can share one database, and every port reads the tables the others write. It has jobs, runs in the caller's flow, runs that span calls, checks, silences, the current run across tasks and threads and a process-exit hook; the memory store and a SQL store over ADO.NET on SQLite, Postgres, MySQL and MariaDB; the fifteen alert channels, Claude triage and the pg_cron source; the dashboard and a job's handler, framework-free in the core, `Cronwatch.Hosting` (the client in the Generic Host's container, and hosted jobs with `AddCronwatchJob`) and `Cronwatch.AspNetCore` (the dashboard and handler on ASP.NET Core); `Cronwatch.Hangfire` and `Cronwatch.Quartz`; and `cronwatch check` from a crontab. [DESIGN.md](https://github.com/cronwatchdev/cronwatch/blob/main/packages/dotnet/DESIGN.md) has how each part works.
 
 ```bash
 dotnet add package Cronwatch --version 0.12.4
@@ -15,12 +13,6 @@ dotnet add package Cronwatch --version 0.12.4
 .NET 10 or newer. The `Cronwatch` package depends on no other package: cron expressions are read by a port of [croner](https://github.com/hexagon/croner), the parser the SDK uses, so every port agrees on every fire time; zones come from the system's IANA database through `TimeZoneInfo`; JSON, the JavaScript regular expressions a stored `expect` pattern holds, and secret redaction are the port's own. It is trimming and Native AOT compatible.
 
 The SQL store takes the app's `System.Data.Common.DbDataSource` and driver, a normal dependency of your app: `Microsoft.Data.Sqlite` for SQLite (`SqliteFactory.Instance.CreateDataSource(...)` is a data source), `Npgsql` for Postgres (`NpgsqlDataSource`), and `MySqlConnector` for MySQL 8.0.13 or newer and MariaDB 10.6 or newer (`MySqlDataSource`). None is a dependency of CronWatch. The channels and triage post through `HttpClient`, part of .NET. A container image without `tzdata` (the chiseled and distroless images, unless you pick an `-extra` one) has no named zones, and a job naming one is refused when it is declared.
-
-Until the first release, build it from this repository:
-
-```bash
-cd packages/dotnet && dotnet pack src/Cronwatch -c Release -o artifacts
-```
 
 ## Use
 
@@ -127,7 +119,7 @@ if (args is ["cronwatch", .. var rest])
 }
 ```
 
-with the lines `0 2 * * * dotnet /app/MyApp.dll nightly-report` and `* * * * * dotnet /app/MyApp.dll cronwatch check`. The check prints `cronwatch: checked 3 jobs, sent 1 alert` and answers 0, 1 for a failed check, or 2 for a command it does not know; it never ends the process. [`examples/crontab`](examples/crontab) is that program on SQLite.
+with the lines `0 2 * * * dotnet /app/MyApp.dll nightly-report` and `* * * * * dotnet /app/MyApp.dll cronwatch check`. The check prints `cronwatch: checked 3 jobs, sent 1 alert` and answers 0, 1 for a failed check, or 2 for a command it does not know; it never ends the process. [`examples/crontab`](https://github.com/cronwatchdev/cronwatch/blob/main/packages/dotnet/examples/crontab) is that program on SQLite.
 
 ### Hosted jobs
 
@@ -153,7 +145,7 @@ public sealed class NightlyReport(ReportBuilder reports) : ICronwatchJob
 }
 ```
 
-`AddCronwatch` and `AddCronwatchJob` are in the namespace `Microsoft.Extensions.DependencyInjection`, as Microsoft's own registration methods are, so they need no `using`; `ICronwatchJob` is in `Cronwatch.Hosting`. Each fire is a run with the trigger `hosting` (runs recorded before 1.0 carry `schedule`), its class resolved from a new DI scope. A fire that comes while the previous run is still going is skipped and logged once. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in Hangfire or Quartz.NET with a shared store. A crontab line can check from the app's own host without starting it (no web server, queue or hosted job starts):
+`AddCronwatch` and `AddCronwatchJob` are in the namespace `Microsoft.Extensions.DependencyInjection`, as Microsoft's own registration methods are, so they need no `using`; `ICronwatchJob` is in `Cronwatch.Hosting`. Each fire is a run with the trigger `hosting` (runs recorded before 0.11 carry `schedule`), its class resolved from a new DI scope. A fire that comes while the previous run is still going is skipped and logged once. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in Hangfire or Quartz.NET with a shared store. A crontab line can check from the app's own host without starting it (no web server, queue or hosted job starts):
 
 ```csharp
 var app = builder.Build();
@@ -240,7 +232,7 @@ An `ActivitySource` and a `Meter`, both named `Cronwatch`: an activity around ea
 
 ## Deprecated
 
-Each name here still works, marked `[Obsolete]` so the compiler points at the replacement. A rename keeps working through every 1.x release and goes in 2.0; a helper that was public by accident goes in 1.0. One name moved without an alias: `ICronwatchJob` is in `Cronwatch.Hosting` now, so a job class written before 1.0 adds `using Cronwatch.Hosting;` (an alias left in `Cronwatch` would make the name ambiguous in every file that imports both).
+Each name here still works, marked `[Obsolete]` so the compiler points at the replacement. A rename keeps working through every 1.x release and goes in 2.0; a helper that was public by accident goes in 1.0. One name moved without an alias: `ICronwatchJob` is in `Cronwatch.Hosting` now, so a job class written before 0.11 adds `using Cronwatch.Hosting;` (an alias left in `Cronwatch` would make the name ambiguous in every file that imports both).
 
 - `cw.Start(every)`: use `cw.StartChecking(every)`, since a job's `StartAsync` opens a run.
 - `Cronwatch.Web.WebRequest` and `WebResponse`: use `CronwatchRequest` and `CronwatchResponse`, since `System.Net` has types of those names. Each converts to and from its replacement, so code written against them still compiles, except a handler lambda that names the request's type.
