@@ -246,7 +246,7 @@ final class Js
     /**
      * text.slice(0, units), counted in UTF-16 code units. A surrogate pair cut
      * in half leaves U+FFFD, the character a lone surrogate becomes once
-     * written out as UTF-8 (to a store, a hash or a network).
+     * written out as UTF-8 (to a store, a hash, or a network).
      */
     public static function head16(string $text, int $units): string
     {
@@ -387,7 +387,7 @@ final class Js
 
     /**
      * JSON.stringify for plain data: arrays (a list is a JSON array, anything
-     * else an object), stdClass objects, strings, numbers, booleans and null,
+     * else an object), stdClass objects, strings, numbers, booleans, null,
      * and anything with toJson() (this package's types). A non-finite number
      * is null, as in JavaScript.
      */

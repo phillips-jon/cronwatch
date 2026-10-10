@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * What an alert carries beyond its title and message, one record per kind of alert: {@link Missed},
- * {@link Failure} (for failed and stuck), {@link Slow}, {@link OverBudget}, {@link UnderFloor} and
+ * {@link Failure} (for failed and stuck), {@link Slow}, {@link OverBudget}, {@link UnderFloor}, and
  * {@link Recovered}.
  */
 public sealed interface AlertDetails

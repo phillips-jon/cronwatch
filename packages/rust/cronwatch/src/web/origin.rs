@@ -3,7 +3,7 @@
 //! characters around the value and tabs or line breaks in it are dropped,
 //! slashes after the scheme may be missing or backslashes, credentials are
 //! ignored, the host is lowercased (percent escapes decoded, IPv4 numbers
-//! written out, IPv6 compressed, a host outside ASCII written in punycode)
+//! written out, IPv6 compressed, a host outside ASCII written in punycode),
 //! and a default port is left out.
 
 use std::net::Ipv6Addr;
@@ -44,7 +44,7 @@ pub(crate) fn configured_origin(value: &str) -> Result<Option<String>, String> {
 }
 
 /// `scheme://host[:port]` for text that is a scheme and a bare host, or
-/// `None` when it carries a path, credentials, a query or a fragment, or is
+/// `None` when it carries a path, credentials, a query, or a fragment, or is
 /// not an http or https URL.
 pub(crate) fn bare_origin(value: &str) -> Option<String> {
     match read_origin(value) {
@@ -62,7 +62,7 @@ fn is_scheme_char(c: u8) -> bool {
 }
 
 /// The origin of `value`, and whether anything past the host would show in
-/// the URL (a path other than `/`, credentials, a query or a fragment).
+/// the URL (a path other than `/`, credentials, a query, or a fragment).
 pub(crate) fn read_origin(value: &str) -> Result<(String, bool), NotOrigin> {
     let text: String =
         value.trim_matches(|c: char| c <= '\u{20}').chars().filter(|&c| c != '\t' && c != '\n' && c != '\r').collect();

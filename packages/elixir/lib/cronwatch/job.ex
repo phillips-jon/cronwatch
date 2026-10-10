@@ -44,7 +44,7 @@ end
 defmodule Cronwatch.Context do
   @moduledoc """
   What a job's function is given: the run it is part of. Pass it to
-  `Cronwatch.log/2`, `Cronwatch.metric/3` and `Cronwatch.cancelled?/1`;
+  `Cronwatch.log/2`, `Cronwatch.metric/3`, and `Cronwatch.cancelled?/1`;
   `Cronwatch.current/0` finds it from the calling process, or from the
   process that started it (a `Task`).
   """

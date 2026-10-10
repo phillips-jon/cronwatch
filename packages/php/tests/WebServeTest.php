@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
  * serve(), the plain entry: a real `php -S` running tests/servers/web.php,
  * which answers from the superglobals with header() and echo, as a bare
  * public/cronwatch.php would. What goes over the wire is the SDK's status,
- * headers and body, and nothing PHP adds by itself (X-Powered-By, a default
+ * headers, and body, and nothing PHP adds by itself (X-Powered-By, a default
  * Content-Type on a redirect); HEAD gets the headers only.
  */
 final class WebServeTest extends TestCase

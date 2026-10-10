@@ -1,6 +1,6 @@
 cronwatch.dashboard:
   title: CronWatch
-  description: 'Cron runs, queue items and alerts.'
+  description: 'Cron runs, queue items, and alerts.'
   route_name: cronwatch.dashboard
   parent: system.admin_reports
 cronwatch.settings:

@@ -20,7 +20,7 @@ import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Checks, reads and the interval (the SDK's {@code check()}, {@code jobs()}, {@code silence()},
+ * Checks, reads, and the interval (the SDK's {@code check()}, {@code jobs()}, {@code silence()},
  * {@code startChecking()}).
  */
 final class Checks {
@@ -141,7 +141,7 @@ final class Checks {
       }
     }
 
-    // Each job on its own: one that cannot be evaluated is reported, shown as failing and does
+    // Each job on its own: one that cannot be evaluated is reported, shown as failing, and does
     // not stop the others.
     List<JobSummary> jobs = new ArrayList<>();
     Delivery.Budget budget = new Delivery.Budget();
@@ -312,7 +312,7 @@ final class Checks {
   }
 
   /**
-   * A stored job as the client reads it, so a foreign, hand-edited or damaged row affects only its
+   * A stored job as the client reads it, so a foreign, hand-edited, or damaged row affects only its
    * own job: {@code tags} kept only when it is a list of strings, every other field as stored. One
    * whose definition was not a JSON object keeps the definition {@code {name}} the store gave it,
    * and {@link #evaluable} refuses it.
@@ -380,7 +380,7 @@ final class Checks {
     return patchState(name, s -> s.silencedUntil = null);
   }
 
-  /** Reads, changes and writes one job's state, in turn with every other update to it. */
+  /** Reads, changes, and writes one job's state, in turn with every other update to it. */
   private JobState patchState(String name, Consumer<MutableState> change) {
     core.ensureReady();
     return core.updateState(

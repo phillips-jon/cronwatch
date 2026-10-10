@@ -1,6 +1,6 @@
 # cronwatch.dev
 
-A static site: `src/landing.html`, `docs/*.md` and `pages/*.md`, built by `build.mjs` into `dist/`. The landing page opens with a paragraph rather than a slogan, then runs as labelled rows: the dashboard's last-24-hours timeline and its jobs board in a browser frame, redrawn from the captured dashboard page `src/demo/dashboard.html`, the alerts and the MCP reply, rendered from the captures in `src/demo`. The two diagrams labelled as illustrations are drawn by hand in `build.mjs`. Beside the pages, `build.mjs` also writes `prompt.txt` (copied from `src/prompt.txt`), `llms.txt`, the sitemap and the `/go/` import pages that serve `cronwatch.dev/go`.
+A static site: `src/landing.html`, `docs/*.md`, and `pages/*.md`, built by `build.mjs` into `dist/`. The landing page opens with a paragraph rather than a slogan, then runs as labelled rows: the dashboard's last-24-hours timeline and its jobs board in a browser frame, redrawn from the captured dashboard page `src/demo/dashboard.html`, the alerts and the MCP reply, rendered from the captures in `src/demo`. The two diagrams labelled as illustrations are drawn by hand in `build.mjs`. Beside the pages, `build.mjs` also writes `prompt.txt` (copied from `src/prompt.txt`), `llms.txt`, the sitemap, and the `/go/` import pages that serve `cronwatch.dev/go`.
 
 ```bash
 npm run dev:site                  # from the repo root: build, watch, serve on http://localhost:4321

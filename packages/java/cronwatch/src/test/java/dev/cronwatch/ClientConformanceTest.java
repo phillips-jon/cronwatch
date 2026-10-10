@@ -21,8 +21,8 @@ import org.sqlite.SQLiteDataSource;
 
 /**
  * {@code conformance/client.json}, the first fixture driven through the client rather than a pure
- * function: the run ids {@code start}, {@code resume} and {@code recordRun} take, and stored data a
- * newer release wrote surviving a check, a silence, an unsilence, a summary and a run, over the
+ * function: the run ids {@code start}, {@code resume}, and {@code recordRun} take, and stored data
+ * a newer release wrote surviving a check, a silence, an unsilence, a summary, and a run, over the
  * memory store, SQLite, and Postgres when {@code CRONWATCH_TEST_PG} is set.
  */
 class ClientConformanceTest {
@@ -69,7 +69,7 @@ class ClientConformanceTest {
       } catch (CronwatchException e) {
         error = e.getMessage();
       }
-      // Every port but Ruby, Python and Elixir spells the method as the SDK does.
+      // Every port but Ruby, Python, and Elixir spells the method as the SDK does.
       failures.same(what, error, c.get("error"));
     }
     failures.check("client");

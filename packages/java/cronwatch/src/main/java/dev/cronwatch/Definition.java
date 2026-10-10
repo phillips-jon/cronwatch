@@ -30,7 +30,7 @@ public final class Definition {
 
   /**
    * The definition {@code {name}} a store reads from a row whose definition is not a JSON object (a
-   * foreign, hand-edited or damaged row): the client reports the job and shows it failing, without
+   * foreign, hand-edited, or damaged row): the client reports the job and shows it failing, without
    * evaluating it.
    */
   static Definition unreadable(String name) {

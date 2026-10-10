@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Cronwatch.Internal;
@@ -11,6 +12,19 @@ namespace Cronwatch.Internal;
 internal static class AlertFormat
 {
     private static readonly string Infinity = ((char)0x221E).ToString();
+
+    /// <summary>
+    /// <c>andList</c>: words joined as an English list, with a serial comma from three on:
+    /// <c>a</c>, <c>a and b</c>, <c>a, b, and c</c>. Every port joins the same way.
+    /// </summary>
+    public static string AndList(IReadOnlyList<string> words)
+    {
+        if (words.Count <= 2)
+        {
+            return string.Join(" and ", words);
+        }
+        return string.Join(", ", words.Take(words.Count - 1)) + ", and " + words[words.Count - 1];
+    }
 
     /// <summary>
     /// <c>formatNumber</c>: a whole number grouped in thousands (<c>1,234</c>), anything else
@@ -353,7 +367,7 @@ internal static class AlertFormat
                     int us = v.IndexOf('_', StringComparison.Ordinal);
                     after.Add(us < 0 ? v : v[..us] + " " + v[(us + 1)..]);
                 }
-                string joined = string.Join(", ", after);
+                string joined = AndList(after);
                 string at = run == null ? "just now" : When(run.StartedAt, now);
                 lines.Add("A run " + at + " succeeded" + (joined.Length == 0 ? "" : " after: " + joined) + ".");
                 if (run?.DurationMs != null)

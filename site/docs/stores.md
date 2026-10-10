@@ -1,6 +1,6 @@
 ---
 title: Stores
-description: Memory, SQLite, Postgres and D1 stores, retention, and the interface for writing your own.
+description: Memory, SQLite, Postgres, and D1 stores, retention, and the interface for writing your own.
 order: 7
 group: Reference
 ---
@@ -29,13 +29,13 @@ cronwatch({ store: sqlite({ path: "./data/cronwatch.db" }) });
 cronwatch({ store: sqlite({ database: existingDb }) });
 ```
 
-The three tables are named `cronwatch_jobs`, `cronwatch_runs` and `cronwatch_state`. Pass `prefix` to change `cronwatch_`, for example to keep them apart from your own tables in a shared database. The same rules apply as for Postgres below.
+The three tables are named `cronwatch_jobs`, `cronwatch_runs`, and `cronwatch_state`. Pass `prefix` to change `cronwatch_`, for example to keep them apart from your own tables in a shared database. The same rules apply as for Postgres below.
 
 Keep the file outside your build output and inside whatever path the process may write to. With Next.js, add `**/*.db` to `outputFileTracingExcludes` so a build never copies it.
 
 ## Postgres
 
-Through the `pg` driver. Three tables are created on first use, prefixed `cronwatch_`, with times stored as BIGINT epoch milliseconds and definitions, metrics and state as JSONB.
+Through the `pg` driver. Three tables are created on first use, prefixed `cronwatch_`, with times stored as BIGINT epoch milliseconds and definitions, metrics, and state as JSONB.
 
 ```ts
 import { postgres } from "@cronwatch/sdk/postgres";
@@ -46,7 +46,7 @@ cronwatch({ store: postgres({ pool, prefix: "monitoring_" }) });
 
 `connectionString` defaults to `DATABASE_URL`.
 
-A `prefix` must be a plain lowercase identifier: lowercase letters, digits and underscores, not starting with a digit, at most 47 characters. Anything else throws when the store is created rather than being changed quietly. Uppercase is refused because Postgres folds unquoted names to lowercase, so `Monitoring_` would become `monitoring_` behind your back.
+A `prefix` must be a plain lowercase identifier: lowercase letters, digits, and underscores, not starting with a digit, at most 47 characters. Anything else throws when the store is created rather than being changed quietly. Uppercase is refused because Postgres folds unquoted names to lowercase, so `Monitoring_` would become `monitoring_` behind your back.
 
 The tables are created inside a transaction that holds an advisory lock for the prefix, so many instances starting at once (serverless cold starts, several replicas) take turns instead of racing `CREATE TABLE IF NOT EXISTS`.
 
@@ -54,7 +54,7 @@ Jobs that pg_cron runs inside the same database (Supabase Cron included) can be 
 
 ## D1
 
-For Cloudflare Workers. D1 is SQLite, so this store uses the SQLite store's tables, statements and row mapping, through D1's `prepare`, `bind` and `batch`. It needs no driver and nothing from `@cloudflare/workers-types`: it takes the binding as it comes.
+For Cloudflare Workers. D1 is SQLite, so this store uses the SQLite store's tables, statements, and row mapping, through D1's `prepare`, `bind`, and `batch`. It needs no driver and nothing from `@cloudflare/workers-types`: it takes the binding as it comes.
 
 ```ts
 import { d1 } from "@cronwatch/sdk/d1";
@@ -103,31 +103,31 @@ interface Store {
 }
 ```
 
-`updateRunIf` writes a run's status, finish time, duration, error, output and metrics only when its stored status is one of `fromStatuses`, and says whether it wrote (a missing row, or an empty list, is false). It is how a run is finished exactly once when two processes finish it at the same moment: only the one whose write lands judges it and sends alerts. Without it the client reads the run and then writes it, which is fine for one process and can count a run twice across two. The bundled stores implement it with `UPDATE ... WHERE id = ? AND status IN (...)`.
+`updateRunIf` writes a run's status, finish time, duration, error, output, and metrics only when its stored status is one of `fromStatuses`, and says whether it wrote (a missing row, or an empty list, is false). It is how a run is finished exactly once when two processes finish it at the same moment: only the one whose write lands judges it and sends alerts. Without it the client reads the run and then writes it, which is fine for one process and can count a run twice across two. The bundled stores implement it with `UPDATE ... WHERE id = ? AND status IN (...)`.
 
 `compareAndSetState` writes `state` only when the stored state's `version` equals `expectedVersion`, and says whether it wrote. A missing row, or a stored state with no `version`, counts as version 0. It is optional so that stores written for earlier versions keep working: without it the client falls back to `setState`, which is safe only when one process at a time updates a job's state (see below). Implement it if your store may be shared.
 
 ## Two processes, one store
 
-Any number of processes may share one store: web servers, workers, a `deliver: "check"` recorder, and processes in any of the other languages. A job's state (open conditions, consecutive failures, silence, queued alerts) is read, changed and written back on every run start and finish, check, delivery and silence, so two processes doing that at the same moment could each overwrite the other's change: a failure not counted, a condition that never opened, a silence undone.
+Any number of processes may share one store: web servers, workers, a `deliver: "check"` recorder, and processes in any of the other languages. A job's state (open conditions, consecutive failures, silence, queued alerts) is read, changed, and written back on every run start and finish, check, delivery, and silence, so two processes doing that at the same moment could each overwrite the other's change: a failure not counted, a condition that never opened, a silence undone.
 
-To prevent that the state carries a `version`, inside its JSON, that goes up by one on every write. A write goes through only if the version is still the one read (`compareAndSetState`); otherwise the client reads the state again, works the change out afresh and retries, up to ten times, before reporting to `onError`. Within one process updates to a job also wait their turn, so the retries are only ever between processes. Nothing is written when a change leaves the state as it was.
+To prevent that the state carries a `version`, inside its JSON, that goes up by one on every write. A write goes through only if the version is still the one read (`compareAndSetState`); otherwise the client reads the state again, works the change out afresh, and retries, up to ten times, before reporting to `onError`. Within one process updates to a job also wait their turn, so the retries are only ever between processes. Nothing is written when a change leaves the state as it was.
 
-The built-in stores do this with one conditional statement and no schema change: SQLite and D1 compare `json_extract(state, '$.version')`, Postgres `(state->>'version')::bigint`, each treating a missing version as 0; expecting 0 is an upsert, so the first write for a job inserts its row. Every port's SQL stores read and write the same three tables with the same bytes (the same JSON, the same `version`), and take the same conditional path: the Ruby gem's ActiveRecord store, the Python package's, the PHP package's (whose MySQL store keeps the same columns in MySQL's dialect), the Go module's, the Rust crate's, the Elixir package's, the Java library's and the .NET package's. So a Rails app, a Django worker and a Node service can share one database and keep each other's updates. Use the same prefix everywhere.
+The built-in stores do this with one conditional statement and no schema change: SQLite and D1 compare `json_extract(state, '$.version')`, Postgres `(state->>'version')::bigint`, each treating a missing version as 0; expecting 0 is an upsert, so the first write for a job inserts its row. Every port's SQL stores read and write the same three tables with the same bytes (the same JSON, the same `version`), and take the same conditional path: the Ruby gem's ActiveRecord store, the Python package's, the PHP package's (whose MySQL store keeps the same columns in MySQL's dialect), the Go module's, the Rust crate's, the Elixir package's, the Java library's, and the .NET package's. So a Rails app, a Django worker, and a Node service can share one database and keep each other's updates. Use the same prefix everywhere.
 
 The built-in stores pass the same conformance test, in [`packages/sdk/test/store-conformance.ts`](https://github.com/cronwatchdev/cronwatch/blob/main/packages/sdk/test/store-conformance.ts) in the repository (D1 runs it in Miniflare). It is not shipped in the npm package; copy it from there to check your own store.
 
 ## Other languages
 
-Every port writes the same three tables with the same bytes, so processes in any two languages can share a store, as long as both have a store for that database: TypeScript, Ruby and Python have none for MySQL or MariaDB, so a MySQL store is shared among PHP, Go, Rust, Elixir, Java and .NET, while SQLite and Postgres can be shared by all nine (TypeScript's D1 store is SQLite too, but only a Worker reaches it). Each language's stores:
+Every port writes the same three tables with the same bytes, so processes in any two languages can share a store, as long as both have a store for that database: TypeScript, Ruby, and Python have none for MySQL or MariaDB, so a MySQL store is shared among PHP, Go, Rust, Elixir, Java, and .NET, while SQLite and Postgres can be shared by all nine (TypeScript's D1 store is SQLite too, but only a Worker reaches it). Each language's stores:
 
 | Language | Stores |
 |---|---|
 | [Ruby](/docs/ruby/#stores) | memory, and ActiveRecord on Postgres or SQLite |
-| [Python](/docs/python/#stores) | memory, SQLite and Postgres |
+| [Python](/docs/python/#stores) | memory, SQLite, and Postgres |
 | [PHP](/docs/php/#stores) | memory, SQLite, MySQL and MariaDB, and Postgres |
-| [Go](/docs/go/#stores) | memory, and `sqlstore` over `database/sql` for SQLite, Postgres, MySQL and MariaDB |
-| [Rust](/docs/rust/#stores) | memory, and `cronwatch-sqlx` over sqlx for SQLite, Postgres, MySQL and MariaDB |
-| [Elixir](/docs/elixir/#stores) | memory, and `Cronwatch.Store.Ecto` over your Ecto repo for SQLite, Postgres, MySQL and MariaDB |
-| [Java](/docs/java/#stores) | memory, and `SqlStore` over your JDBC `DataSource` for SQLite, Postgres, MySQL and MariaDB |
-| [.NET](/docs/dotnet/#stores) | memory, and `SqlStore` over your ADO.NET `DbDataSource` for SQLite, Postgres, MySQL and MariaDB |
+| [Go](/docs/go/#stores) | memory, and `sqlstore` over `database/sql` for SQLite, Postgres, MySQL, and MariaDB |
+| [Rust](/docs/rust/#stores) | memory, and `cronwatch-sqlx` over sqlx for SQLite, Postgres, MySQL, and MariaDB |
+| [Elixir](/docs/elixir/#stores) | memory, and `Cronwatch.Store.Ecto` over your Ecto repo for SQLite, Postgres, MySQL, and MariaDB |
+| [Java](/docs/java/#stores) | memory, and `SqlStore` over your JDBC `DataSource` for SQLite, Postgres, MySQL, and MariaDB |
+| [.NET](/docs/dotnet/#stores) | memory, and `SqlStore` over your ADO.NET `DbDataSource` for SQLite, Postgres, MySQL, and MariaDB |

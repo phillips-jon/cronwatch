@@ -10,9 +10,9 @@ use Cronwatch\Cron\Zone;
 
 /**
  * Schedules: "0 2 * * *" (cron, five or six fields), "@hourly", or "every
- * 5m". Due times, deadlines and what a run covers, as schedule.ts has them.
+ * 5m". Due times, deadlines, and what a run covers, as schedule.ts has them.
  * Fire times come from the port of croner in Cron/, so a Node, a Ruby, a
- * Python and a PHP process sharing one store agree on every due time.
+ * Python, and a PHP process sharing one store agree on every due time.
  *
  * @internal
  */

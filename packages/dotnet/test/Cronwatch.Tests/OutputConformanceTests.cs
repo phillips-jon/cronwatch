@@ -6,7 +6,7 @@ using Xunit;
 namespace Cronwatch.Tests;
 
 /// <summary>
-/// <c>conformance/output.json</c>: the output cap, every redaction case, every error message and
+/// <c>conformance/output.json</c>: the output cap, every redaction case, every error message, and
 /// the recorder's expect text, byte for byte.
 /// </summary>
 public class OutputConformanceTests

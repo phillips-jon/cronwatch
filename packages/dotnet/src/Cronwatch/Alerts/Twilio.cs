@@ -37,7 +37,7 @@ public sealed class TwilioOptions
     /// <summary>Also text when a job recovers. Default false: a text is for what needs a person.</summary>
     public bool Recovered { get; init; }
 
-    /// <summary>How many SMS segments a text may use, held to 1 to 10. Default 3. (A <c>double?</c> before 1.0, the SDK's number.)</summary>
+    /// <summary>How many SMS segments a text may use, held to 1 to 10. Default 3. (A <c>double?</c> before 0.11, the SDK's number.)</summary>
     public int? Segments { get; init; }
 
     /// <summary>A link back to the job in your dashboard. Null or <c>""</c> is no link.</summary>
@@ -86,7 +86,7 @@ public sealed class TwilioChannel : IChannel
     private readonly ITransport? _transport;
 
     /// <summary>The channel.</summary>
-    /// <exception cref="CronwatchException">Without an account SID, credentials, a sender or a number.</exception>
+    /// <exception cref="CronwatchException">Without an account SID, credentials, a sender, or a number.</exception>
     public TwilioChannel(TwilioOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);

@@ -1,13 +1,13 @@
 ---
 title: MCP server
-description: Give Claude Code, Cursor or any MCP client read and control access to your jobs.
+description: Give Claude Code, Cursor, or any MCP client read and control access to your jobs.
 order: 9
 group: Reference
 ---
 
 # MCP server
 
-`@cronwatch/mcp` is a Model Context Protocol server over stdio. It talks to the JSON API your app mounts with its dashboard, which every port serves at the same paths, so it works the same with a TypeScript, Ruby, Python, PHP, Go, Rust, Elixir, Java or .NET app. It needs a URL and the token, and nothing else. It runs on Node through `npx`; your app does not need Node for anything else.
+`@cronwatch/mcp` is a Model Context Protocol server over stdio. It talks to the JSON API your app mounts with its dashboard, which every port serves at the same paths, so it works the same with a TypeScript, Ruby, Python, PHP, Go, Rust, Elixir, Java, or .NET app. It needs a URL and the token, and nothing else. It runs on Node through `npx`; your app does not need Node for anything else.
 
 ## Claude Code
 
@@ -47,7 +47,7 @@ Any client that launches stdio servers:
 | Spring Boot, the starter | `cronwatch.web.path` within the app's context, `https://yourapp.com/cronwatch` by default |
 | Java, `CronwatchFilter` or `WebServer.mount` | the path you give it, `https://yourapp.com/cronwatch` by default |
 | ASP.NET Core, `app.MapCronwatch()` or `app.UseCronwatch()` | the path you give it (under a route group, with the group's prefix), `https://yourapp.com/cronwatch` by default |
-| Python, PHP, Go or Rust, the routes served by hand | the path you serve them at |
+| Python, PHP, Go, or Rust, the routes served by hand | the path you serve them at |
 | Laravel or Symfony | `https://yourapp.com/cronwatch` ([Laravel](/docs/laravel/), [Symfony](/docs/symfony/)) |
 | Drupal or Craft CMS | `https://yoursite.com/cronwatch`, once a token is set ([Drupal](/docs/drupal/), [Craft CMS](/docs/craft/)) |
 | WordPress | `https://yoursite.com/wp-json/cronwatch/v1`, once the JSON API is on in the plugin's settings ([WordPress](/docs/wordpress/)) |
@@ -62,23 +62,23 @@ For a local app in development without `CRONWATCH_TOKEN`, the app makes a token 
 
 `--url` and `--token` work as flags too, but a flag is visible to anyone who can list processes, so keep the token in the environment.
 
-Use an `https` URL. The server sends the token with every request, so over plain `http` it travels unencrypted; for an `http` URL whose host is not `localhost`, `127.0.0.1` or `[::1]` the server prints a warning to stderr when it starts, and carries on.
+Use an `https` URL. The server sends the token with every request, so over plain `http` it travels unencrypted; for an `http` URL whose host is not `localhost`, `127.0.0.1`, or `[::1]` the server prints a warning to stderr when it starts, and carries on.
 
 ## Tools
 
 | Tool | Does |
 |---|---|
-| `list_jobs` | every job with health, schedule, last run and next due. The place to start. |
-| `get_job` | one job in detail: definition, open conditions, and recent runs with errors, output tails and metrics. Takes `name` and `runs`, how many recent runs to include: 1 to 100, 10 by default |
+| `list_jobs` | every job with health, schedule, last run, and next due. The place to start. |
+| `get_job` | one job in detail: definition, open conditions, and recent runs with errors, output tails, and metrics. Takes `name` and `runs`, how many recent runs to include: 1 to 100, 10 by default |
 | `run_check` | look for missed and stuck runs now and send due alerts |
-| `silence_job` | stop alerts for a while, for example during a fix. Takes `name` and `for`, a duration such as `"30m"`, `"2h"` or `"1d"`; one hour by default |
+| `silence_job` | stop alerts for a while, for example during a fix. Takes `name` and `for`, a duration such as `"30m"`, `"2h"`, or `"1d"`; one hour by default |
 | `unsilence_job` | resume them. Takes `name` |
 | `forget_job` | remove a job that no longer exists in the code, with its runs. Takes `name`. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
-| `get_setup_guide` | the TypeScript code to add CronWatch to a job, so the agent writes it correctly. For another language, point the agent at that language's page instead: [Rails](/docs/rails/), [Ruby](/docs/ruby/), [Django](/docs/django/), [Python](/docs/python/), [PHP](/docs/php/), [Laravel](/docs/laravel/), [Symfony](/docs/symfony/), [WordPress](/docs/wordpress/), [Go](/docs/go/), [Rust](/docs/rust/), [Elixir](/docs/elixir/), [Java](/docs/java/) or [.NET](/docs/dotnet/) |
+| `get_setup_guide` | the TypeScript code to add CronWatch to a job, so the agent writes it correctly. For another language, point the agent at that language's page instead: [Rails](/docs/rails/), [Ruby](/docs/ruby/), [Django](/docs/django/), [Python](/docs/python/), [PHP](/docs/php/), [Laravel](/docs/laravel/), [Symfony](/docs/symfony/), [WordPress](/docs/wordpress/), [Go](/docs/go/), [Rust](/docs/rust/), [Elixir](/docs/elixir/), [Java](/docs/java/), or [.NET](/docs/dotnet/) |
 
 The tools return prose an agent can act on, not raw JSON. A typical exchange: "why did invoice-run fail last night" becomes `get_job`, a read of the error and the earlier runs, and a suggested fix in your code.
 
-The server works with the [JSON API](/docs/dashboard/#endpoints) of any release, 0.x or 1.x, in any language: the API only grows within a major release, and the one answer that changed at 1.0 (silence now returns the job's summary, not its stored state) is read either way.
+The server works with the [JSON API](/docs/dashboard/#endpoints) of any release, 0.x or 1.x, in any language: the API only grows within a major release, and the one answer that changed in 0.11 (silence now returns the job's summary, not its stored state) is read either way.
 
 ## Security
 

@@ -1,7 +1,7 @@
 {
   "name": "@cronwatch/mcp",
   "version": "0.12.4",
-  "description": "MCP server for CronWatch. Lets Claude Code, Cursor and other agents list jobs, read failures, run a check and silence alerts in an app that uses @cronwatch/sdk.",
+  "description": "MCP server for CronWatch. Lets Claude Code, Cursor, and other agents list jobs, read failures, run a check, and silence alerts in an app that uses @cronwatch/sdk.",
   "license": "MIT",
   "repository": {
     "type": "git",

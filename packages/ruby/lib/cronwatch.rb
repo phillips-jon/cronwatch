@@ -110,5 +110,5 @@ module Cronwatch
 end
 
 # In a Rails app Bundler requires gems after Rails itself, so `gem "cronwatch"`
-# alone brings in the Railtie, the ActiveJob concern and the generator.
+# alone brings in the Railtie, the ActiveJob concern, and the generator.
 require_relative "cronwatch/rails" if defined?(::Rails::Railtie)

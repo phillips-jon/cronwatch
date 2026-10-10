@@ -16,15 +16,15 @@ internal delegate Task<List<Dictionary<string, object?>>> PgCronQuery(string sql
 
 /// <summary>
 /// Watches pg_cron jobs, which run inside Postgres where nothing can wrap them: the SDK's
-/// <c>pgCron()</c> source (<c>sources/pgcron.ts</c>), line for line as the Go, Rust, Elixir and
+/// <c>pgCron()</c> source (<c>sources/pgcron.ts</c>), line for line as the Go, Rust, Elixir, and
 /// Java ports have it. On every check it reads <c>cron.job</c> and declares each job with its
 /// schedule, then copies new rows of <c>cron.job_run_details</c> in as runs (ids
 /// <c>pgcron:&lt;prefix&gt;&lt;runid&gt;</c>), so the usual evaluation raises missed, failed,
-/// stuck and slow alerts.
+/// stuck, and slow alerts.
 /// </summary>
 /// <remarks>
 /// <para>
-/// A job that is renamed, unscheduled or no longer picked keeps its old name's runs and history,
+/// A job that is renamed, unscheduled, or no longer picked keeps its old name's runs and history,
 /// and that name is declared again without a schedule, so it is never reported missed. Its
 /// description says why.
 /// </para>
@@ -219,7 +219,7 @@ public sealed class PgCronSource : ISource
 
     /// <summary>
     /// The default CronWatch name for a pg_cron job, before the prefix (<c>pgCronJobName</c>): its
-    /// jobname with each run of anything other than letters, digits, <c>.</c>, <c>_</c>, <c>:</c>
+    /// jobname with each run of anything other than letters, digits, <c>.</c>, <c>_</c>, <c>:</c>,
     /// and <c>-</c> turned into <c>-</c>, what leads up to the first letter or digit dropped, at
     /// most 100 characters, or <c>pg_cron:&lt;jobid&gt;</c> when nothing is left.
     /// </summary>
@@ -580,7 +580,7 @@ public sealed class PgCronSource : ISource
             }
         }
 
-        // A name this source used for a job that has since been renamed, unscheduled or dropped
+        // A name this source used for a job that has since been renamed, unscheduled, or dropped
         // from the jobs picked.
         var inUse = new HashSet<string>(names.Values, StringComparer.Ordinal);
         _retired.ExceptWith(inUse);

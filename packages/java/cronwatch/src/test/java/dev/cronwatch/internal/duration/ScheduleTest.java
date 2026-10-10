@@ -305,7 +305,7 @@ class ScheduleTest {
   void aJsonValueIsReadAsTheSdkReadsIt() {
     assertEquals(900_000.0, Durations.parseValue("15m", "grace"));
     assertEquals(1.5, Durations.parseValue(1.5, "grace"));
-    String like = " is not a duration like \"15m\", \"1h30m\" or \"90s\"";
+    String like = " is not a duration like \"15m\", \"1h30m\", or \"90s\"";
     assertEquals("grace \"true\"" + like, error(() -> Durations.parseValue(true, "grace")));
     assertEquals("duration \"null\"" + like, error(() -> Durations.parseValue(null, "")));
     assertEquals(
@@ -329,7 +329,7 @@ class ScheduleTest {
     // Characters are code points: forty emoji are eighty UTF-16 units but under the cap.
     String forty = "😀".repeat(40);
     assertEquals(
-        "duration \"" + forty + "\" is not a duration like \"15m\", \"1h30m\" or \"90s\"",
+        "duration \"" + forty + "\" is not a duration like \"15m\", \"1h30m\", or \"90s\"",
         error(() -> Durations.parse(forty, "")));
     assertEquals(
         "duration \"" + "😀".repeat(32) + "...\" " + tooLong,

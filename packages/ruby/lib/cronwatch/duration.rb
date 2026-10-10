@@ -34,7 +34,7 @@ module Cronwatch
         return value
       end
       unless value.is_a?(String)
-        raise ArgumentError, "#{label} \"#{value}\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+        raise ArgumentError, "#{label} \"#{value}\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
       end
 
       if value.length > MAX_LENGTH
@@ -52,7 +52,7 @@ module Cronwatch
         consumed << match[0]
       end
       if consumed.gsub(JS::SPACES, "") != text.gsub(JS::SPACES, "")
-        raise ArgumentError, "#{label} \"#{value}\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+        raise ArgumentError, "#{label} \"#{value}\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
       end
 
       JS.round(total)

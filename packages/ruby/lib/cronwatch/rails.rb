@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # The Rails integration: a Railtie, the Cronwatch::ActiveJob concern,
-# Cronwatch::CheckJob, Cronwatch::Web and the `cronwatch:install` generator.
+# Cronwatch::CheckJob, Cronwatch::Web, and the `cronwatch:install` generator.
 # Needs railties and activejob; the ActiveRecord store loads on first use,
 # and so does Cronwatch::Sidekiq when the app has Sidekiq (the Railtie loads
 # it at boot).

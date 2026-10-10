@@ -1,6 +1,6 @@
 <section class="opening">
   {{HERO}}
-  <h1 class="say"><b>CronWatch</b> records every run of your scheduled jobs in your own database, and speaks up when one is missed, fails, gets stuck, runs slow or costs too much.</h1>
+  <h1 class="say"><b>CronWatch</b> records every run of your scheduled jobs in your own database, and speaks up when one is missed, fails, gets stuck, runs slow, or costs too much.</h1>
   <p class="then">It is a library, not a service. No server to run, no account to make, and run history that stays in your database. An alert carries the error and the last lines of output to the channels you pick, and to Anthropic only if you turn on triage. <a href="{{GITHUB}}">MIT licensed</a>.</p>
   <div class="installs">
     <div class="tabs" role="tablist" aria-label="Install for your language" hidden>
@@ -89,7 +89,7 @@
   <p class="label">Code</p>
   <div class="body">
     <h2>Say it where the job lives.</h2>
-    <p>One client per app, each job declared once, and a wrapper around the work. The schedule, the grace period and the timeout sit next to the code they describe, and every run lands in the SQLite, Postgres, MySQL or D1 database you already have.</p>
+    <p>One client per app, each job declared once, and a wrapper around the work. The schedule, the grace period, and the timeout sit next to the code they describe, and every run lands in the SQLite, Postgres, MySQL, or D1 database you already have.</p>
     <div class="out code">
       <p class="from"><span translate="no">app/api/cron/nightly/route.ts</span><span>TypeScript</span></p>
 <pre><code translate="no"><span class="k">import</span> { cronwatch } <span class="k">from</span> <span class="s">"@cronwatch/sdk"</span>;
@@ -113,10 +113,10 @@
     </div>
     <p class="small">It runs wherever a fetch handler or an async function does, and in every language it can wrap a plain script run from crontab.</p>
     <dl class="stacks">
-      <div><dt>TypeScript</dt><dd>Vercel cron, Next.js, SvelteKit, Nuxt, NestJS, Cloudflare Workers, Supabase Cron, Inngest and a dozen more platforms. <a href="/docs/">Docs</a></dd></div>
-      <div><dt>Ruby</dt><dd>Rails: ActiveJob on Solid Queue or any adapter, Sidekiq and sidekiq-cron, with the schedule read from the scheduler’s own config. <a href="/docs/rails/">Rails docs</a></dd></div>
+      <div><dt>TypeScript</dt><dd>Vercel cron, Next.js, SvelteKit, Nuxt, NestJS, Cloudflare Workers, Supabase Cron, Inngest, and a dozen more platforms. <a href="/docs/">Docs</a></dd></div>
+      <div><dt>Ruby</dt><dd>Rails: ActiveJob on Solid Queue or any adapter, Sidekiq, and sidekiq-cron, with the schedule read from the scheduler’s own config. <a href="/docs/rails/">Rails docs</a></dd></div>
       <div><dt>Python</dt><dd>Django, Celery and beat, and APScheduler, with Celery’s schedules read from beat. <a href="/docs/python/">Python docs</a></dd></div>
-      <div><dt>PHP</dt><dd>Laravel’s scheduler, the Symfony Scheduler and Drupal cron with no code, and Laravel’s queues and Symfony Messenger with one attribute; Craft CMS commands and queue jobs listed in its config; WP-Cron through a WordPress plugin. <a href="/docs/php/">PHP docs</a></dd></div>
+      <div><dt>PHP</dt><dd>Laravel’s scheduler, the Symfony Scheduler, and Drupal cron with no code, and Laravel’s queues and Symfony Messenger with one attribute; Craft CMS commands and queue jobs listed in its config; WP-Cron through a WordPress plugin. <a href="/docs/php/">PHP docs</a></dd></div>
       <div><dt>Go</dt><dd>robfig/cron and gocron with one option each, River and Asynq with a wrapper and a middleware, and the schedule read from the scheduler. <a href="/docs/go/">Go docs</a></dd></div>
       <div><dt>Rust</dt><dd>tokio-cron-scheduler and apalis, each job declared where the scheduler is built, with one schedule that both the scheduler and CronWatch read. <a href="/docs/rust/">Rust docs</a></dd></div>
       <div><dt>Elixir</dt><dd>Oban and Quantum with one entry in the instance’s options and no change to your workers: each crontab entry is a job on the scheduler’s own schedule, and each attempt is a run. <a href="/docs/elixir/">Elixir docs</a></dd></div>
@@ -178,7 +178,7 @@
   <p class="label">Agents</p>
   <div class="body">
     <h2>Ask your coding agent what failed, and why.</h2>
-    <p>CronWatch comes with an MCP server, so Claude Code, Cursor or any MCP client reads the same records you do. It can tell you what broke overnight, read the error and the output, and silence the job while it ships the fix.</p>
+    <p>CronWatch comes with an MCP server, so Claude Code, Cursor, or any MCP client reads the same records you do. It can tell you what broke overnight, read the error and the output, and silence the job while it ships the fix.</p>
     <div class="install"><code translate="no">claude mcp add cronwatch -e CRONWATCH_URL=https://yourapp.com/cronwatch -e CRONWATCH_TOKEN=your-token -- npx -y @cronwatch/mcp</code><button class="copy" type="button" aria-label="Copy the MCP command">Copy</button></div>
     <p class="small"><code>CRONWATCH_URL</code> is where your app mounts the dashboard. <code>CRONWATCH_TOKEN</code> is the token your app reads from its own <code>CRONWATCH_TOKEN</code>; in development, the app prints a sign-in link with one on its first request. More in <a href="/docs/mcp/">the MCP docs</a>.</p>
     <div class="actions">
@@ -207,7 +207,7 @@
       <div><dt>TypeScript</dt><dd><code>cw.routes()</code> in your router.</dd></div>
       <div><dt>Ruby</dt><dd><code>mount Cronwatch::Web</code> in Rails.</dd></div>
       <div><dt>Python</dt><dd><code>cronwatch.django.urls</code> in Django.</dd></div>
-      <div><dt>PHP</dt><dd>Serve <code>$cw-&gt;routes()</code>. Laravel has it at <code>/cronwatch</code>, Symfony through the bundle’s routes, and WordPress, Drupal and Craft CMS in their admin.</dd></div>
+      <div><dt>PHP</dt><dd>Serve <code>$cw-&gt;routes()</code>. Laravel has it at <code>/cronwatch</code>, Symfony through the bundle’s routes, and WordPress, Drupal, and Craft CMS in their admin.</dd></div>
       <div><dt>Go</dt><dd>Hand <code>cw.MustRoutes()</code> to your <code>http.ServeMux</code>.</dd></div>
       <div><dt>Rust</dt><dd>Nest <code>cw.routes(options)</code> in your axum <code>Router</code>.</dd></div>
       <div><dt>Elixir</dt><dd><code>forward</code> to <code>Cronwatch.Web</code> in your Phoenix router.</dd></div>

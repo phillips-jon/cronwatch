@@ -59,7 +59,7 @@ new Worker("scheduled", async (bull) => {
 
 ## Plain scripts from crontab
 
-A script run by crontab starts, does its work and exits, so nothing inside it is around to notice the run that never happened. Two crontab lines solve that: the job, and a check every few minutes.
+A script run by crontab starts, does its work, and exits, so nothing inside it is around to notice the run that never happened. Two crontab lines solve that: the job, and a check every few minutes.
 
 ```ts
 // lib/jobs.ts: every job, declared once
@@ -98,7 +98,7 @@ await cw.close();
 
 Keep every `cw.job()` declaration in that one module, and import it from the job scripts and the check script alike, so the schedule a script runs under and the one the check expects can never drift apart. A job is only known to the store once it has been declared in a process that ran a check or a run, so a job that has never run and is not declared in the check process cannot be reported as missing.
 
-## Hono, Bun, Deno and friends
+## Hono, Bun, Deno, and friends
 
 `handler()` and `routes()` speak the fetch standard: they take a `Request` and return a `Response`. Mount them wherever a fetch handler goes.
 
@@ -127,7 +127,7 @@ const routes = cw.routes({ basePath: "/cronwatch", trustProxy: true });
 
 See [behind a proxy](/docs/dashboard/#behind-a-proxy).
 
-A handler requires `Authorization: Bearer <CRON_SECRET>`. With no `CRON_SECRET` set (an empty value counts as unset) it answers 503 and runs nothing, unless the app is [in development](/docs/dashboard/#development) (`CRONWATCH_ENV`, `APP_ENV` or `NODE_ENV`, read in that order). For an endpoint that is protected some other way, say so explicitly with `secret: null`:
+A handler requires `Authorization: Bearer <CRON_SECRET>`. With no `CRON_SECRET` set (an empty value counts as unset) it answers 503 and runs nothing, unless the app is [in development](/docs/dashboard/#development) (`CRONWATCH_ENV`, `APP_ENV`, or `NODE_ENV`, read in that order). For an endpoint that is protected some other way, say so explicitly with `secret: null`:
 
 ```ts
 const runReindex = reindex.handler(async (job) => { /* ... */ }, { secret: null });
@@ -174,16 +174,16 @@ Deno.serve({ port: 3000 }, (request) => routes.handler(request));
 
 ### Which store where
 
-- **Postgres** (`@cronwatch/sdk/postgres`, through `pg`) works on Node, Bun and Deno.
+- **Postgres** (`@cronwatch/sdk/postgres`, through `pg`) works on Node, Bun, and Deno.
 - **SQLite** (`@cronwatch/sdk/sqlite`, through `better-sqlite3`) is a native Node addon. It works on Node, crashes in Bun, and is not tested on Deno, so use Postgres on those two.
 - **Memory**, the default, works everywhere and keeps nothing across a restart.
 - **D1** is for Cloudflare Workers only; see [Cloudflare Workers](/docs/cloudflare/).
 
-The core, the routes and every alert channel need only `fetch` and Web Crypto, so they run the same on all three. `@cronwatch/sdk/node`, below, is for Node's own request objects and is not needed on Bun or Deno.
+The core, the routes, and every alert channel need only `fetch` and Web Crypto, so they run the same on all three. `@cronwatch/sdk/node`, below, is for Node's own request objects and is not needed on Bun or Deno.
 
-## Express, Koa and plain Node servers
+## Express, Koa, and plain Node servers
 
-Express, Connect, Koa, NestJS and `http.createServer` hand you Node's `IncomingMessage` and `ServerResponse` rather than a `Request`. `@cronwatch/sdk/node` converts between the two, for the routes and for any job `handler()`:
+Express, Connect, Koa, NestJS, and `http.createServer` hand you Node's `IncomingMessage` and `ServerResponse` rather than a `Request`. `@cronwatch/sdk/node` converts between the two, for the routes and for any job `handler()`:
 
 ```ts
 import { createServer } from "node:http";
@@ -229,7 +229,7 @@ The request body, for anything but `GET` and `HEAD`, comes from the first of the
 
 A parsed body of any other type, multipart for instance, cannot be rebuilt and is dropped. Mounting the adapter before the body parsers avoids the question.
 
-The response is written with its status, every header (each `Set-Cookie` on its own line) and its body, streamed. An error the fetch handler throws goes to `next(error)` in Express and is thrown on to Koa; a plain server answers 500.
+The response is written with its status, every header (each `Set-Cookie` on its own line), and its body, streamed. An error the fetch handler throws goes to `next(error)` in Express and is thrown on to Koa; a plain server answers 500.
 
 The request URL is built from the `Host` header and the connection's scheme. Behind a proxy that terminates TLS, pass `trustProxy: true` to use the first `X-Forwarded-Proto` and `X-Forwarded-Host` instead, but only when the proxy sets or overwrites both, since a client can send them too. Setting `origin` on the routes does the same job without trusting any header; see [behind a proxy](/docs/dashboard/#behind-a-proxy).
 

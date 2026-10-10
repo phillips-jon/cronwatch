@@ -12,11 +12,11 @@ use Cronwatch\Run;
 use Cronwatch\StoredJob;
 
 /**
- * The schema, statements, parameters and row mapping of the SQL stores.
- * SQLite's are stores/sql.ts's text for text, so a Node, a Ruby, a Python
+ * The schema, statements, parameters, and row mapping of the SQL stores.
+ * SQLite's are stores/sql.ts's text for text, so a Node, a Ruby, a Python,
  * and a PHP process can share one file. MySQL (and MariaDB) has a dialect
- * of its own, since it has no ON CONFLICT, no partial index and no TEXT
- * primary key, but the same tables, columns and values: the JSON columns
+ * of its own, since it has no ON CONFLICT, no partial index, and no TEXT
+ * primary key, but the same tables, columns, and values: the JSON columns
  * are text holding the SDK's JSON byte for byte, never MySQL's JSON type,
  * which would rewrite it. See DESIGN.md, "Storage".
  *
@@ -38,7 +38,7 @@ final class Sql
     {
         if (preg_match('/^[a-z_][a-z0-9_]*$/D', $prefix) !== 1 || strlen($prefix) > self::MAX_PREFIX) {
             throw new \InvalidArgumentException(
-                'cronwatch: invalid table prefix ' . Js::quote($prefix) . '. Use lowercase letters, digits and underscores, '
+                'cronwatch: invalid table prefix ' . Js::quote($prefix) . '. Use lowercase letters, digits, and underscores, '
                 . 'not starting with a digit, at most ' . self::MAX_PREFIX . ' characters.'
             );
         }
@@ -335,7 +335,7 @@ final class Sql
 
     /**
      * JSON text as the SDK wrote it. Rows are read leniently: a foreign,
-     * hand-edited or damaged row (SQLite keeps whatever type it is given, in
+     * hand-edited, or damaged row (SQLite keeps whatever type it is given, in
      * any column) must affect only its own job, never every read, so text
      * that does not parse reads as null, which the client takes as no state,
      * or as an unreadable definition it reports (stores/sql.ts).
@@ -404,7 +404,7 @@ final class Sql
 
     /**
      * A job's row. A definition that is not a JSON object (text that does
-     * not parse, a foreign row's null, "nightly" or [1]) is unreadable: the
+     * not parse, a foreign row's null, "nightly", or [1]) is unreadable: the
      * client reports the job and shows it as failing without evaluating it
      * (see StoredJob::unreadable()).
      *

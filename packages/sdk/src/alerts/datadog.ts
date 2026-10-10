@@ -12,7 +12,7 @@ export interface DatadogOptions {
   apiKey: string;
   /** Your Datadog site: "datadoghq.com" (the default), "datadoghq.eu", "us3.datadoghq.com", "us5.datadoghq.com", "ap1.datadoghq.com", "ddog-gov.com". */
   site?: string;
-  /** Extra tags, "env:prod" say. Every event also has cronwatch, job:<name> and alert:<type>. */
+  /** Extra tags, "env:prod" say. Every event also has cronwatch, job:<name>, and alert:<type>. */
   tags?: string[];
   /** Associates the event with a host and its tags. */
   host?: string;

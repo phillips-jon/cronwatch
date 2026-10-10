@@ -14,7 +14,7 @@ namespace Cronwatch.Hangfire.Tests;
 
 /// <summary>
 /// Cronwatch.Hangfire against a real Hangfire server on in-memory storage. Hangfire keeps its
-/// filters, its storage and its type resolver in statics, so every test is in this one class,
+/// filters, its storage, and its type resolver in statics, so every test is in this one class,
 /// whose tests xUnit runs one at a time.
 /// </summary>
 public class HangfireTests

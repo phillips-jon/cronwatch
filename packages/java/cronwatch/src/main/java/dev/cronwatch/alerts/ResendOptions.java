@@ -46,7 +46,7 @@ public final class ResendOptions {
     /**
      * The options.
      *
-     * @throws dev.cronwatch.CronwatchException without an API key, a from address or a to address
+     * @throws dev.cronwatch.CronwatchException without an API key, a from address, or a to address
      */
     public ResendOptions build() {
       // A pasted credential often carries a stray space or newline, which a header would refuse.

@@ -21,7 +21,7 @@ defmodule Cronwatch.Transport do
   the channel's request runs `c:post/2` and reads the body in a process
   of its own, which it kills past the deadline, and reads at most 1 MiB of
   the body. A body can be a binary, or a function of no arguments called
-  in that same process for each chunk in turn (`{:ok, chunk}`, `:done` or
+  in that same process for each chunk in turn (`{:ok, chunk}`, `:done`, or
   `{:error, reason}`), so a transport that streams is held to the cap as
   the body arrives. Its errors are rewritten so they name only the URL's
   origin.
@@ -60,7 +60,7 @@ defmodule Cronwatch.Transport do
   def resolve(module, _) when is_atom(module), do: {module, []}
 
   @doc false
-  # Checks a transport given as an option: nil, a module or `{module, opts}` whose module has `post/2`.
+  # Checks a transport given as an option: nil, a module, or `{module, opts}` whose module has `post/2`.
   @spec check(term(), String.t()) :: :ok | {:error, String.t()}
   def check(nil, _who), do: :ok
   def check({module, _opts}, who) when is_atom(module), do: check(module, who)

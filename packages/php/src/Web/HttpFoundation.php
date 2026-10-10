@@ -75,7 +75,7 @@ final class HttpFoundation
 
     /**
      * An HttpFoundation response with the dashboard's (or a handler's) status,
-     * headers and body: Laravel's Illuminate\Http\Response when `laravel`,
+     * headers, and body: Laravel's Illuminate\Http\Response when `laravel`,
      * so Laravel middleware that call its helpers work, else Symfony's.
      */
     public static function toResponse(Response $response, bool $laravel = false): object

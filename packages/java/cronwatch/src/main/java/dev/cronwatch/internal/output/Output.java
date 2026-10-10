@@ -9,7 +9,7 @@ import java.util.function.UnaryOperator;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The SDK's {@code output.ts}: the output cap, error text and secret redaction. Lengths and cuts
+ * The SDK's {@code output.ts}: the output cap, error text, and secret redaction. Lengths and cuts
  * are in UTF-16 code units, as JavaScript counts them (a Java string is one), so the same output is
  * capped at the same character here and in every other port.
  */
@@ -250,7 +250,7 @@ public final class Output {
               "(\\bdiscord(?:app)?\\.com\\/api\\/(?:v\\d{1,2}\\/)?webhooks\\/)[A-Za-z0-9/_-]{1,255}",
               "gi",
               "$1" + REDACTED),
-          // Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI and Google
+          // Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI, and Google
           // style keys.
           Pattern.template("\\b(?:AKIA|ASIA)[0-9A-Z]{16}\\b", "g", REDACTED),
           Pattern.template(
@@ -266,7 +266,8 @@ public final class Output {
   /**
    * The default redact: blanks values that look like secrets (key=value pairs with secret-ish
    * names, Authorization headers, URL credentials, bearer tokens, JWTs, PEM private keys, webhook
-   * URLs and well-known token formats) before output or an error is stored, shown or sent anywhere.
+   * URLs, and well-known token formats) before output or an error is stored, shown, or sent
+   * anywhere.
    */
   public static String redactSecrets(String text) {
     String out = text;

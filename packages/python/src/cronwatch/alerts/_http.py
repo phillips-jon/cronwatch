@@ -85,7 +85,7 @@ def _origin_of(url: str) -> str:
 
 
 def trim_header(value: Any) -> str:
-    """A header value without the spaces, tabs and line breaks around it, as fetch sends it."""
+    """A header value without the spaces, tabs, and line breaks around it, as fetch sends it."""
     return _AROUND.sub("", str(value))
 
 

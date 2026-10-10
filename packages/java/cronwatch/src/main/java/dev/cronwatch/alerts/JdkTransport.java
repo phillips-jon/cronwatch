@@ -37,7 +37,7 @@ import org.jspecify.annotations.Nullable;
  * closes the connection. No {@code accept-encoding} is sent, and nothing is decompressed, so a gzip
  * answer cannot grow in memory.
  *
- * <p>The JDK sets {@code host}, {@code connection}, {@code content-length}, {@code expect} and
+ * <p>The JDK sets {@code host}, {@code connection}, {@code content-length}, {@code expect}, and
  * {@code upgrade} itself and refuses to let a caller set them, so a header of those names (a
  * webhook's extra header, say) is dropped. It sends {@code User-Agent: Java-http-client/<version>}
  * unless the request names one.

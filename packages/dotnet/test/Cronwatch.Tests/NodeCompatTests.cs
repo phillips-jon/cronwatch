@@ -13,10 +13,10 @@ namespace Cronwatch.Tests;
 /// <summary>
 /// A Node process and a .NET process sharing one SQLite file: the SDK's store (from the built
 /// packages/sdk/dist) and <see cref="SqlStore"/> replay the same store calls
-/// (shared_store.json, the Ruby, Python, Go, Rust and Java ports' fixture), and each must read
+/// (shared_store.json, the Ruby, Python, Go, Rust, and Java ports' fixture), and each must read
 /// what the other wrote exactly as it reads its own, down to the bytes and SQLite type of every
 /// column; the tables are the same whoever makes them; and the two take turns on one job's state
-/// version. Needs node, the SDK built and its SQLite driver installed (<c>npm ci &amp;&amp; npm run
+/// version. Needs node, the SDK built, and its SQLite driver installed (<c>npm ci &amp;&amp; npm run
 /// build</c> at the repository root); skipped, with the reason, without them.
 /// </summary>
 public class NodeCompatTests

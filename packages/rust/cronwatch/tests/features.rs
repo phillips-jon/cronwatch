@@ -24,7 +24,7 @@ fn the_public_types_serialize_as_the_sdk_writes_them() {
 
     let text = r#"{"id":"r1","job":"nightly","status":"failed","startedAt":1767605400000,"finishedAt":1767605401500,"durationMs":1500,"error":"Error: disk full","output":"a\nb","metrics":{"rows":3,"cost":1.25},"trigger":"run"}"#;
     let run = Run::from_json(text).unwrap();
-    assert_eq!(serde_json::to_string(&run).unwrap(), text, "the SDK's fields, order and numbers");
+    assert_eq!(serde_json::to_string(&run).unwrap(), text, "the SDK's fields, order, and numbers");
     let back: Run = serde_json::from_str(text).unwrap();
     assert_eq!(back, run);
     assert_eq!(serde_json::to_string(&RunStatus::Failed).unwrap(), r#""failed""#);

@@ -12,7 +12,7 @@ use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
 /**
- * A job's handler() as a PSR-15 request handler, for Slim, Mezzio and
+ * A job's handler() as a PSR-15 request handler, for Slim, Mezzio, and
  * anything that speaks PSR-7:
  *
  *     $factory = new Nyholm\Psr7\Factory\Psr17Factory();
@@ -53,6 +53,6 @@ final class PsrJobHandler implements RequestHandlerInterface
             }
             return $response->withBody($this->streams->createStream((string) $answer->getContent()));
         }
-        throw new \TypeError(get_debug_type($answer) . ' is a response a PSR-15 handler cannot answer with; return a PSR-7 response, a Cronwatch\Web\Response or an array response');
+        throw new \TypeError(get_debug_type($answer) . ' is a response a PSR-15 handler cannot answer with; return a PSR-7 response, a Cronwatch\Web\Response, or an array response');
     }
 }

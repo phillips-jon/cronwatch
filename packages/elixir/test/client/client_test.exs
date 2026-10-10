@@ -13,7 +13,7 @@ defmodule Cronwatch.ClientTest do
   @min 60_000
   @hour 3_600_000
 
-  test "run records output, metrics and duration, and returns the result" do
+  test "run records output, metrics, and duration, and returns the result" do
     %{cw: cw, clock: c} = make()
     job = Cronwatch.job!("report", schedule: "0 2 * * *", instance: cw)
 
@@ -49,7 +49,7 @@ defmodule Cronwatch.ClientTest do
     assert Cronwatch.job_summary!("nightly", instance: cw).health == "failing"
   end
 
-  test "throws, exits, {:error, reason} and :error fail the run and are handed back" do
+  test "throws, exits, {:error, reason}, and :error fail the run and are handed back" do
     %{cw: cw} = make()
     job = Cronwatch.job!("ways", instance: cw)
     assert catch_throw(Cronwatch.run(job, fn _ -> throw(:nope) end)) == :nope
@@ -81,7 +81,7 @@ defmodule Cronwatch.ClientTest do
     assert Capture.types(alerts) == ["failed", "recovered"]
   end
 
-  test "run defines on first use and names, schedules and durations are checked" do
+  test "run defines on first use and names, schedules, and durations are checked" do
     %{cw: cw} = make()
     assert Cronwatch.run("adhoc", fn _ -> 1 end, schedule: "every 5m", instance: cw) == 1
     assert length(Cronwatch.jobs!(instance: cw)) == 1

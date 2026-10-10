@@ -55,13 +55,13 @@ const ok = received.length === expected.length && timingSafeEqual(received, expe
 
 `timingSafeEqual` throws when the two buffers differ in length, so compare the lengths first: a request with no signature, or a short one, is then refused rather than crashing the handler. Hash the raw body as it arrived, before any JSON parsing. Without the SDK, `createHmac("sha256", secret).update(rawBody).digest("hex")` from `node:crypto` gives the same hex.
 
-## Email, SMS and error trackers
+## Email, SMS, and error trackers
 
-Each provider below is its own entry point, with nothing to install: they use only `fetch` and Web Crypto, so they run on Node, Cloudflare Workers, Deno and Bun. Every request gives up after 10 seconds. A failure names the provider and the URL's origin, with any key the channel holds cut out of the response it quotes. A redirect is treated as a failure rather than followed, here and for Slack, Discord and the webhook, so a key in a header never goes to another address. Every channel takes an optional `link: (alert) => string`, shown as an "Open" link.
+Each provider below is its own entry point, with nothing to install: they use only `fetch` and Web Crypto, so they run on Node, Cloudflare Workers, Deno, and Bun. Every request gives up after 10 seconds. A failure names the provider and the URL's origin, with any key the channel holds cut out of the response it quotes. A redirect is treated as a failure rather than followed, here and for Slack, Discord, and the webhook, so a key in a header never goes to another address. Every channel takes an optional `link: (alert) => string`, shown as an "Open" link.
 
 ### Email
 
-All five email channels send the same message: the subject is the alert title (after `subjectPrefix`, if you set one), and the body is the title, the message, the triage and the link, as plain text and as a small HTML part with everything escaped and no remote images. They share these options:
+All five email channels send the same message: the subject is the alert title (after `subjectPrefix`, if you set one), and the body is the title, the message, the triage, and the link, as plain text and as a small HTML part with everything escaped and no remote images. They share these options:
 
 | Option | |
 |---|---|
@@ -142,7 +142,7 @@ The alert counts as sent when any number took it, so the next check never texts 
 
 ### Error trackers
 
-These report each alert as an event, grouped so that each job's condition is one issue: the fingerprint (or grouping key) is `cronwatch:<job>:<type>`. Failed, stuck and missed are errors, slow, over budget and under floor are warnings, and a recovery is informational.
+These report each alert as an event, grouped so that each job's condition is one issue: the fingerprint (or grouping key) is `cronwatch:<job>:<type>`. Failed, stuck, and missed are errors, slow, over budget, and under floor are warnings, and a recovery is informational.
 
 #### Sentry
 
@@ -151,7 +151,7 @@ import { sentry } from "@cronwatch/sdk/sentry";
 sentry({ dsn: process.env.SENTRY_DSN!, environment: "production", release: "app@1.2.3" });
 ```
 
-Sends an event to the project's envelope endpoint, tagged `job` and `type`, with the triage, link, details and run under Additional Data. The event id is derived from the alert, so Sentry drops a resend. `recovered: false` leaves recoveries out.
+Sends an event to the project's envelope endpoint, tagged `job` and `type`, with the triage, link, details, and run under Additional Data. The event id is derived from the alert, so Sentry drops a resend. `recovered: false` leaves recoveries out.
 
 #### Honeybadger
 
@@ -169,7 +169,7 @@ import { datadog } from "@cronwatch/sdk/datadog";
 datadog({ apiKey: process.env.DD_API_KEY!, site: "datadoghq.eu", tags: ["env:prod"] });
 ```
 
-Posts to the Events API with `alert_type` `error`, `warning` or `success`, an aggregation key per job and type, and the tags `cronwatch`, `job:<name>` and `alert:<type>`. `site` defaults to `datadoghq.com`; `host` is optional. Datadog rejects events more than 18 hours old, which matters only if an alert was queued that long.
+Posts to the Events API with `alert_type` `error`, `warning`, or `success`, an aggregation key per job and type, and the tags `cronwatch`, `job:<name>`, and `alert:<type>`. `site` defaults to `datadoghq.com`; `host` is optional. Datadog rejects events more than 18 hours old, which matters only if an alert was queued that long.
 
 #### Rollbar
 
@@ -196,7 +196,7 @@ import { newrelic } from "@cronwatch/sdk/newrelic";
 newrelic({ accountId: 1234567, apiKey: process.env.NEW_RELIC_LICENSE_KEY!, region: "us" });
 ```
 
-Records a `CronWatchAlert` custom event (rename it with `eventType`) with `job`, `alertType`, `severity`, `title`, `message`, `triage`, `link`, `runId`, `runStatus` and `durationMs`, which you can chart or alert on with NRQL: `SELECT count(*) FROM CronWatchAlert WHERE severity = 'error' FACET job`. The key is an ingest license key; `region: "eu"` is for EU accounts.
+Records a `CronWatchAlert` custom event (rename it with `eventType`) with `job`, `alertType`, `severity`, `title`, `message`, `triage`, `link`, `runId`, `runStatus`, and `durationMs`, which you can chart or alert on with NRQL: `SELECT count(*) FROM CronWatchAlert WHERE severity = 'error' FACET job`. The key is an ingest license key; `region: "eu"` is for EU accounts.
 
 ## Console and custom
 
@@ -260,7 +260,7 @@ custom("latency", (alert) => {
 
 The webhook's body is the alert after one more field, `"schema": 1`, which comes first: every CronWatch library, in every language, posts the same fields. Its JSON Schema is published at [cronwatch.dev/schemas/webhook/1.json](/schemas/webhook/1.json) (draft 2020-12), for a receiver to validate against or generate types from.
 
-What stays the same within `schema: 1`: every field above, the `details` of each type, the `X-CronWatch-Signature` header and its HMAC-SHA256. A release may add a field, a `details` field, an alert type, a condition or a run status, so ignore what you do not know rather than refusing it. A change that is not additive would come with `"schema": 2`, in a major release.
+What stays the same within `schema: 1`: every field above, the `details` of each type, the `X-CronWatch-Signature` header, and its HMAC-SHA256. A release may add a field, a `details` field, an alert type, a condition, or a run status, so ignore what you do not know rather than refusing it. A change that is not additive would come with `"schema": 2`, in a major release.
 
 What is not promised: the wording of `title` and `message`, and what the other channels' messages look like. They are written for people and may read better in any release. Parse the fields, not the text: `type` rather than "failed" in the title, `details.durationMs` rather than the message's duration.
 
@@ -272,4 +272,4 @@ What is not promised: the wording of `title` and `message`, and what the other c
 cronwatch({ onError: (error, where) => Sentry.captureException(error, { tags: { where } }) });
 ```
 
-Every port has the same channels, sending the same requests, and the same triage: see Alerts in [Ruby](/docs/ruby/#alerts), [Python](/docs/python/#alerts), [PHP](/docs/php/#alerts), [Go](/docs/go/#alerts), [Rust](/docs/rust/#alerts), [Elixir](/docs/elixir/#alerts), [Java](/docs/java/#alerts) and [.NET](/docs/dotnet/#alerts).
+Every port has the same channels, sending the same requests, and the same triage: see Alerts in [Ruby](/docs/ruby/#alerts), [Python](/docs/python/#alerts), [PHP](/docs/php/#alerts), [Go](/docs/go/#alerts), [Rust](/docs/rust/#alerts), [Elixir](/docs/elixir/#alerts), [Java](/docs/java/#alerts), and [.NET](/docs/dotnet/#alerts).

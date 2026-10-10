@@ -28,7 +28,7 @@ export const cw = cronwatch({
 export const digest = cw.job("daily-digest", { schedule: "0 6 * * *", grace: "10m", timeout: "2m" });
 ```
 
-Set `DATABASE_URL`, `SLACK_WEBHOOK_URL` and `CRONWATCH_TOKEN` in the site's environment variables with the Functions scope. Variables written in `netlify.toml` are not passed to functions.
+Set `DATABASE_URL`, `SLACK_WEBHOOK_URL`, and `CRONWATCH_TOKEN` in the site's environment variables with the Functions scope. Variables written in `netlify.toml` are not passed to functions.
 
 ## A scheduled function
 
@@ -56,7 +56,7 @@ The schedule can live in `netlify.toml` instead:
 schedule = "0 6 * * *"
 ```
 
-Netlify accepts five-field cron and the nicknames `@hourly`, `@daily`, `@weekly`, `@monthly` and `@yearly`, and so does a job's `schedule`, so copy the same string into both.
+Netlify accepts five-field cron and the nicknames `@hourly`, `@daily`, `@weekly`, `@monthly`, and `@yearly`, and so does a job's `schedule`, so copy the same string into both.
 
 ## The check
 

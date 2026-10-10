@@ -3,7 +3,7 @@ defmodule Cronwatch.Alerts.Post do
   # Internal: not the package's API, and it can change in any release.
   #
   # The one POST the alert channels and Claude triage make, as the SDK makes
-  # it with fetch (`alerts/shared.ts`), the Go port's `internal/post` and the
+  # it with fetch (`alerts/shared.ts`), the Go port's `internal/post`, and the
   # Rust port's `alerts::post`: the URL read as fetch reads it, only http and
   # https, headers checked as fetch checks them, one ten second deadline for
   # the whole request, a redirect refused rather than followed, at most 1 MiB
@@ -13,7 +13,7 @@ defmodule Cronwatch.Alerts.Post do
   #
   # The request goes out through a `Cronwatch.Transport`, in a process of its
   # own that is killed past the deadline, so the deadline holds whatever the
-  # transport does, while connecting, sending or reading the answer.
+  # transport does, while connecting, sending, or reading the answer.
   #
   # Errors are `Cronwatch.Error`s of kind `:other`; one past the deadline has
   # the reason `:timeout` and fetch's message, `The operation was aborted due
@@ -33,7 +33,7 @@ defmodule Cronwatch.Alerts.Post do
   @type answer :: %{status: non_neg_integer(), body: String.t()}
 
   @doc """
-  How long one request may take, connecting, sending and reading the
+  How long one request may take, connecting, sending, and reading the
   answer, as the SDK's `AbortSignal.timeout(10_000)`: 10 seconds. The tests
   shorten it through the application environment (`:post_timeout`).
   """
@@ -81,7 +81,7 @@ defmodule Cronwatch.Alerts.Post do
   end
 
   @doc """
-  `new URL(url).origin`: the scheme, host and port only, a port that is the
+  `new URL(url).origin`: the scheme, host, and port only, a port that is the
   scheme's own left out; `"null"` for a URL of a scheme that has no origin
   and `"(invalid URL)"` for text that is no URL. A URL's path or query can
   hold a credential, so an error names only this.
@@ -108,7 +108,7 @@ defmodule Cronwatch.Alerts.Post do
 
   @doc """
   The headers as a request sends them: each name a token, each value
-  without the spaces, tabs and line breaks around it, as fetch sends it. A
+  without the spaces, tabs, and line breaks around it, as fetch sends it. A
   name that is not a token, or a value with a line break or NUL inside, is
   refused, as fetch refuses them, so no header can add another; the error
   names the header, never its value, which may be a credential.
@@ -121,7 +121,7 @@ defmodule Cronwatch.Alerts.Post do
 
       cond do
         not token?(name) ->
-          {:halt, {:error, fail("a header name must be a token (letters, digits and !#$%&'*+.^_`|~-)")}}
+          {:halt, {:error, fail("a header name must be a token (letters, digits, and !#$%&'*+.^_`|~-)")}}
 
         String.contains?(value, ["\r", "\n", <<0>>]) ->
           {:halt, {:error, fail("the #{name} header's value may not contain a line break")}}

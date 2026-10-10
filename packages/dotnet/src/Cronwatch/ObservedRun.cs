@@ -10,8 +10,8 @@ namespace Cronwatch;
 /// A run whose function is seen from outside, as a scheduler's filter or listener sees one:
 /// opened when the scheduler says the function starts (<see cref="Job.OpenAsync"/>) and closed
 /// when it says the function has ended. The two halves of <c>RunAsync</c>, so the running row, the
-/// activity, the timeout and the process-exit hook's record are a run's. The first of
-/// <see cref="CloseAsync"/>, <see cref="CloseWithAsync"/> and <see cref="TakeBackAsync"/> ends it,
+/// activity, the timeout, and the process-exit hook's record are a run's. The first of
+/// <see cref="CloseAsync"/>, <see cref="CloseWithAsync"/>, and <see cref="TakeBackAsync"/> ends it,
 /// and later calls do nothing. Safe to use from any thread.
 /// </summary>
 [DebuggerDisplay("{ToString(),nq}")]

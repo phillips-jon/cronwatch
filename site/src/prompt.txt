@@ -1,5 +1,5 @@
 Add CronWatch to this project so that every scheduled job is recorded and I am
-told when one is missed, fails, gets stuck, runs slow, goes over budget or
+told when one is missed, fails, gets stuck, runs slow, goes over budget, or
 quietly does nothing.
 
 CronWatch is an open source library: @cronwatch/sdk for TypeScript (Node,
@@ -15,23 +15,23 @@ database. There is no hosted service and no account to make; the only key it
 can use is an Anthropic API key, for triage, which is optional.
 
 First decide which steps this project needs:
-- package.json (Node, Next.js or another JavaScript runtime): TypeScript. With
+- package.json (Node, Next.js, or another JavaScript runtime): TypeScript. With
   wrangler.toml or wrangler.jsonc it is Cloudflare Workers; follow the Workers notes.
 - Gemfile: Ruby. A Rails app follows the steps as written; for plain Ruby see
   https://cronwatch.dev/docs/ruby/
-- pyproject.toml, requirements.txt or manage.py: Python.
+- pyproject.toml, requirements.txt, or manage.py: Python.
 - composer.json or wp-config.php: PHP. artisan is Laravel, bin/console Symfony,
   wp-config.php WordPress, drupal/core-recommended Drupal, craftcms/cms Craft CMS.
-- go.mod: Go. robfig/cron/v3, go-co-op/gocron/v2, riverqueue/river or hibiken/asynq
+- go.mod: Go. robfig/cron/v3, go-co-op/gocron/v2, riverqueue/river, or hibiken/asynq
   in it names the scheduler.
 - Cargo.toml: Rust. tokio-cron-scheduler or apalis among its dependencies names the
   scheduler.
 - mix.exs: Elixir. :oban or :quantum among its deps names the scheduler; :phoenix
   is a Phoenix app.
-- pom.xml, build.gradle or build.gradle.kts: Java. spring-boot among its
+- pom.xml, build.gradle, or build.gradle.kts: Java. spring-boot among its
   dependencies is a Spring Boot app; org.quartz-scheduler:quartz or
   org.jobrunr:jobrunr names the scheduler.
-- *.csproj, *.sln or *.slnx: .NET. Hangfire.Core or Quartz among its
+- *.csproj, *.sln, or *.slnx: .NET. Hangfire.Core or Quartz among its
   PackageReferences names the scheduler; Sdk="Microsoft.NET.Sdk.Web" is an
   ASP.NET Core app.
 If scheduled jobs live in more than one, set up each side where its jobs run;
@@ -42,23 +42,23 @@ The examples below use Slack, but every language has the same channels, and
 the client takes as many as I want:
 - Slack or Discord: an incoming webhook URL.
 - Webhook: a URL of mine, and a secret if the requests should be signed.
-- Email: Resend, Postmark, SendGrid, Mailgun or Amazon SES. Each needs the
+- Email: Resend, Postmark, SendGrid, Mailgun, or Amazon SES. Each needs the
   provider's API key (for SES, AWS credentials with ses:SendEmail and the
   region), a from address on a domain the provider has verified, and the
   address or addresses to send to. CronWatch has no mail server of its own.
-- SMS: Twilio, with an account SID, an auth token, a from number and the
+- SMS: Twilio, with an account SID, an auth token, a from number, and the
   numbers to text.
-- Error trackers: Sentry, Honeybadger, Datadog, Rollbar, Bugsnag or New
+- Error trackers: Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, or New
   Relic, with the project's DSN or API key.
-- WordPress, Drupal and Craft CMS: the settings page has every channel above,
+- WordPress, Drupal, and Craft CMS: the settings page has every channel above,
   and email through the site's own mail, which needs no provider. Nothing to
   write in code: tell me what to fill in there, and to press "Send a test
   alert" once it is saved.
 With no channel, alerts only go to the console, which nobody reads in
-production. Read every key, token and address from the environment or the
+production. Read every key, token, and address from the environment or the
 framework's secrets, never from the code. Add the variable names to
 .env.example or this project's equivalent, and tell me at the end which
-accounts, keys and verified sender I still have to set up. If I named a
+accounts, keys, and verified sender I still have to set up. If I named a
 channel without its details, wire it up from those variables anyway rather
 than leaving it out. Each channel's options: https://cronwatch.dev/docs/alerts/
 and the language's page.
@@ -121,7 +121,7 @@ TypeScript and Node
    });
 
    .handler() and cw.routes() are fetch handlers. For Express, Koa, NestJS
-   or a plain Node server, wrap them with toNodeHandler (or toKoaMiddleware)
+  , or a plain Node server, wrap them with toNodeHandler (or toKoaMiddleware)
    from "@cronwatch/sdk/node".
 
 5. Make missed and stuck runs detectable. A job that never fires cannot report
@@ -147,7 +147,7 @@ Ruby and Rails (Ruby 3.2 or newer, Rails 7.2 or newer)
    bin/rails generate cronwatch:install
    bin/rails db:migrate
 
-2. Leave the ActiveRecord store the initializer sets (web, workers and the
+2. Leave the ActiveRecord store the initializer sets (web, workers, and the
    check must see the same runs), and set the alert channel there:
 
    # config/initializers/cronwatch.rb
@@ -218,7 +218,7 @@ Python (Python 3.11 or newer)
    dependency file (pyproject.toml, requirements.txt) the way the project
    already does.
 
-2. Use a store every process shares (web, workers and the check must see the
+2. Use a store every process shares (web, workers, and the check must see the
    same runs): cronwatch.stores.postgres.PostgresStore() (reads DATABASE_URL),
    or cronwatch.stores.SqliteStore("./data/cronwatch.db") on one machine.
 
@@ -261,7 +261,7 @@ Python (Python 3.11 or newer)
      Outside Django, cw.job(...) the same way. Async functions use
      async with nightly.run().
    - A platform that calls a URL on a schedule: nightly.handler(fn) gives
-     .django, .flask, .starlette and .aws_lambda endpoints, which need
+     .django, .flask, .starlette, and .aws_lambda endpoints, which need
      Authorization: Bearer $CRON_SECRET.
 
 4. Run the check every few minutes so missed and stuck runs are noticed: the
@@ -392,7 +392,7 @@ Go (Go 1.25 or newer)
    *sql.DB with the driver it already uses.
 
 2. Make one client at startup and pass it to whatever needs it. Use a store
-   every process shares (web, workers and the check must see the same runs):
+   every process shares (web, workers, and the check must see the same runs):
 
    store, err := sqlstore.New(db, sqlstore.Postgres)   // "cronwatch.dev/go/sqlstore"; or sqlstore.SQLite, sqlstore.MySQL
    slack, err := alerts.Slack(alerts.SlackOptions{WebhookURL: os.Getenv("SLACK_WEBHOOK_URL")})   // "cronwatch.dev/go/alerts"
@@ -468,7 +468,7 @@ Rust (Rust 1.85 or newer; 1.94 for the SQL store)
 
 2. Make one client at startup, inside the tokio runtime, and keep it in the
    app's state (it is a cheap Clone). Use a store every process shares
-   (web, workers and the check must see the same runs):
+   (web, workers, and the check must see the same runs):
 
    let cw = cronwatch::Client::builder()
        .store(cronwatch_sqlx::SqlStore::postgres(pool.clone()))   // or SqlStore::sqlite(pool), SqlStore::mysql(pool)
@@ -539,11 +539,11 @@ Elixir (Elixir 1.18 or newer on OTP 27 or newer)
    {:cronwatch, "~> 0.12"}
 
    It needs only tz and telemetry. The SQL store uses the project's own Ecto
-   repo and adapter (ecto_sqlite3, postgrex or myxql); the dashboard and a
+   repo and adapter (ecto_sqlite3, postgrex, or myxql); the dashboard and a
    job's handler use plug, which every Phoenix app has.
 
 2. Start one instance in the application's supervision tree, after the repo,
-   with a store every node shares (web, workers and the check must see the
+   with a store every node shares (web, workers, and the check must see the
    same runs), and declare every job in its jobs: option:
 
    {Cronwatch,
@@ -576,7 +576,7 @@ Elixir (Elixir 1.18 or newer on OTP 27 or newer)
      :check, [[scheduler: MyApp.Scheduler]]}].
    - Anything else, or a release a crontab runs: wrap the work in
      Cronwatch.run("nightly-report", fn job -> ...; Cronwatch.log(job,
-     "Report written"); :ok end). A raise, throw, exit, {:error, reason} or
+     "Report written"); :ok end). A raise, throw, exit, {:error, reason}, or
      :error fails the run and is handed back as it came; in a crontab
      script, exit non-zero on a failure.
    - A platform that calls a URL: in the Phoenix router,
@@ -621,7 +621,7 @@ Java (Java 21 or newer)
    SQL store uses the project's own JDBC driver and DataSource.
 
 2. Create one client for the whole app, with a store every instance shares
-   (web, workers and the check must see the same runs).
+   (web, workers, and the check must see the same runs).
 
    Spring Boot: the starter makes the client a bean. It uses SqlStore over
    the app's one DataSource, every Channel bean as a channel, and
@@ -710,10 +710,10 @@ Java (Java 21 or newer)
    Add Cronwatch.Hangfire for Hangfire (1.8) and Cronwatch.Quartz for
    Quartz.NET (4), all at the same version. The core depends on nothing; the
    SQL store uses the project's own ADO.NET driver (Microsoft.Data.Sqlite,
-   Npgsql or MySqlConnector) through a DbDataSource.
+   Npgsql, or MySqlConnector) through a DbDataSource.
 
 2. Create one client for the whole app, with a store every instance shares
-   (web, workers and the check must see the same runs).
+   (web, workers, and the check must see the same runs).
 
    In a Generic Host or ASP.NET Core app, register it:
 
@@ -795,7 +795,7 @@ Java (Java 21 or newer)
 
 Rules for you:
 - Declare every existing scheduled job in this project, not just one. Find them
-  in cron config, workflow files, queue schedulers and any crontab.
+  in cron config, workflow files, queue schedulers, and any crontab.
 - Use the real schedules already in use. Do not change when anything runs.
 - Keep the job names stable and human readable; they are the identity of the
   job across restarts and deploys.
@@ -837,11 +837,11 @@ Rules for you:
 
 Docs: https://cronwatch.dev/docs/
 Rails docs: https://cronwatch.dev/docs/rails/
-Python docs: https://cronwatch.dev/docs/python/, https://cronwatch.dev/docs/django/
+Python docs: https://cronwatch.dev/docs/python/, https://cronwatch.dev/docs/django/,
 and https://cronwatch.dev/docs/celery/
 PHP docs: https://cronwatch.dev/docs/php/, https://cronwatch.dev/docs/laravel/,
 https://cronwatch.dev/docs/symfony/, https://cronwatch.dev/docs/wordpress/,
-https://cronwatch.dev/docs/drupal/ and https://cronwatch.dev/docs/craft/
+https://cronwatch.dev/docs/drupal/, and https://cronwatch.dev/docs/craft/
 Go docs: https://cronwatch.dev/docs/go/ and https://cronwatch.dev/docs/go-schedulers/
 Rust docs: https://cronwatch.dev/docs/rust/ and https://cronwatch.dev/docs/rust-schedulers/
 Elixir docs: https://cronwatch.dev/docs/elixir/ and https://cronwatch.dev/docs/elixir-schedulers/

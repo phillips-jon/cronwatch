@@ -7,7 +7,7 @@ import dev.cronwatch.json.Json;
 import java.util.ArrayList;
 import java.util.List;
 
-/** The client's side of {@link Access}, for the dashboard, a job's handler and the bridge. */
+/** The client's side of {@link Access}, for the dashboard, a job's handler, and the bridge. */
 final class Friend implements Access.Client {
   @Override
   public JobState silence(Cronwatch cw, String name, double ms) {

@@ -43,7 +43,7 @@ public class RedactionTests
         Assert.DoesNotContain("opaqueTOKEN", bearerOutput, StringComparison.Ordinal);
         Assert.True(bearerOutput.Length <= OutputText.OutputCap + Trimmed.Length);
 
-        // Errors, recorded runs and flushed lines the same way.
+        // Errors, recorded runs, and flushed lines the same way.
         await Quietly(() => m.Cw.RunAsync("thrown", (j, ct) =>
             throw new InvalidOperationException(new string('e', OutputText.OutputCap) + " " + bearer + " " + new string('z', OutputText.OutputCap - 40))));
         Assert.DoesNotContain("opaqueTOKEN", (await m.Cw.RunsAsync("thrown", 1))[0].Error!, StringComparison.Ordinal);

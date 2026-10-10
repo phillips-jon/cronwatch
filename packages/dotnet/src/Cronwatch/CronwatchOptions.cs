@@ -60,7 +60,7 @@ public sealed class CronwatchOptions
 {
     private readonly ChannelList _alerts = new();
 
-    /// <summary>Where jobs, runs and state live. Default: a <see cref="MemoryStore"/>, which forgets on restart.</summary>
+    /// <summary>Where jobs, runs, and state live. Default: a <see cref="MemoryStore"/>, which forgets on restart.</summary>
     public IStore? Store { get; init; }
 
     /// <summary>
@@ -105,7 +105,7 @@ public sealed class CronwatchOptions
     /// <summary>How long finished runs are kept. Default <c>"30d"</c>.</summary>
     public Duration Retention { get; init; } = "30d";
 
-    /// <summary>Defaults for every job: only <c>Grace</c>, <c>Timeout</c>, <c>Timezone</c> and <c>FailuresBeforeAlert</c>.</summary>
+    /// <summary>Defaults for every job: only <c>Grace</c>, <c>Timeout</c>, <c>Timezone</c>, and <c>FailuresBeforeAlert</c>.</summary>
     public JobOptions? Defaults { get; init; }
 
     /// <summary>

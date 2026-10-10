@@ -9,7 +9,7 @@ using Cronwatch.Internal;
 
 namespace Cronwatch.Alerts;
 
-/// <summary>Configures <see cref="WebhookChannel"/>. Its <see cref="ToString"/> never shows the URL, a header's value or the secret.</summary>
+/// <summary>Configures <see cref="WebhookChannel"/>. Its <see cref="ToString"/> never shows the URL, a header's value, or the secret.</summary>
 [DebuggerDisplay("{ToString(),nq}")]
 public sealed class WebhookOptions
 {
@@ -23,8 +23,8 @@ public sealed class WebhookOptions
     /// Extra request headers, an <c>authorization</c> header say, as name and value pairs sent in
     /// the order given; a name given again keeps its place and takes the new value. Values are
     /// trimmed of the spaces and newlines a paste leaves. <c>host</c>, <c>content-length</c>,
-    /// <c>connection</c>, <c>expect</c>, <c>upgrade</c> and <c>transfer-encoding</c> are set by the
-    /// default transport itself, which drops them.
+    /// <c>connection</c>, <c>expect</c>, <c>upgrade</c>, and <c>transfer-encoding</c> are set by
+    /// the default transport itself, which drops them.
     /// </summary>
     public IEnumerable<KeyValuePair<string, string>>? Headers { internal get; init; }
 

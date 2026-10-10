@@ -391,7 +391,7 @@ public final class Timeline {
       String text = "went over budget";
       List<String> over = overCeilings(job);
       if (!over.isEmpty()) {
-        text += " on " + String.join(" and ", over);
+        text += " on " + Format.andList(over);
       }
       return text + " at " + when(last.startedAt(), now);
     }
@@ -399,7 +399,7 @@ public final class Timeline {
       String text = "fell short";
       List<String> under = underFloors(job);
       if (!under.isEmpty()) {
-        text += " on " + String.join(" and ", under);
+        text += " on " + Format.andList(under);
       }
       return text + " at " + when(last.startedAt(), now);
     }
@@ -781,7 +781,7 @@ public final class Timeline {
       {boxed("run ok"), "ran"},
       {boxed("run bad"), "failed"},
       {boxed("run timeout"), "timed out"},
-      {boxed("run warn"), "over budget, under floor or slow"},
+      {boxed("run warn"), "over budget, under floor, or slow"},
       {boxed("run running"), "running"},
       {boxed("missed"), "missed"},
     };

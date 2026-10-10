@@ -108,7 +108,7 @@ async fn a_bad_prefix_is_refused_with_the_sdks_message() {
     let err = SqlStore::sqlite(memory_pool()).prefix("Bad-").unwrap_err();
     assert_eq!(
         err.to_string(),
-        "cronwatch: invalid table prefix \"Bad-\". Use lowercase letters, digits and underscores, not starting with a digit, at most 47 characters."
+        "cronwatch: invalid table prefix \"Bad-\". Use lowercase letters, digits, and underscores, not starting with a digit, at most 47 characters."
     );
     let s = SqlStore::sqlite(memory_pool());
     assert_eq!(s.table_prefix(), "cronwatch_");
@@ -210,7 +210,7 @@ async fn a_client_records_and_checks_on_sqlite_and_another_reads_it() {
     assert!(one.errors.list().is_empty() && two.errors.list().is_empty(), "{:?}", one.errors.list());
 }
 
-// ---- store.json foreignRows: rows a foreign, hand-edited or damaged writer
+// ---- store.json foreignRows: rows a foreign, hand-edited, or damaged writer
 // could leave, each read leniently, one affecting only its own job.
 
 fn foreign_rows() -> cronwatch::js::Object {

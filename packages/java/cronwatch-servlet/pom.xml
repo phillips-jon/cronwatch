@@ -20,7 +20,7 @@
   <packaging>jar</packaging>
 
   <name>CronWatch for servlet containers</name>
-  <description>The CronWatch dashboard and a job's HTTP handler as a Jakarta Servlet filter and servlet, for Tomcat, Jetty, Undertow and any Jakarta EE 10 or 11 server.</description>
+  <description>The CronWatch dashboard and a job's HTTP handler as a Jakarta Servlet filter and servlet, for Tomcat, Jetty, Undertow, and any Jakarta EE 10 or 11 server.</description>
 
   <dependencies>
     <dependency>

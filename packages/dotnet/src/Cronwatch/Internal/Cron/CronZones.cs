@@ -87,7 +87,7 @@ internal static class CronZones
         }
     }
 
-    /// <summary>Reads "+HH", "+HHMM" or "+HH:MM" (or "-"), as <c>Intl</c> reads an offset time zone.</summary>
+    /// <summary>Reads "+HH", "+HHMM", or "+HH:MM" (or "-"), as <c>Intl</c> reads an offset time zone.</summary>
     private static TimeSpan? FixedOffset(string name)
     {
         if (name.Length < 3 || (name[0] != '+' && name[0] != '-'))

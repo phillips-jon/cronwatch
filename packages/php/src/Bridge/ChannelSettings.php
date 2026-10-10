@@ -22,9 +22,9 @@ use Cronwatch\Alerts\Twilio;
 use Cronwatch\Js;
 
 /**
- * The channels a CMS settings page offers beyond its own email, Slack and
- * the webhook: Discord, the email providers, Twilio and the error trackers.
- * One list, so the WordPress, Drupal and Craft forms show the same fields
+ * The channels a CMS settings page offers beyond its own email, Slack, and
+ * the webhook: Discord, the email providers, Twilio, and the error trackers.
+ * One list, so the WordPress, Drupal, and Craft forms show the same fields
  * and make the same channels from them.
  *
  * Each setting is named "<provider>_<field>" (discord_webhook_url,

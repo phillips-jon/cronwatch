@@ -1,7 +1,7 @@
 package output
 
 // Replays conformance/output.json, written by scripts/conformance.mjs from
-// the TypeScript SDK: the cap, every redaction case, error text and what an
+// the TypeScript SDK: the cap, every redaction case, error text, and what an
 // expect rule sees.
 
 import (

@@ -25,7 +25,7 @@
  * Each of the library's PHP files gets one line after its declare():
  * CRONWATCH_LIB_ANNOTATION, which tells the directory's Plugin Check (PHPCS
  * with the WordPress rules) that the library's exception messages are not
- * output. They are plain text for the error log, WP-CLI and the dashboard,
+ * output. They are plain text for the error log, WP-CLI, and the dashboard,
  * and everywhere the plugin shows one it escapes it (esc_html in wp-admin,
  * the dashboard's own escaping on its pages); the library runs outside
  * WordPress too, so it cannot call esc_html itself. Nothing else in a file
@@ -68,7 +68,7 @@ const CRONWATCH_LEFT_OUT = [
 const CRONWATCH_STYLESHEET = 'css/dashboard.css';
 
 /** The line each library PHP file gets in the zip, after declare(strict_types=1); (see above). */
-const CRONWATCH_LIB_ANNOTATION = '// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- the library\'s exception messages are plain text for logs, WP-CLI and the dashboard, and are escaped wherever the plugin shows one.';
+const CRONWATCH_LIB_ANNOTATION = '// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- the library\'s exception messages are plain text for logs, WP-CLI, and the dashboard, and are escaped wherever the plugin shows one.';
 
 /** Whether a file under src/ is left out. */
 function cronwatch_left_out(string $file): bool

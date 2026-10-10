@@ -60,7 +60,7 @@ function pngSize(bytes: Uint8Array): [number, number] {
   return [view.getUint32(16), view.getUint32(20)];
 }
 
-test("icons are served with their types, a long cache and no token", async () => {
+test("icons are served with their types, a long cache, and no token", async () => {
   const { get } = app();
   for (const [name, size] of [["icon-192.png", 192], ["icon-512.png", 512], ["maskable-512.png", 512], ["apple-touch-icon.png", 180]] as const) {
     const res = await get(`/cronwatch/icons/${name}`);
@@ -115,7 +115,7 @@ test("only GET and HEAD reach the app shell; a write there still needs the token
   assert.equal((await send("POST", "/cronwatch/manifest.webmanifest", bearer)).status, 404);
 });
 
-test("pages link the manifest, icons and app.js under the base, and set theme colours", async () => {
+test("pages link the manifest, icons, and app.js under the base, and set theme colours", async () => {
   const { cw, get, bearer } = app({ basePath: "/ops/cron" });
   await cw.run("h", async () => {});
   for (const path of ["/ops/cron/", "/ops/cron/jobs/h", "/ops/cron/nope", "/ops/cron/offline"]) {
@@ -147,7 +147,7 @@ test("the page CSP allows exactly the app shell, and data stays uncacheable", as
   assert.equal((await get("/cronwatch/")).headers.get("cache-control"), "no-store", "the sign-in page too");
 });
 
-test("the offline page is public, plain and says why", async () => {
+test("the offline page is public, plain, and says why", async () => {
   const { get } = app();
   const res = await get("/cronwatch/offline");
   assert.equal(res.status, 200);
@@ -158,7 +158,7 @@ test("the offline page is public, plain and says why", async () => {
   assert.match(html, /<h1>You are offline<\/h1><p>CronWatch shows live data from your app, so it needs a connection.<\/p>/);
 });
 
-/** A page for app.js to run on: the root's attributes, a key listener, localStorage and the system's scheme. */
+/** A page for app.js to run on: the root's attributes, a key listener, localStorage, and the system's scheme. */
 function page(options: { stored?: string | null; systemDark?: boolean; storage?: "throws" } = {}) {
   const attributes = new Map<string, string>();
   const stored = new Map<string, string>();
@@ -242,7 +242,7 @@ test("app.js switches between light and dark on Cmd+Shift+D or Ctrl+Shift+D and 
   assert.equal(blocked.theme(), "dark");
 });
 
-/** Runs sw.js with a scope, fake caches and a fake network, and returns its listeners and what it stored. */
+/** Runs sw.js with a scope, fake caches, and a fake network, and returns its listeners and what it stored. */
 function worker(js: string, scope: string, online: boolean) {
   const listeners: Record<string, (event: unknown) => void> = {};
   const stored: string[] = [];

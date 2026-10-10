@@ -1,5 +1,5 @@
 //! `conformance/health.json`: health, summaries, percentiles, state
-//! normalization, silence and which queued alerts a retry drops.
+//! normalization, silence, and which queued alerts a retry drops.
 
 use super::format::{definition, draft_from, draft_value};
 use super::{Failures, field, fixture, int, objects, opt_int};

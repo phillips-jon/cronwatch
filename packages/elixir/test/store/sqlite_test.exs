@@ -24,7 +24,7 @@ defmodule Cronwatch.Store.SQLiteTest do
 
     assert SQL.table_prefix("Monitoring_") ==
              {:error,
-              ~s(cronwatch: invalid table prefix "Monitoring_". Use lowercase letters, digits and underscores, ) <>
+              ~s(cronwatch: invalid table prefix "Monitoring_". Use lowercase letters, digits, and underscores, ) <>
                 "not starting with a digit, at most 47 characters."}
 
     assert {:error, _} = SQL.table_prefix("9x")
@@ -139,7 +139,7 @@ defmodule Cronwatch.Store.SQLiteTest do
     end)
   end
 
-  test "a check, a silence and every page over foreign rows (store.json foreignRows.check)" do
+  test "a check, a silence, and every page over foreign rows (store.json foreignRows.check)" do
     ForeignRows.replay_check(&fresh/0)
   end
 

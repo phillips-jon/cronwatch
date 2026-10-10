@@ -1,11 +1,11 @@
 defmodule Cronwatch.Conformance.ClientTest do
   @moduledoc """
   Replays `conformance/client.json` through the client's public API:
-  `runIds`, the run ids `start/2`, `resume/2` and `record_run/2` take, and
+  `runIds`, the run ids `start/2`, `resume/2`, and `record_run/2` take, and
   `unknownFields`, what a newer release wrote (a definition or state key, a
   run status, a trigger, an open condition this release does not know)
-  surviving a check, a silence, an unsilence, a summary and a run, over the
-  memory store and the SQL store on SQLite, and on Postgres, MySQL and
+  surviving a check, a silence, an unsilence, a summary, and a run, over the
+  memory store and the SQL store on SQLite, and on Postgres, MySQL, and
   MariaDB when their variables are set.
   """
   use ExUnit.Case, async: true

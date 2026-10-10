@@ -263,7 +263,7 @@ final class SchedulerTest extends TestCase
 
     /**
      * The tag is on the dashboard and in the API, so nothing secret goes
-     * into it: before 1.0 it was 48 bits of a fast hash of APP_SECRET.
+     * into it: before 0.11 it was 48 bits of a fast hash of APP_SECRET.
      */
     public function testTheDefaultTagIsTheProjectDirectorysNeverTheSecrets(): void
     {

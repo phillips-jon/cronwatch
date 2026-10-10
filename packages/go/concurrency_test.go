@@ -287,7 +287,7 @@ func TestAJobForgottenByAnotherProcessComesBackInOneThatStillDeclaresIt(t *testi
 	stored("after a run")
 	eq(t, "runs", len(must[[]cronwatch.Run](t)(web.Runs(bg, "nightly", 50))), 1)
 
-	// So does a started run, a check, the board and the job's page in the process that declares it.
+	// So does a started run, a check, the board, and the job's page in the process that declares it.
 	forgotten()
 	handle := must[*cronwatch.RunHandle](t)(nightly.Start(bg))
 	stored("after a start")

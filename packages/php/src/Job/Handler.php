@@ -32,10 +32,10 @@ use Cronwatch\Web\ResponseStatus;
  * The caller must send `Authorization: Bearer <secret>`, compared in
  * constant time. The secret is the handler's own `secret:`, else the
  * client's cronSecret (CRON_SECRET by default); "" (the default), a string
- * of only whitespace and FromEnv::Read each mean the client's secret, and
+ * of only whitespace, and FromEnv::Read each mean the client's secret, and
  * `secret: null` (or a client made with `cronSecret: null`) lets anyone run
- * the job. `false` does what null does, deprecated since 1.0 and removed in
- * 2.0 (in 0.x, null meant the client's secret). Any other value (true, a
+ * the job. `false` does what null does, deprecated since 0.11 and removed in
+ * 2.0 (before 0.11, null meant the client's secret). Any other value (true, a
  * number) throws a TypeError. With no secret at all the handler answers 503 unless the
  * environment is development (see Env), and reports it once to onError as
  * "handler". A wrong or missing bearer is 401.
@@ -211,7 +211,7 @@ final class Handler
 
     /**
      * Writes an answer of any kind this handler returns: a Web\Response, an
-     * array response, an HttpFoundation response or a PSR-7 response.
+     * array response, an HttpFoundation response, or a PSR-7 response.
      */
     public static function send(mixed $answer, string $method = 'GET'): void
     {
@@ -235,7 +235,7 @@ final class Handler
             (new Response($answer->getStatusCode(), $headers, (string) $body->getContents()))->send($method);
             return;
         }
-        throw new \TypeError(get_debug_type($answer) . ' is a response this handler cannot send; return a Cronwatch\Web\Response, an array response, an HttpFoundation or a PSR-7 response');
+        throw new \TypeError(get_debug_type($answer) . ' is a response this handler cannot send; return a Cronwatch\Web\Response, an array response, an HttpFoundation, or a PSR-7 response');
     }
 
     /** Whether an answer is this package's own kind: a Web\Response or an array response. */

@@ -9,7 +9,7 @@ defmodule Cronwatch.Alerts.Honeybadger do
   Options: `:api_key` (required, a project API key), `:environment`
   (default `"production"`), `:endpoint` (the API's origin,
   `"https://eu-api.honeybadger.io"` for the EU), `:recovered` (default
-  false: a notice is for what broke), `:link` (sent as the notice's URL) and
+  false: a notice is for what broke), `:link` (sent as the notice's URL), and
   `:transport`.
   """
   @behaviour Cronwatch.Channel

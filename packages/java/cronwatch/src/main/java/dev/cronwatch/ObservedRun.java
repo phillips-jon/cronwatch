@@ -6,7 +6,7 @@ import org.jspecify.annotations.Nullable;
  * A run whose function is seen from outside, as a scheduler's listener sees one: opened when the
  * scheduler says the function starts ({@link Job#open(RunOptions)}) and closed when it says the
  * function has ended. The two halves of {@link Job#run}, so the running row, {@link
- * Cronwatch#current()}, the MDC keys, the timeout and the shutdown hook's record are the same as a
+ * Cronwatch#current()}, the MDC keys, the timeout, and the shutdown hook's record are the same as a
  * run's. Open it in the thread the function runs in; close it there too, so the current run and the
  * MDC keys are put back as they were (closed from another thread, it is recorded all the same).
  *

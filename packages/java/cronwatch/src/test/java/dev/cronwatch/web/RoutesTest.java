@@ -48,7 +48,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The SDK's routes tests ({@code routes.test.ts}, {@code routes-security.test.ts}, {@code
- * routes-origin.test.ts}, {@code routes-pwa.test.ts} in part), as the Go, Rust and Elixir ports
+ * routes-origin.test.ts}, {@code routes-pwa.test.ts} in part), as the Go, Rust, and Elixir ports
  * have them, with their audits' cases: the body cap, a body cut short, a body nested deeply, a long
  * host outside ASCII, huge durations, and the base path from the mount. What needs an environment
  * of its own (locked, the development token) is in {@link RoutesEnvTest}.

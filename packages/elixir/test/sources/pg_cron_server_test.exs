@@ -4,10 +4,10 @@ defmodule Cronwatch.Test.PgCronServer do
   alias Cronwatch.Test.PgRepo
   alias Cronwatch.Test.Servers
 
-  @doc "A name no other test uses, for jobs, roles and databases."
+  @doc "A name no other test uses, for jobs, roles, and databases."
   def tag(label), do: "cwex#{label}#{System.unique_integer([:positive])}"
 
-  @doc "`url` with its database, user or password replaced."
+  @doc "`url` with its database, user, or password replaced."
   def url_with(url, changes) do
     uri = URI.parse(url)
 
@@ -104,7 +104,7 @@ defmodule Cronwatch.Sources.PgCronPostgresTest do
     runid
   end
 
-  test "the source's SQL against Postgres: history, cursors, arrays, times and a run held" do
+  test "the source's SQL against Postgres: history, cursors, arrays, times, and a run held" do
     pid = fake_cron_database()
     PgCronServer.sql(pid, "INSERT INTO cron.job (jobname, schedule) VALUES ('nightly vacuum', '0 3 * * *')")
     PgCronServer.sql(pid, "INSERT INTO cron.job (jobname, schedule) VALUES (NULL, '10 seconds')")
@@ -349,7 +349,7 @@ defmodule Cronwatch.Sources.PgCronRealTest do
     assert Object.get(ok_job.definition, "description") =~ "no longer in cron.job"
   end
 
-  test "restart rows, a crowded job, first sight and a rename" do
+  test "restart rows, a crowded job, first sight, and a rename" do
     pool = admin()
     tag = PgCronServer.tag("row")
     unschedule_at_exit(tag)

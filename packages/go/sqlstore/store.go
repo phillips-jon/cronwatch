@@ -1,5 +1,5 @@
-// Package sqlstore keeps CronWatch's jobs, runs and state in the app's own
-// database through database/sql: SQLite, Postgres or MySQL (and MariaDB).
+// Package sqlstore keeps CronWatch's jobs, runs, and state in the app's own
+// database through database/sql: SQLite, Postgres, or MySQL (and MariaDB).
 // The app brings its driver and its *sql.DB; this package imports none, so
 // the cronwatch module needs no driver at all.
 //
@@ -10,9 +10,9 @@
 //	store, err := sqlstore.New(db, sqlstore.Postgres)
 //	cw, err := cronwatch.New(cronwatch.WithStore(store))
 //
-// The tables are the SDK's (stores/sql.ts): the same names, columns and
+// The tables are the SDK's (stores/sql.ts): the same names, columns, and
 // statements, and the SDK's JSON in the JSON columns byte for byte, so a
-// Go process shares a database with a Node, Ruby, Python or PHP one.
+// Go process shares a database with a Node, Ruby, Python, or PHP one.
 package sqlstore
 
 import (
@@ -46,7 +46,7 @@ const (
 // Option configures a store.
 type Option func(*Store)
 
-// Prefix starts every table name: lowercase letters, digits and
+// Prefix starts every table name: lowercase letters, digits, and
 // underscores. Default "cronwatch_".
 func Prefix(prefix string) Option { return func(s *Store) { s.prefix = prefix } }
 
@@ -64,7 +64,7 @@ func Prefix(prefix string) Option { return func(s *Store) { s.prefix = prefix } 
 // app's open transaction on the others: give it room for the store too.
 //
 // The tests are in the sqltest module beside this package (SQLite,
-// Postgres, MySQL and MariaDB, and a file shared with the SDK in Node),
+// Postgres, MySQL, and MariaDB, and a file shared with the SDK in Node),
 // kept apart so the drivers never become the cronwatch module's
 // requirements.
 type Store struct {
@@ -91,7 +91,7 @@ func New(db *sql.DB, dialect Dialect, options ...Option) (*Store, error) {
 		return nil, errors.New("sqlstore: New needs a *sql.DB")
 	}
 	if dialect != SQLite && dialect != Postgres && dialect != MySQL {
-		return nil, fmt.Errorf("sqlstore: unknown dialect %s; use sqlstore.SQLite, sqlstore.Postgres or sqlstore.MySQL", js.Quote(string(dialect)))
+		return nil, fmt.Errorf("sqlstore: unknown dialect %s; use sqlstore.SQLite, sqlstore.Postgres, or sqlstore.MySQL", js.Quote(string(dialect)))
 	}
 	s := &Store{db: db, dialect: dialect, prefix: DefaultPrefix}
 	for _, o := range options {
@@ -265,7 +265,7 @@ func text(v any) (string, bool) {
 	}
 	// A driver that decoded a JSON column itself: written back as JSON,
 	// though a map loses the order of its keys on the way. pgx's stdlib,
-	// go-sql-driver/mysql and modernc.org/sqlite all hand JSON back as
+	// go-sql-driver/mysql, and modernc.org/sqlite all hand JSON back as
 	// text (the sqltest module checks it), so this is for other drivers.
 	b, err := json.Marshal(v)
 	if err != nil {
@@ -275,7 +275,7 @@ func text(v any) (string, bool) {
 }
 
 // Rows are read leniently, as the SDK's stores/sql.ts reads them: a
-// foreign, hand-edited or damaged row (SQLite keeps whatever type it is
+// foreign, hand-edited, or damaged row (SQLite keeps whatever type it is
 // given, in any column) must affect only its own job, never every read.
 
 // numeric is a time or a count of milliseconds as a column holds it: a
@@ -436,7 +436,7 @@ func (r row) state() (*cronwatch.JobState, error) {
 
 // Postgres refuses U+0000 in TEXT and JSONB, and a refused write loses the
 // whole row, so every dialect writes text without it: a run's trigger,
-// output, error and metric names, and every key and string of a definition
+// output, error, and metric names, and every key and string of a definition
 // and a state. Identifiers (a job's name, a run's id) are written as given;
 // the client refuses one with a NUL before it gets here.
 
@@ -556,7 +556,7 @@ func (s *Store) ListJobs(ctx context.Context) ([]cronwatch.StoredJob, error) {
 	return out, nil
 }
 
-// DeleteJob removes the job, its runs and its state in one transaction.
+// DeleteJob removes the job, its runs, and its state in one transaction.
 func (s *Store) DeleteJob(ctx context.Context, name string) error {
 	return s.transaction(ctx, func(q querier) error {
 		for _, st := range []string{s.sql.deleteRuns, s.sql.deleteState, s.sql.deleteJob} {

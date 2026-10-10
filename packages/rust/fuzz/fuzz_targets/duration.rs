@@ -1,5 +1,5 @@
-//! Duration text, through the public doors only (a job's grace, timeout and
-//! longest run, the client's retention, an `every` schedule and a silence),
+//! Duration text, through the public doors only (a job's grace, timeout, and
+//! longest run, the client's retention, an `every` schedule, and a silence),
 //! so the target stands whatever the parser inside looks like. Text a
 //! dashboard user sends reaches the parser through the silence.
 #![no_main]

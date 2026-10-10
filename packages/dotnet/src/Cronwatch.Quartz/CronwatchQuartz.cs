@@ -15,7 +15,7 @@ namespace Cronwatch.Quartz;
 /// <summary>
 /// CronWatch for a Quartz.NET 4 scheduler: every job the scheduler holds with a trigger is
 /// declared as a CronWatch job with its schedule, and every firing is recorded as a run, so a job
-/// that fails, runs late, never runs, gets stuck or runs slow is reported.
+/// that fails, runs late, never runs, gets stuck, or runs slow is reported.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -348,7 +348,7 @@ public sealed class CronwatchQuartz : IAsyncDisposable
                 if (!SchedulerBridge.ValidName(name))
                 {
                     _watch.ReportOnce(
-                        "cronwatch: " + Label(name) + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\" or \"-\"), so it is not watched; rename it",
+                        "cronwatch: " + Label(name) + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\", or \"-\"), so it is not watched; rename it",
                         "declaring " + Label(name));
                     continue;
                 }
@@ -564,7 +564,7 @@ public sealed class CronwatchQuartz : IAsyncDisposable
     // ---- runs
 
     /// <summary>
-    /// The run's id: the app, the scheduler instance and the firing, since a fire instance id is
+    /// The run's id: the app, the scheduler instance, and the firing, since a fire instance id is
     /// unique only within one scheduler instance and a refire reuses it. One longer than a store
     /// holds keeps its prefix and instance and a hash of the rest.
     /// </summary>
@@ -814,7 +814,7 @@ public sealed class CronwatchQuartz : IAsyncDisposable
         }
     }
 
-    /// <summary>The scheduler's word that its jobs changed, which only asks for a read, and its start, error and shutdown.</summary>
+    /// <summary>The scheduler's word that its jobs changed, which only asks for a read, and its start, error, and shutdown.</summary>
     private sealed class Changes(CronwatchQuartz q) : ISchedulerListener
     {
         public string Name => ListenerName;

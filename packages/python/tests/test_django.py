@@ -1,5 +1,5 @@
 """cronwatch.django in a Django project made here: settings, the dashboard
-under the project's URLs, the cronwatch_check command and DEBUG as the
+under the project's URLs, the cronwatch_check command, and DEBUG as the
 environment. CI runs this file on every supported Django series."""
 
 from __future__ import annotations

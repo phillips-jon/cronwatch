@@ -95,7 +95,7 @@ class PostTest {
     CronwatchException e =
         assertThrows(CronwatchException.class, () -> Post.headers(List.of(Map.entry("a b", "v"))));
     assertEquals(
-        "a header name must be a token (letters, digits and !#$%&'*+.^_`|~-)", e.getMessage());
+        "a header name must be a token (letters, digits, and !#$%&'*+.^_`|~-)", e.getMessage());
     e =
         assertThrows(
             CronwatchException.class,

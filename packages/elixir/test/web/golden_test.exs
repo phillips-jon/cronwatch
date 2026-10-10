@@ -2,13 +2,13 @@ defmodule Cronwatch.Web.GoldenTest do
   @moduledoc """
   Replays packages/ruby/test/web/golden.json, the SDK routes' answers to a
   fixed seed (written by golden.mjs), against `Cronwatch.Web` seeded the same
-  way, and compares status, headers and body byte for byte, three ways:
+  way, and compares status, headers, and body byte for byte, three ways:
   straight into the plug with `Plug.Test`, through a `Plug.Router` forward
   under a real Bandit server (its base path found from the mount), and
   through a Phoenix endpoint and router, whose `Plug.Parsers` has read the
   forms and JSON before the dashboard sees them. Run ids are random on both
   sides, so each becomes `<id:N>` in order of first appearance. The gem and
-  the Python, PHP, Go and Rust ports replay the same file.
+  the Python, PHP, Go, and Rust ports replay the same file.
   """
   use ExUnit.Case, async: false
 

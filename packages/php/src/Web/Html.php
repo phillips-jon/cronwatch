@@ -18,7 +18,7 @@ use Cronwatch\Run;
  * person reads, a mono for what a machine printed, neutral greys, and colour
  * only for the states CronWatch reports. The page loads nothing but its own
  * app shell (its CSP is default-src 'none' plus 'self' for the script, the
- * manifest, the worker and images), so the fonts are system stacks that echo
+ * manifest, the worker, and images), so the fonts are system stacks that echo
  * the site's Newsreader and IBM Plex Mono, and use them when they are installed.
  *
  * Installed as an app (display-mode: standalone) the header stays at the top
@@ -331,7 +331,7 @@ CSS;
     }
 
     /**
-     * The board: health figures, the last day's timeline and a table of every job.
+     * The board: health figures, the last day's timeline, and a table of every job.
      *
      * @param list<JobSummary> $jobs
      * @param array<string, list<Run>> $runsByJob

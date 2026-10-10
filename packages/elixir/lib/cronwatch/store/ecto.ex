@@ -1,11 +1,11 @@
 if Code.ensure_loaded?(Ecto.Adapters.SQL) do
   defmodule Cronwatch.Store.Ecto do
     @moduledoc """
-    Keeps CronWatch's jobs, runs and state in the app's own database through
+    Keeps CronWatch's jobs, runs, and state in the app's own database through
     the app's Ecto repo: the SDK's three tables (`stores/sql.ts`), the same
-    names, columns and statements, and the SDK's JSON in the JSON columns
+    names, columns, and statements, and the SDK's JSON in the JSON columns
     byte for byte, so an Elixir process shares a database with a Node, Ruby,
-    Python, PHP, Go or Rust one.
+    Python, PHP, Go, or Rust one.
 
         {Cronwatch, store: {Cronwatch.Store.Ecto, repo: MyApp.Repo}}
 
@@ -13,10 +13,10 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
 
       * `:repo` (required): the app's Ecto repo. Its adapter picks the
         dialect: SQLite (`Ecto.Adapters.SQLite3`), Postgres
-        (`Ecto.Adapters.Postgres`) or MySQL 8.0.13 and MariaDB 10.6 or newer
+        (`Ecto.Adapters.Postgres`), or MySQL 8.0.13 and MariaDB 10.6 or newer
         (`Ecto.Adapters.MyXQL`).
       * `:prefix`: what every table name starts with, lowercase letters,
-        digits and underscores. Default `"cronwatch_"`.
+        digits, and underscores. Default `"cronwatch_"`.
       * `:dynamic_repo`: a repo started with `name: nil` (its pid) or under
         another name, put with `put_dynamic_repo/1` around each statement.
 
@@ -39,7 +39,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     On Postgres the tables and statements are the SDK's (`JSONB` for the
     JSON, `BIGINT` times, names sorted `COLLATE "C"`), and many processes can
     start at once: `c:Cronwatch.Store.init/1` makes the tables under an
-    advisory lock per prefix. On MySQL and MariaDB the dialect is the PHP, Go
+    advisory lock per prefix. On MySQL and MariaDB the dialect is the PHP, Go,
     and Rust ports': the JSON columns are `LONGTEXT` holding the SDK's bytes
     (never MySQL's `JSON` type, which rewrites them), names compare by byte
     (`utf8mb4_bin`), and a run's trigger is cut to 255 characters.
@@ -251,7 +251,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       end
     end
 
-    # Rows are read leniently: a foreign, hand-edited or damaged row (SQLite
+    # Rows are read leniently: a foreign, hand-edited, or damaged row (SQLite
     # keeps whatever type it is given, in any column) must affect only its
     # own job, never every read. JSON text that does not parse reads as nil,
     # which the client takes as no state, or as an unreadable definition it
@@ -413,7 +413,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     @impl Cronwatch.Store
     def list_jobs(h), do: rows(h, h.sql.list_jobs, [], &job_of/1)
 
-    @doc "Removes the job, its runs and its state, in one transaction."
+    @doc "Removes the job, its runs, and its state, in one transaction."
     @impl Cronwatch.Store
     def delete_job(h, name) do
       transaction(h, [h.sql.delete_runs, h.sql.delete_state, h.sql.delete_job], [name])

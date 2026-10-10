@@ -1,6 +1,6 @@
 """What makes the dashboard an installable web app, as the SDK's
 routes/pwa.ts has it: a manifest, icons, a service worker, the script that
-registers it and a page to show offline. None of it says anything about the
+registers it, and a page to show offline. None of it says anything about the
 jobs, so it is served without the token (a browser fetches the manifest and
 icons without cookies in some flows)."""
 
@@ -47,7 +47,7 @@ APP_JS = """"use strict";
 """
 
 #: The service worker. It caches the app shell (the offline page, the
-#: manifest, the icons and app.js) and nothing else: every other request goes
+#: manifest, the icons, and app.js) and nothing else: every other request goes
 #: to the network as the page made it, and its answer is never stored, since
 #: the pages and the JSON carry job data. When a page cannot be reached it
 #: shows the offline page. Its scope gives the base, so it is the same text
@@ -101,7 +101,7 @@ REVALIDATE = "no-cache"
 
 @dataclass(frozen=True)
 class Asset:
-    """One app shell file: its type, body and Cache-Control, and whether it
+    """One app shell file: its type, body, and Cache-Control, and whether it
     is the service worker (which may control everything under the base)."""
 
     type: str
@@ -131,7 +131,7 @@ def manifest(base: str) -> str:
             "id": f"{base}/",
             "name": "CronWatch",
             "short_name": "CronWatch",
-            "description": "The scheduled jobs of this app: their health, their last day and their runs.",
+            "description": "The scheduled jobs of this app: their health, their last day, and their runs.",
             "start_url": f"{base}/",
             "scope": f"{base}/",
             "display": "standalone",

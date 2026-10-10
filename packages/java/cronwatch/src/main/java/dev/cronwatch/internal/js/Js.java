@@ -13,13 +13,13 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
- * What the port needs of JavaScript's own behaviour, so that every value the SDK writes, compares
- * or counts is written, compared and counted the same way here: numbers as {@code
+ * What the port needs of JavaScript's own behaviour, so that every value the SDK writes, compares,
+ * or counts is written, compared, and counted the same way here: numbers as {@code
  * Number.prototype.toString} prints them, the characters {@code \s} matches and {@code trim}
  * removes, {@code Date}'s calendar arithmetic and {@code toISOString}, and strings written out as
  * UTF-8 with a lone surrogate as U+FFFD.
  *
- * <p>Java strings are UTF-16, as JavaScript's are, so {@code length()}, {@code substring} and
+ * <p>Java strings are UTF-16, as JavaScript's are, so {@code length()}, {@code substring}, and
  * {@code charAt} count and cut as the SDK does.
  */
 public final class Js {
@@ -166,8 +166,8 @@ public final class Js {
   }
 
   /**
-   * Whether {@code s} is null, empty or only whitespace as {@code String.prototype.trim} sees it: a
-   * token or secret like that counts as unset, so the routes and handlers fail closed.
+   * Whether {@code s} is null, empty, or only whitespace as {@code String.prototype.trim} sees it:
+   * a token or secret like that counts as unset, so the routes and handlers fail closed.
    */
   public static boolean isBlank(@Nullable String s) {
     return s == null || trim(s).isEmpty();
@@ -248,7 +248,7 @@ public final class Js {
     return era * 146_097 + doe - 719_468;
   }
 
-  /** The date of a day counted from 1970-01-01: year, month (1 to 12) and day. */
+  /** The date of a day counted from 1970-01-01: year, month (1 to 12), and day. */
   public static long[] civilFromDays(long z0) {
     long z = z0 + 719_468;
     long era = Math.floorDiv(z, 146_097);

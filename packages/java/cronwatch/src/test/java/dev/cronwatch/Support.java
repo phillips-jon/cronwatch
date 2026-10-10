@@ -109,7 +109,7 @@ final class Support {
   /** A test's client and what it watches. */
   record Made(Cronwatch cw, Clock clock, Capture alerts, Errors errors) {}
 
-  /** A builder with the test clock, a capturing channel, errors collected and no hook. */
+  /** A builder with the test clock, a capturing channel, errors collected, and no hook. */
   static Cronwatch.Builder builder(Clock clock, Capture alerts, Errors errors) {
     return Cronwatch.builder()
         .clock(clock::now)

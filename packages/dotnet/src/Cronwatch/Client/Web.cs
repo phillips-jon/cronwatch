@@ -45,7 +45,7 @@ public sealed partial class CronwatchClient
     /// <summary>
     /// Runs <paramref name="fn"/> as a recorded run and answers the run as recorded with what the
     /// function answered or threw, rather than throwing: what a job's handler answers from, and
-    /// what <c>RunAsync</c> throws from. The run is current, its activity open and the app's run
+    /// what <c>RunAsync</c> throws from. The run is current, its activity open, and the app's run
     /// scope open while the function runs.
     /// </summary>
     internal async Task<(Run Run, T? Value, Exception? Thrown)> ExecuteCaughtAsync<T>(

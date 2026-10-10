@@ -3,9 +3,9 @@ defmodule Cronwatch.Schedule do
   # Internal: not the package's API, and it can change in any release.
   #
   # The SDK's `schedule.ts`: schedules (`"0 2 * * *"`, `"@hourly"`,
-  # `"every 5m"`) with their fire times, due times, deadlines and what a run
+  # `"every 5m"`) with their fire times, due times, deadlines, and what a run
   # covers. Cron fire times come from the croner port (`Cronwatch.Cron`), so an
-  # Elixir process and a Node, Ruby, Python, PHP, Go or Rust process sharing
+  # Elixir process and a Node, Ruby, Python, PHP, Go, or Rust process sharing
   # one store agree on every due time.
   #
   # A schedule is read on each call; reading one is cheap next to the store

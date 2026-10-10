@@ -8,7 +8,7 @@ defmodule Cronwatch.Store.NodeCompatTest do
   Then the two take turns on one job's state version, and a Node client
   and an Elixir client carry on from each other on one file.
 
-  Needs node on the PATH, the SDK built and its SQLite driver installed
+  Needs node on the PATH, the SDK built, and its SQLite driver installed
   (`npm ci && npm run build` at the repository root); skipped, with the
   reason, without them.
   """

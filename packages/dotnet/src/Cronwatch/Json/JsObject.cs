@@ -13,9 +13,9 @@ namespace Cronwatch;
 /// <remarks>
 /// Values are what <see cref="Json"/> reads and writes: <c>null</c>, a <see cref="bool"/>, a
 /// number (<see cref="double"/> when read), a <see cref="string"/>, a <see cref="List{T}"/> of
-/// values or a <see cref="JsObject"/>. A definition, a state's unknown keys and a stored alert are
-/// kept as these, so a field another writer added is written back where it was. Not safe for use
-/// from several threads at once without a lock of the caller's.
+/// values, or a <see cref="JsObject"/>. A definition, a state's unknown keys, and a stored alert
+/// are kept as these, so a field another writer added is written back where it was. Not safe for
+/// use from several threads at once without a lock of the caller's.
 /// </remarks>
 public sealed class JsObject : IEnumerable<KeyValuePair<string, object?>>
 {

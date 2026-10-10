@@ -6,7 +6,7 @@ declare(strict_types=1);
  * One process of a multi-process test (FinishOnceTest). It opens the store
  * the test names, declares the job, says it is ready, waits for the go file
  * so every process acts at the same moment, does its part, and prints what
- * happened as JSON: the runs it recorded, its alerts and its errors.
+ * happened as JSON: the runs it recorded, its alerts, and its errors.
  *
  *     php worker.php '{"store": {...}, "action": "...", "ready": "...", "go": "...", ...}'
  */

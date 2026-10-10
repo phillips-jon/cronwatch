@@ -1,5 +1,5 @@
 """job.handler(), the SDK's fetch-style job handler (client.test.ts and
-client-hardening.test.ts's handler tests), its adapters for WSGI, ASGI, Flask
+client-hardening.test.ts's handler tests), its adapters for WSGI, ASGI, Flask,
 and Starlette (Django's is in test_django.py), and the rule it brings to every
 run: a returned HTTP response of 400 or more is a failure."""
 

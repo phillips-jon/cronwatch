@@ -1,9 +1,9 @@
-"""Everything public about a job, a run and an alert.
+"""Everything public about a job, a run, and an alert.
 
 Python names are snake_case (``failures_before_alert``, ``started_at``).
 Anything that leaves the process (store rows, JSON columns, webhook bodies)
 uses the SDK's exact camelCase field names and string values, so a Node, a
-Ruby and a Python process can share one database. Each type's ``to_dict()``
+Ruby, and a Python process can share one database. Each type's ``to_dict()``
 is that JSON shape, with the SDK's key order, and ``from_dict()`` reads it
 (camelCase or snake_case keys).
 """
@@ -202,7 +202,7 @@ class Run:
     #: Lines written with log(), or the string the job returned. Capped at 16 KB.
     output: str | None = None
     metrics: dict[str, float] = field(default_factory=dict)
-    #: What started the run: "run", "start" or a value you pass.
+    #: What started the run: "run", "start", or a value you pass.
     trigger: str = "run"
 
     def __post_init__(self) -> None:
@@ -370,7 +370,7 @@ class Alert:
     @classmethod
     def from_dict(cls, data: Mapping[str, Any] | Alert) -> Alert:
         """Read leniently, as a foreign or damaged row may hold anything: a
-        `run`, `definition` or `details` that is not an object reads as none
+        `run`, `definition`, or `details` that is not an object reads as none
         (and is written back as it came while unchanged), and a key the
         entry lacked stays left out when it is written back."""
         if isinstance(data, Alert):
@@ -477,7 +477,7 @@ class SendingAlert:
         return out
 
 
-# A stored state is read leniently, since a foreign, hand-edited or damaged
+# A stored state is read leniently, since a foreign, hand-edited, or damaged
 # row must affect only its own job, and the next write puts it right (the
 # SDK's normalizeState): `open` keeps only its entries whose value is a
 # number (anything but an object reads as {}); `silencedUntil` and
@@ -576,7 +576,7 @@ class JobState:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """pendingRecovery, undelivered, sending, underFloor and version are
+        """pendingRecovery, undelivered, sending, underFloor, and version are
         left out when unset, as in state written before they existed (sending
         and underFloor also when empty). The version comes after the known keys, where the SDK's
         spread of a normalized state puts it, and the keys this release does

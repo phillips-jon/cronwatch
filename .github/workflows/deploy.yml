@@ -1,7 +1,7 @@
 # CI green on a push to main -> run the deploy script on the server over SSH.
 #
 # Waits for the CI workflow, so nothing reaches the server that failed the
-# dash check, typecheck, tests or build (the server itself only builds the
+# dash check, typecheck, tests, or build (the server itself only builds the
 # site). It hands the server the exact commit CI tested
 # (workflow_run.head_sha), and the server deploys that commit, not whatever
 # main has moved on to since; one older than the live release is skipped.

@@ -25,7 +25,7 @@ internal static class CurrentRun
 /// <c>--environment</c> sets); else .NET's <c>ASPNETCORE_ENVIRONMENT</c> or
 /// <c>DOTNET_ENVIRONMENT</c>, in ASP.NET Core's order; else unset, which is not development. Each
 /// is lowercased, with the ports' aliases (<c>prod</c> is production; <c>dev</c>, <c>local</c>,
-/// <c>test</c> and <c>testing</c> are development). A stale .NET variable never outranks the
+/// <c>test</c>, and <c>testing</c> are development). A stale .NET variable never outranks the
 /// environment a host resolved or the app named.
 /// </summary>
 internal static class Env

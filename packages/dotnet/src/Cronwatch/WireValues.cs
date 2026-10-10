@@ -3,7 +3,7 @@ using System;
 namespace Cronwatch;
 
 /// <summary>
-/// A run's status as stored: <c>running</c>, <c>ok</c>, <c>failed</c> or <c>timeout</c>. Stored
+/// A run's status as stored: <c>running</c>, <c>ok</c>, <c>failed</c>, or <c>timeout</c>. Stored
 /// values come from other writers, so any other string passes through unharmed.
 /// </summary>
 /// <param name="Value">The stored string.</param>
@@ -30,7 +30,7 @@ public readonly record struct RunStatus(string Value)
 
 /// <summary>
 /// A condition an alert opens: <c>missed</c>, <c>failed</c>, <c>stuck</c>, <c>slow</c>,
-/// <c>over_budget</c> or <c>under_floor</c>.
+/// <c>over_budget</c>, or <c>under_floor</c>.
 /// </summary>
 /// <param name="Value">The stored string.</param>
 public readonly record struct Condition(string Value)
@@ -100,7 +100,7 @@ public readonly record struct AlertType(string Value)
 
 /// <summary>
 /// A job's health as a summary reports it: <c>healthy</c>, <c>late</c>, <c>failing</c>,
-/// <c>stuck</c>, <c>silenced</c> or <c>never_ran</c>.
+/// <c>stuck</c>, <c>silenced</c>, or <c>never_ran</c>.
 /// </summary>
 /// <param name="Value">The reported string.</param>
 public readonly record struct JobHealth(string Value)

@@ -10,7 +10,7 @@ defmodule Cronwatch.Audit.WebTest do
   alias Cronwatch.Test.Clock
   alias Cronwatch.Web.Request
 
-  test "a request's inspect shows no header values, query or body" do
+  test "a request's inspect shows no header values, query, or body" do
     req = %Request{
       method: "POST",
       path: "/cronwatch/api/check",

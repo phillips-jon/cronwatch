@@ -15,7 +15,7 @@ use crate::schedule;
 use crate::serialize::{ExpectRule, Matcher};
 use crate::types::Definition;
 
-/// What a duration option takes: text like `"15m"`, `"1h30m"`, `"90s"` or
+/// What a duration option takes: text like `"15m"`, `"1h30m"`, `"90s"`, or
 /// `"2d"` (the SDK's form, kept as written in the stored definition), a
 /// [`Duration`], or a whole or fractional number of milliseconds. A
 /// `Duration` is stored as its milliseconds, as the SDK stores a number.
@@ -113,7 +113,7 @@ impl JobOptions {
     /// When the job is supposed to run: a five or six field cron expression
     /// (`"0 2 * * *"`), a nickname (`"@hourly"`), or an interval
     /// (`"every 5m"`). Leave it out for a job with no fixed cadence:
-    /// failures, duration and budgets are still watched, but nothing is ever
+    /// failures, duration, and budgets are still watched, but nothing is ever
     /// missed.
     pub fn schedule(self, expr: impl Into<String>) -> Self {
         self.put("schedule", expr.into())
@@ -241,7 +241,7 @@ impl JobOptions {
 }
 
 /// Whether a job name is 1 to 120 characters of letters, digits, `.`, `_`,
-/// `:` or `-`, starting with a letter or digit.
+/// `:`, or `-`, starting with a letter or digit.
 pub(crate) fn valid_name(name: &str) -> bool {
     let b = name.as_bytes();
     !b.is_empty()

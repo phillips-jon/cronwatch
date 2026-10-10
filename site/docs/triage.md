@@ -7,7 +7,7 @@ group: Reference
 
 # AI triage
 
-When an alert is about to be sent, CronWatch can hand the alert, the job definition, the triggering run's error, output tail and metrics, and the last few runs to Claude, and attach two to four sentences: the likely cause and the first thing to check. The diagnosis appears in every built-in channel: the Slack and Discord messages, the webhook payload, every email, SMS and error tracker channel, and the console. It is the alert's `triage` field, so a custom channel can show it too.
+When an alert is about to be sent, CronWatch can hand the alert, the job definition, the triggering run's error, output tail, and metrics, and the last few runs to Claude, and attach two to four sentences: the likely cause and the first thing to check. The diagnosis appears in every built-in channel: the Slack and Discord messages, the webhook payload, every email, SMS, and error tracker channel, and the console. It is the alert's `triage` field, so a custom channel can show it too.
 
 ```ts
 import { anthropic } from "@cronwatch/sdk/anthropic";
@@ -30,16 +30,16 @@ The key comes from the Anthropic SDK's usual environment, normally `ANTHROPIC_AP
 | Option | Default | |
 |---|---|---|
 | `model` | `claude-opus-5` | any current model id |
-| `effort` | `medium` | `low`, `medium` or `high` |
+| `effort` | `medium` | `low`, `medium`, or `high` |
 | `maxTokens` | `800` | a diagnosis is a paragraph |
 | `context` | | a sentence about the app, so advice is specific |
 | `fallbacks` | `true` | route a policy refusal to Anthropic's default fallback model inside the same request. Turn off if your account or gateway rejects the beta. |
 
 ## Cost and timing
 
-Triage runs only when an alert is sent, never per run, so it costs roughly one short request per incident: every missed, failed, stuck, slow and over-budget alert, but never a recovery. It gets 25 seconds; if the request is slower or fails, the alert goes out without a diagnosis and the error is reported through `onError`. The request is made once, without retries, and is cancelled when the 25 seconds are up, so it never runs on after the alert has gone.
+Triage runs only when an alert is sent, never per run, so it costs roughly one short request per incident: every missed, failed, stuck, slow, and over-budget alert, but never a recovery. It gets 25 seconds; if the request is slower or fails, the alert goes out without a diagnosis and the error is reported through `onError`. The request is made once, without retries, and is cancelled when the 25 seconds are up, so it never runs on after the alert has gone.
 
-Triage runs once per alert, whatever happens to it. When it gives nothing (it threw, timed out or answered empty) the alert's `triage` is `null`, and it is not asked again when the alert is retried. An alert that no channel accepted is queued with its diagnosis, so a later retry sends the same one. Alerts queued by a `deliver: "check"` process are triaged by the check that first retries them, within that check's 20 second retry budget.
+Triage runs once per alert, whatever happens to it. When it gives nothing (it threw, timed out, or answered empty) the alert's `triage` is `null`, and it is not asked again when the alert is retried. An alert that no channel accepted is queued with its diagnosis, so a later retry sends the same one. Alerts queued by a `deliver: "check"` process are triaged by the check that first retries them, within that check's 20 second retry budget.
 
 ## What is sent
 
@@ -60,4 +60,4 @@ cronwatch({
 });
 ```
 
-Every port has the same triage, sending the same request, beside the same channels: see Triage in [Ruby](/docs/ruby/#triage), [Python](/docs/python/#triage), [PHP](/docs/php/#triage), [Go](/docs/go/#triage), [Rust](/docs/rust/#triage), [Elixir](/docs/elixir/#triage), [Java](/docs/java/#triage) and [.NET](/docs/dotnet/#triage).
+Every port has the same triage, sending the same request, beside the same channels: see Triage in [Ruby](/docs/ruby/#triage), [Python](/docs/python/#triage), [PHP](/docs/php/#triage), [Go](/docs/go/#triage), [Rust](/docs/rust/#triage), [Elixir](/docs/elixir/#triage), [Java](/docs/java/#triage), and [.NET](/docs/dotnet/#triage).

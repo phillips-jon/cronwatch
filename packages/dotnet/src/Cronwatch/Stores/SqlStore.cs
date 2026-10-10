@@ -11,10 +11,10 @@ using Cronwatch.Internal;
 namespace Cronwatch;
 
 /// <summary>
-/// Keeps CronWatch's jobs, runs and state in the app's own database through ADO.NET: the SDK's
-/// tables (<c>stores/sql.ts</c>), the same names, columns and statements, and the SDK's JSON in
+/// Keeps CronWatch's jobs, runs, and state in the app's own database through ADO.NET: the SDK's
+/// tables (<c>stores/sql.ts</c>), the same names, columns, and statements, and the SDK's JSON in
 /// the JSON columns byte for byte, so a .NET process shares a database with a Node, Ruby, Python,
-/// PHP, Go, Rust, Elixir or Java one. The app brings its driver and its
+/// PHP, Go, Rust, Elixir, or Java one. The app brings its driver and its
 /// <see cref="DbDataSource"/> (its pool); no driver is a dependency of this library. The tables
 /// are made when the client first calls <see cref="InitAsync"/>.
 /// </summary>
@@ -28,7 +28,7 @@ namespace Cronwatch;
 /// </para>
 /// <para>
 /// On MySQL 8.0.13 or newer and MariaDB 10.6 or newer (MySqlConnector) the dialect is the PHP,
-/// Go, Rust, Elixir and Java ports': the same tables with <c>VARCHAR(255)</c> keys, the JSON
+/// Go, Rust, Elixir, and Java ports': the same tables with <c>VARCHAR(255)</c> keys, the JSON
 /// columns as <c>LONGTEXT</c> holding the SDK's JSON byte for byte (never MySQL's <c>JSON</c>
 /// type, which rewrites it), names compared by byte (<c>utf8mb4_bin</c>), and a run's trigger cut
 /// to 255 characters on a code point. A conditional write that answered 0 is read back, so a
@@ -36,7 +36,7 @@ namespace Cronwatch;
 /// make a write that landed read as refused.
 /// </para>
 /// <para>
-/// On Postgres, MySQL and MariaDB every statement runs on a connection the store opens for it, in
+/// On Postgres, MySQL, and MariaDB every statement runs on a connection the store opens for it, in
 /// autocommit. Every
 /// connection the store opens is opened with the ambient transaction suppressed
 /// (<see cref="TransactionScopeOption.Suppress"/>), so the store's writes never join a
@@ -70,7 +70,7 @@ public sealed class SqlStore : IStore, IUpdateRunIfStore, ICompareAndSetStateSto
 
     /// <summary>
     /// A store over the app's SQLite data source, with the tables named <c>cronwatch_jobs</c>,
-    /// <c>cronwatch_runs</c> and <c>cronwatch_state</c>. Nothing is read or written until
+    /// <c>cronwatch_runs</c>, and <c>cronwatch_state</c>. Nothing is read or written until
     /// <see cref="InitAsync"/>.
     /// </summary>
     public static SqlStore Sqlite(DbDataSource dataSource) => new(dataSource, SqlDialect.Sqlite, SqlText.DefaultPrefix);
@@ -117,12 +117,12 @@ public sealed class SqlStore : IStore, IUpdateRunIfStore, ICompareAndSetStateSto
         }
         // The type's name is the driver's, never a credential, but it is not quoted either.
         throw CronwatchException.Invalid(
-            "SqlStore: the data source's database is not one SqlStore knows (SQLite, Postgres, MySQL or MariaDB)");
+            "SqlStore: the data source's database is not one SqlStore knows (SQLite, Postgres, MySQL, or MariaDB)");
     }
 
     /// <summary>
     /// A store like this one whose tables start with <paramref name="prefix"/>: lowercase letters,
-    /// digits and underscores, not starting with a digit, at most 47 characters. Default
+    /// digits, and underscores, not starting with a digit, at most 47 characters. Default
     /// <c>cronwatch_</c>. Call it before the store is used.
     /// </summary>
     /// <exception cref="CronwatchException">Of kind <see cref="CronwatchErrorKind.Invalid"/>, with the SDK's message.</exception>
@@ -141,7 +141,7 @@ public sealed class SqlStore : IStore, IUpdateRunIfStore, ICompareAndSetStateSto
     /// <summary>The prefix of the store's tables.</summary>
     public string Prefix => _prefix;
 
-    /// <summary>The store's database: <c>sqlite</c>, <c>postgres</c> or <c>mysql</c> (MySQL and MariaDB).</summary>
+    /// <summary>The store's database: <c>sqlite</c>, <c>postgres</c>, or <c>mysql</c> (MySQL and MariaDB).</summary>
     public string Dialect => _dialect switch
     {
         SqlDialect.Sqlite => "sqlite",
@@ -159,8 +159,8 @@ public sealed class SqlStore : IStore, IUpdateRunIfStore, ICompareAndSetStateSto
 
     /// <summary>
     /// Runs <paramref name="work"/> on SQLite's kept connection, in turn, or on a connection of its
-    /// own from the data source for Postgres, MySQL and MariaDB; every connection opened outside the app's ambient
-    /// transaction.
+    /// own from the data source for Postgres, MySQL, and MariaDB; every connection opened outside
+    /// the app's ambient transaction.
     /// </summary>
     private async Task<T> WithAsync<T>(Func<DbConnection, Task<T>> work, CancellationToken ct)
     {
@@ -460,8 +460,8 @@ public sealed class SqlStore : IStore, IUpdateRunIfStore, ICompareAndSetStateSto
     }
 
     /// <summary>
-    /// A column's JSON, or null when its text does not parse: a foreign, hand-edited or damaged row
-    /// must affect only its own job, never every read.
+    /// A column's JSON, or null when its text does not parse: a foreign, hand-edited, or damaged
+    /// row must affect only its own job, never every read.
     /// </summary>
     private static object? JsonOf(Dictionary<string, object> row, string name)
     {
@@ -557,7 +557,7 @@ public sealed class SqlStore : IStore, IUpdateRunIfStore, ICompareAndSetStateSto
         ct);
 
     // Postgres refuses U+0000 in TEXT and JSONB, and a refused write loses the whole row, so every
-    // dialect writes text without it: a run's trigger, output, error and metric names, and every
+    // dialect writes text without it: a run's trigger, output, error, and metric names, and every
     // key and string of a definition and a state. Identifiers (a job's name, a run's id) are
     // written as given; the client refuses one with a NUL before it gets here.
     private static List<Param> InsertRunParams(Run r) =>
@@ -624,7 +624,7 @@ public sealed class SqlStore : IStore, IUpdateRunIfStore, ICompareAndSetStateSto
         return output;
     }
 
-    /// <summary>Removes the job, its runs and its state in one transaction.</summary>
+    /// <summary>Removes the job, its runs, and its state in one transaction.</summary>
     public Task DeleteJobAsync(string name, CancellationToken cancellationToken = default) =>
         TransactionAsync([_sql.DeleteRuns, _sql.DeleteState, _sql.DeleteJob], [Text(name)], null, cancellationToken);
 
@@ -764,7 +764,7 @@ public sealed class SqlStore : IStore, IUpdateRunIfStore, ICompareAndSetStateSto
         RunsAsync(_sql.RunningRuns, [], cancellationToken);
 
     /// <summary>
-    /// The job's state. A state that is not JSON, or not an object (a foreign, hand-edited or
+    /// The job's state. A state that is not JSON, or not an object (a foreign, hand-edited, or
     /// damaged row), reads as none, which the client takes as a fresh state: the next write, whose
     /// version check counts such a row as 0, replaces it.
     /// </summary>

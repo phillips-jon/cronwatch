@@ -1,12 +1,12 @@
 # cronwatch for Java
 
-Cron and scheduled-job monitoring that lives inside your JVM service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
+Cron and scheduled-job monitoring that lives inside your JVM service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget, or quietly does nothing. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
 
-This is the Java port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Java process and a Node, Ruby, Python, PHP, Go, Rust, Elixir or .NET process can share one database, and every port reads the tables the others write. It has jobs, runs in the calling thread, runs that span calls, checks, silences, the current run across threads and a shutdown hook; the memory store and a SQL store over JDBC on SQLite, Postgres, MySQL and MariaDB; the fifteen alert channels, Claude triage and the pg_cron source; the dashboard and its JSON API and a job's handler, framework-free, with adapters for the JDK's own HTTP server, servlet containers (`dev.cronwatch:cronwatch-servlet`) and Spring MVC and WebFlux (`dev.cronwatch:cronwatch-spring-boot-starter`); the scheduler integrations: the Spring Boot starter's (every `@Scheduled` method watched with no code changes, ShedLock, the app's Quartz schedulers), `cronwatch-quartz` and `cronwatch-jobrunr`; and `CronwatchCli` for a check from a crontab line. [DESIGN.md](https://github.com/cronwatchdev/cronwatch/blob/main/packages/java/DESIGN.md) has how each part works.
+This is the Java port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text, and the same stored rows, so a Java process and a Node, Ruby, Python, PHP, Go, Rust, Elixir, or .NET process can share one database, and every port reads the tables the others write. It has jobs, runs in the calling thread, runs that span calls, checks, silences, the current run across threads, and a shutdown hook; the memory store and a SQL store over JDBC on SQLite, Postgres, MySQL, and MariaDB; the fifteen alert channels, Claude triage, and the pg_cron source; the dashboard and its JSON API and a job's handler, framework-free, with adapters for the JDK's own HTTP server, servlet containers (`dev.cronwatch:cronwatch-servlet`), and Spring MVC and WebFlux (`dev.cronwatch:cronwatch-spring-boot-starter`); the scheduler integrations: the Spring Boot starter's (every `@Scheduled` method watched with no code changes, ShedLock, the app's Quartz schedulers), `cronwatch-quartz`, and `cronwatch-jobrunr`; and `CronwatchCli` for a check from a crontab line. [DESIGN.md](https://github.com/cronwatchdev/cronwatch/blob/main/packages/java/DESIGN.md) has how each part works.
 
 ## Install
 
-Java 21 or newer. The core, `dev.cronwatch:cronwatch`, depends on nothing: cron expressions are read by a port of [croner](https://github.com/hexagon/croner), the parser the SDK uses, so every port agrees on every fire time; zones come from the JDK's own copy of the IANA database; JSON, the JavaScript regular expressions a stored `expect` pattern holds, and secret redaction are the port's own. The SQL store takes the app's `javax.sql.DataSource` and driver, as a normal dependency of your app: xerial's `org.xerial:sqlite-jdbc`, `org.postgresql:postgresql`, `com.mysql:mysql-connector-j` or `org.mariadb.jdbc:mariadb-java-client`. None is a dependency of CronWatch. The alert channels and Claude triage post over the JDK's own `java.net.http.HttpClient`.
+Java 21 or newer. The core, `dev.cronwatch:cronwatch`, depends on nothing: cron expressions are read by a port of [croner](https://github.com/hexagon/croner), the parser the SDK uses, so every port agrees on every fire time; zones come from the JDK's own copy of the IANA database; JSON, the JavaScript regular expressions a stored `expect` pattern holds, and secret redaction are the port's own. The SQL store takes the app's `javax.sql.DataSource` and driver, as a normal dependency of your app: xerial's `org.xerial:sqlite-jdbc`, `org.postgresql:postgresql`, `com.mysql:mysql-connector-j`, or `org.mariadb.jdbc:mariadb-java-client`. None is a dependency of CronWatch. The alert channels and Claude triage post over the JDK's own `java.net.http.HttpClient`.
 
 From Maven Central:
 
@@ -40,7 +40,7 @@ try (Cronwatch cw = Cronwatch.builder()
   nightly.run(job -> {
     Files.writeString(Path.of("report.txt"), "done"); // an IOException thrown here is thrown from run()
     job.log("Report written");                        // kept with the run, shown in alerts
-    job.metric("cost", 1.2);                          // watched against budgets, floors and baselines
+    job.metric("cost", 1.2);                          // watched against budgets, floors, and baselines
     job.metric("pages", 3);
   });
 
@@ -51,9 +51,9 @@ try (Cronwatch cw = Cronwatch.builder()
 }
 ```
 
-`run` takes a function that returns nothing and `call` one that returns a value; each runs the function in the calling thread, where your transaction, MDC and security context live, as a recorded run. Anything the function throws, checked or not, fails the run and is thrown again as it came, its type and stack intact, so your own error handling sees exactly what it would have without CronWatch; the function types are generic in what they throw, so `run` declares exactly the checked exceptions your lambda throws. A `String` `call`'s function returns is the run's output when nothing was logged (and what `expect` checks), and an HTTP answer of 400 or more (`java.net.http.HttpResponse`, Spring's `ResponseEntity`) fails the run. The store failing never stops a job: its failures go to the error handler (`onError`, by default `System.Logger` named `dev.cronwatch`).
+`run` takes a function that returns nothing and `call` one that returns a value; each runs the function in the calling thread, where your transaction, MDC, and security context live, as a recorded run. Anything the function throws, checked or not, fails the run and is thrown again as it came, its type and stack intact, so your own error handling sees exactly what it would have without CronWatch; the function types are generic in what they throw, so `run` declares exactly the checked exceptions your lambda throws. A `String` `call`'s function returns is the run's output when nothing was logged (and what `expect` checks), and an HTTP answer of 400 or more (`java.net.http.HttpResponse`, Spring's `ResponseEntity`) fails the run. The store failing never stops a job: its failures go to the error handler (`onError`, by default `System.Logger` named `dev.cronwatch`).
 
-Durations take the SDK's text (`"15m"`, `"1h30m"`, stored as written), a `java.time.Duration` or milliseconds. `expect` takes the text the output must contain, `expectMatch(source, flags)` for a JavaScript regular expression (run by the port's own engine, so it reads as the SDK reads it; a `java.util.regex.Pattern` is not taken, since it reads a pattern differently), or `expectThat(predicate)`. A bad option, schedule or zone is a `CronwatchException` from `job()` with the SDK's message.
+Durations take the SDK's text (`"15m"`, `"1h30m"`, stored as written), a `java.time.Duration`, or milliseconds. `expect` takes the text the output must contain, `expectMatch(source, flags)` for a JavaScript regular expression (run by the port's own engine, so it reads as the SDK reads it; a `java.util.regex.Pattern` is not taken, since it reads a pattern differently), or `expectThat(predicate)`. A bad option, schedule, or zone is a `CronwatchException` from `job()` with the SDK's message.
 
 `startChecking()` checks every minute, for a long-running service; a program a crontab runs calls `check()` instead, from a line of its own.
 
@@ -104,11 +104,11 @@ A store of your own implements `dev.cronwatch.store.Store`, building the records
 dev.cronwatch.storetest.StoreContract.run(new MemoryStore());
 ```
 
-`StoreContract.run` is the kit's one entry point, and the only part of `dev.cronwatch.storetest` the 1.x releases promise. (Before 0.11 the package also published `StoreReplay`, `FinishOnce`, `ForeignRows` and `StoreContract.newRun`, the parts the port's own store tests use; they are internal now.)
+`StoreContract.run` is the kit's one entry point, and the only part of `dev.cronwatch.storetest` the 1.x releases promise. (Before 0.11 the package also published `StoreReplay`, `FinishOnce`, `ForeignRows`, and `StoreContract.newRun`, the parts the port's own store tests use; they are internal now.)
 
 ### Alerts
 
-`Console` is the default channel. The SDK's fifteen are in `dev.cronwatch.alerts`, request for request: Slack, Discord and a signed webhook; the email providers Resend, Postmark, SendGrid, Mailgun and SES (signed with SigV4, no AWS SDK); Twilio for SMS; and the trackers Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic. Each is made from its options, whose `build()` refuses what the SDK refuses:
+`Console` is the default channel. The SDK's fifteen are in `dev.cronwatch.alerts`, request for request: Slack, Discord, and a signed webhook; the email providers Resend, Postmark, SendGrid, Mailgun, and SES (signed with SigV4, no AWS SDK); Twilio for SMS; and the trackers Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, and New Relic. Each is made from its options, whose `build()` refuses what the SDK refuses:
 
 ```java
 Cronwatch cw = Cronwatch.builder()
@@ -121,7 +121,7 @@ Cronwatch cw = Cronwatch.builder()
     .build();
 ```
 
-Every request is made the way the SDK makes it: one ten second deadline for the whole request, a redirect refused rather than followed (so credentials never go where it points), at most 1 MiB of an answer read as it arrives, TLS always verified, and an error that names the provider and the URL's origin only, with every secret the channel holds cut out of any answer it quotes. The requests go through the client's `Transport`: by default a `JdkTransport` over one `HttpClient` the client makes on its first send and closes with itself. An app that wants a proxy, its own trust store or another HTTP client gives one, to the client (`Cronwatch.builder().transport(...)`) or to one channel's options (`.transport(...)`). A transport is one method, `post(Transport.Request)`, answering a `Transport.Response` once the answer's head has arrived, its body read a chunk at a time; it must not follow redirects. The JDK sets `host`, `connection`, `content-length`, `expect` and `upgrade` itself, so a webhook header of those names is dropped.
+Every request is made the way the SDK makes it: one ten second deadline for the whole request, a redirect refused rather than followed (so credentials never go where it points), at most 1 MiB of an answer read as it arrives, TLS always verified, and an error that names the provider and the URL's origin only, with every secret the channel holds cut out of any answer it quotes. The requests go through the client's `Transport`: by default a `JdkTransport` over one `HttpClient` the client makes on its first send and closes with itself. An app that wants a proxy, its own trust store, or another HTTP client gives one, to the client (`Cronwatch.builder().transport(...)`) or to one channel's options (`.transport(...)`). A transport is one method, `post(Transport.Request)`, answering a `Transport.Response` once the answer's head has arrived, its body read a chunk at a time; it must not follow redirects. The JDK sets `host`, `connection`, `content-length`, `expect`, and `upgrade` itself, so a webhook header of those names is dropped.
 
 ### Claude triage
 
@@ -150,11 +150,11 @@ Cronwatch cw = Cronwatch.builder()
 cw.startChecking();
 ```
 
-The pg_cron source watches the jobs that run inside Postgres, where nothing can wrap them: each check reads `cron.job`, declares each job with its schedule, and copies new rows of `cron.job_run_details` in as runs, so a missed, failed, stuck or slow pg_cron job is alerted like any other. It needs a data source on the database pg_cron runs in (its `cron.database_name`). Jobs are named from their jobname (`prefix` in front); a paused job loses its schedule, and one renamed or dropped keeps its history without one.
+The pg_cron source watches the jobs that run inside Postgres, where nothing can wrap them: each check reads `cron.job`, declares each job with its schedule, and copies new rows of `cron.job_run_details` in as runs, so a missed, failed, stuck, or slow pg_cron job is alerted like any other. It needs a data source on the database pg_cron runs in (its `cron.database_name`). Jobs are named from their jobname (`prefix` in front); a paused job loses its schedule, and one renamed or dropped keeps its history without one.
 
 ### The dashboard
 
-`cw.routes()` is the SDK's dashboard and small JSON API: the same pages, URLs, JSON, cookie and token rules, so [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) works against a Java app as it does against a Node one. It is framework-free (`Routes.handle` takes a `dev.cronwatch.web.Request` and answers a `Response`), and served by an adapter. On the JDK's own server:
+`cw.routes()` is the SDK's dashboard and small JSON API: the same pages, URLs, JSON, cookie, and token rules, so [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) works against a Java app as it does against a Node one. It is framework-free (`Routes.handle` takes a `dev.cronwatch.web.Request` and answers a `Response`), and served by an adapter. On the JDK's own server:
 
 ```java
 try (Cronwatch cw = Cronwatch.builder().build()) {
@@ -179,7 +179,7 @@ cronwatch.web.token=${CRONWATCH_TOKEN}
 
 The filter runs ahead of Spring Security's chain (order -110, before its -100), since the dashboard checks its own token; with `cronwatch.web.open=true` it has none, so it runs behind the chain (order -90) and your security rules guard it. `cronwatch.web.order` sets either.
 
-Tomcat, Jetty and Spring Security refuse an encoded slash (`%2F`) in a path by default, so a job whose name holds a `/` is reached through the dashboard behind them only if the app allows it; the JDK's server passes it through.
+Tomcat, Jetty, and Spring Security refuse an encoded slash (`%2F`) in a path by default, so a job whose name holds a `/` is reached through the dashboard behind them only if the app allows it; the JDK's server passes it through.
 
 ### A job's handler
 
@@ -201,15 +201,15 @@ In a servlet container, `new CronwatchServlet(handler)` serves it.
 
 ## Spring Boot
 
-`dev.cronwatch:cronwatch-spring-boot-starter`, for Spring Boot 3.5 and 4, makes the client a bean from `cronwatch.*` properties and the app's own beans: a `Store` bean is the store (else `SqlStore` over the app's one `DataSource`, else the memory store), every `Channel` bean is a channel, and a `Triage`, `Source` beans and an `ErrorHandler` are used when the app has them. When neither `CRONWATCH_ENV` nor `APP_ENV` is set, the environment is the app's active profile (`dev` and `local` are development, `prod` production). An app's own `Cronwatch` bean replaces it.
+`dev.cronwatch:cronwatch-spring-boot-starter`, for Spring Boot 3.5 and 4, makes the client a bean from `cronwatch.*` properties and the app's own beans: a `Store` bean is the store (else `SqlStore` over the app's one `DataSource`, else the memory store), every `Channel` bean is a channel, and a `Triage`, `Source` beans, and an `ErrorHandler` are used when the app has them. When neither `CRONWATCH_ENV` nor `APP_ENV` is set, the environment is the app's active profile (`dev` and `local` are development, `prod` production). An app's own `Cronwatch` bean replaces it.
 
 ```properties
-# auto, memory or jdbc (the app's DataSource)
+# auto, memory, or jdbc (the app's DataSource)
 cronwatch.store=auto
 cronwatch.retention=30d
 cronwatch.defaults.grace=10m
 cronwatch.check-every=1m
-# auto, local, shedlock, quartz or none
+# auto, local, shedlock, quartz, or none
 cronwatch.check-mode=auto
 # default: $CRONWATCH_APP_ID, else spring.application.name
 cronwatch.app=billing
@@ -228,7 +228,7 @@ class NightlyReports {
 }
 ```
 
-A `cron` is declared as written, in the annotation's zone (else the JVM's), and checked against Spring's own reading of it: Spring runs a job whose day of the month and day of the week are both given only when both match, where CronWatch (croner) runs it when either does, so an expression the two read differently is reported once and watched without a schedule. A `fixedRate` is `every <rate>`; so is a `fixedDelay`, whose runs start a delay after the last one ended, so give such a job a grace as long as its longest run. A method with several `@Scheduled` annotations is one job without a schedule. A method that returns a `Mono`, a `Flux` or a Kotlin flow, or suspends, is observed by Spring around its subscription rather than its work, so it is reported and watched without runs. Jobs are tagged `spring-scheduled` and `spring-scheduled:<app>`, so two apps sharing a store never unschedule each other's jobs.
+A `cron` is declared as written, in the annotation's zone (else the JVM's), and checked against Spring's own reading of it: Spring runs a job whose day of the month and day of the week are both given only when both match, where CronWatch (croner) runs it when either does, so an expression the two read differently is reported once and watched without a schedule. A `fixedRate` is `every <rate>`; so is a `fixedDelay`, whose runs start a delay after the last one ended, so give such a job a grace as long as its longest run. A method with several `@Scheduled` annotations is one job without a schedule. A method that returns a `Mono`, a `Flux`, or a Kotlin flow, or suspends, is observed by Spring around its subscription rather than its work, so it is reported and watched without runs. Jobs are tagged `spring-scheduled` and `spring-scheduled:<app>`, so two apps sharing a store never unschedule each other's jobs.
 
 **ShedLock.** When the app runs its `@Scheduled` methods on every instance under ShedLock's `@SchedulerLock`, the starter wraps the app's `LockProvider`, so the instances that do not get the lock give their run back and only the one that ran the method records it.
 
@@ -289,7 +289,7 @@ final class CronwatchMain {
 
 ## Deprecated
 
-These still work, marked `@Deprecated(forRemoval = true)`, through every 1.x release, and go in 2.0: `cw.start()` and its overloads (use `cw.startChecking()`); `dev.cronwatch.jdbc.SqlStore` (use `dev.cronwatch.store.SqlStore`, the same store, now beside `MemoryStore`); `dev.cronwatch.bridge.Bridge` (use `SchedulerBridge`, the .NET port's name; the bridge is for integration authors and outside the 1.x promise); `Routes.of(cw, options)` (use `cw.routes(options)`). `Json.quote`, `Json.kind`, `Json.copy`, `Json.MAX_DEPTH`, pg_cron's helpers (`PgCron.schedule`, `jobName`, `run`, `HOLD_MS`, `PgCronRow`), `Twilio.MAX_SEGMENTS` and every part of `dev.cronwatch.storetest` but `StoreContract.run` are internal. The [Java docs](https://cronwatch.dev/docs/java/#deprecated) have the list.
+These still work, marked `@Deprecated(forRemoval = true)`, through every 1.x release, and go in 2.0: `cw.start()` and its overloads (use `cw.startChecking()`); `dev.cronwatch.jdbc.SqlStore` (use `dev.cronwatch.store.SqlStore`, the same store, now beside `MemoryStore`); `dev.cronwatch.bridge.Bridge` (use `SchedulerBridge`, the .NET port's name; the bridge is for integration authors and outside the 1.x promise); `Routes.of(cw, options)` (use `cw.routes(options)`). `Json.quote`, `Json.kind`, `Json.copy`, `Json.MAX_DEPTH`, pg_cron's helpers (`PgCron.schedule`, `jobName`, `run`, `HOLD_MS`, `PgCronRow`), `Twilio.MAX_SEGMENTS`, and every part of `dev.cronwatch.storetest` but `StoreContract.run` are internal. The [Java docs](https://cronwatch.dev/docs/java/#deprecated) have the list.
 
 ## Testing this package
 
@@ -298,7 +298,7 @@ npm ci && npm run build        # at the repository root: the SDK, for the croner
 cd packages/java && ./mvnw -B verify
 ```
 
-The tests replay every file in `conformance/` byte for byte, with `TZ=UTC` and `-Duser.timezone=UTC` as the fixtures are made (Surefire sets both). The Postgres, MySQL, MariaDB and pg_cron tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` are set, as URLs (`postgres://postgres:pw@127.0.0.1:5432/cw`, `mysql://root:pw@127.0.0.1:3306/cw`), and skip, saying why, without them; each test uses tables of a prefix of its own, dropped at the end. The channels' hardening tests run against local servers on raw sockets, TLS with a certificate `keytool` makes at run time. The croner parity check and the SQLite file shared with Node need `node` and the built SDK, and skip, saying why, without them. The dashboard replays the SDK's recorded answers (`packages/ruby/test/web/golden.json`) straight into the routes, through the JDK's server, through the servlet filter under Jetty, and through the starter on Spring MVC under Tomcat and on WebFlux under Netty; `CRONWATCH_TEST_JAVA=1 npm test --workspace packages/mcp` drives the MCP server against `webserver`, a seeded dashboard. The build compiles with Error Prone and `-Xlint:all` with warnings as errors, and the Enforcer holds the core to no dependencies and Java 21 bytecode; `./mvnw spotless:apply` formats the code (google-java-format), and CI runs `spotless:check`. CI runs it all on JDK 21, 25 and the newest, and on macOS and Windows. The README's examples are compiled by a test (the integrations' in the starter's tests). The integrations' tests run real schedulers on the JVM's clock: `-Dspring-boot.version=`, `-Dshedlock.version=`, `-Dquartz.version=` and `-Djobrunr.version=` pick the releases they run against (CI's `java-frameworks` runs the oldest and newest of each), and the Quartz recovery test runs on the JDBC job store over Postgres when `CRONWATCH_TEST_PG` is set.
+The tests replay every file in `conformance/` byte for byte, with `TZ=UTC` and `-Duser.timezone=UTC` as the fixtures are made (Surefire sets both). The Postgres, MySQL, MariaDB, and pg_cron tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB`, and `CRONWATCH_TEST_PGCRON` are set, as URLs (`postgres://postgres:pw@127.0.0.1:5432/cw`, `mysql://root:pw@127.0.0.1:3306/cw`), and skip, saying why, without them; each test uses tables of a prefix of its own, dropped at the end. The channels' hardening tests run against local servers on raw sockets, TLS with a certificate `keytool` makes at run time. The croner parity check and the SQLite file shared with Node need `node` and the built SDK, and skip, saying why, without them. The dashboard replays the SDK's recorded answers (`packages/ruby/test/web/golden.json`) straight into the routes, through the JDK's server, through the servlet filter under Jetty, and through the starter on Spring MVC under Tomcat and on WebFlux under Netty; `CRONWATCH_TEST_JAVA=1 npm test --workspace packages/mcp` drives the MCP server against `webserver`, a seeded dashboard. The build compiles with Error Prone and `-Xlint:all` with warnings as errors, and the Enforcer holds the core to no dependencies and Java 21 bytecode; `./mvnw spotless:apply` formats the code (google-java-format), and CI runs `spotless:check`. CI runs it all on JDK 21, 25, and the newest, and on macOS and Windows. The README's examples are compiled by a test (the integrations' in the starter's tests). The integrations' tests run real schedulers on the JVM's clock: `-Dspring-boot.version=`, `-Dshedlock.version=`, `-Dquartz.version=`, and `-Djobrunr.version=` pick the releases they run against (CI's `java-frameworks` runs the oldest and newest of each), and the Quartz recovery test runs on the JDBC job store over Postgres when `CRONWATCH_TEST_PG` is set.
 
 ## License
 

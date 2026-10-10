@@ -124,7 +124,7 @@ class SqliteStoreTest {
             CronwatchException.class, () -> SqlStore.sqlite(source(":memory:")).prefix("Bad-"));
     assertEquals(CronwatchException.Kind.INVALID, e.kind());
     assertEquals(
-        "cronwatch: invalid table prefix \"Bad-\". Use lowercase letters, digits and underscores,"
+        "cronwatch: invalid table prefix \"Bad-\". Use lowercase letters, digits, and underscores,"
             + " not starting with a digit, at most 47 characters.",
         e.getMessage());
     assertThrows(CronwatchException.class, () -> SqlStore.sqlite(source(":memory:")).prefix("9x"));

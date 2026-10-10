@@ -19,13 +19,13 @@ use url::Url;
 use crate::js;
 use crate::store::{BoxError, BoxFuture};
 
-/// How long one request may take, connecting, sending and reading the
+/// How long one request may take, connecting, sending, and reading the
 /// answer, as the SDK's `AbortSignal.timeout(10_000)`.
 pub(crate) const DEADLINE: Duration = Duration::from_secs(10);
 
-/// `DEADLINE`'s public name before 1.0.
+/// `DEADLINE`'s public name before 0.11.
 #[doc(hidden)]
-#[deprecated(note = "internal, outside the 1.x promise; no longer public from 1.0")]
+#[deprecated(note = "internal, outside the 1.x promise; no longer public from 0.11")]
 pub const TIMEOUT: Duration = DEADLINE;
 
 /// How much of an answer is read. A channel quotes 200 characters of a
@@ -33,9 +33,9 @@ pub const TIMEOUT: Duration = DEADLINE;
 /// otherwise decode to far more than a process has.
 pub(crate) const ANSWER_MAX: usize = 1 << 20;
 
-/// `ANSWER_MAX`'s public name before 1.0.
+/// `ANSWER_MAX`'s public name before 0.11.
 #[doc(hidden)]
-#[deprecated(note = "internal, outside the 1.x promise; no longer public from 1.0")]
+#[deprecated(note = "internal, outside the 1.x promise; no longer public from 0.11")]
 pub const MAX_BODY: usize = ANSWER_MAX;
 
 /// How much of an answer's body goes into an error.
@@ -153,7 +153,7 @@ impl ReqwestTransport {
     /// Deprecated: it takes a type of reqwest's, which is below 1.0, so its
     /// next release would break this crate's API. The default transport
     /// ([`new`](Self::new), or `transport: None`) honours `HTTP_PROXY`,
-    /// `HTTPS_PROXY` and `NO_PROXY` and trusts the platform's roots; for
+    /// `HTTPS_PROXY`, and `NO_PROXY` and trusts the platform's roots; for
     /// anything else, implement [`Transport`] over a client of your own.
     #[deprecated(
         note = "use the default transport (transport: None), or implement Transport over your own client; this goes at 1.0"
@@ -301,7 +301,7 @@ pub(crate) fn postable(raw: &str) -> Result<Url, BoxError> {
     Ok(url)
 }
 
-/// `new URL(url).origin`: the scheme, host and port only, a port that is the
+/// `new URL(url).origin`: the scheme, host, and port only, a port that is the
 /// scheme's own left out. A URL's path or query can hold a credential, so an
 /// error names only this.
 pub(crate) fn origin_of(raw: &str) -> String {
@@ -311,9 +311,9 @@ pub(crate) fn origin_of(raw: &str) -> String {
     }
 }
 
-/// `origin_of`'s public name before 1.0.
+/// `origin_of`'s public name before 0.11.
 #[doc(hidden)]
-#[deprecated(note = "internal, outside the 1.x promise; no longer public from 1.0")]
+#[deprecated(note = "internal, outside the 1.x promise; no longer public from 0.11")]
 pub fn origin(raw: &str) -> String {
     origin_of(raw)
 }
@@ -324,7 +324,7 @@ fn token(name: &str) -> bool {
 }
 
 /// The headers as a request sends them: each name a token, each value
-/// without the spaces, tabs and line breaks around it, as fetch sends it. A
+/// without the spaces, tabs, and line breaks around it, as fetch sends it. A
 /// name that is not a token, or a value with a line break or NUL inside, is
 /// refused, as fetch refuses them, so no header can add another; the error
 /// names the header, never its value, which may be a credential.
@@ -332,7 +332,7 @@ pub(crate) fn headers(list: &[(&str, String)]) -> Result<Vec<(String, String)>, 
     let mut out = Vec::with_capacity(list.len());
     for (name, value) in list {
         if !token(name) {
-            return Err(fail("a header name must be a token (letters, digits and !#$%&'*+.^_`|~-)"));
+            return Err(fail("a header name must be a token (letters, digits, and !#$%&'*+.^_`|~-)"));
         }
         let value = value.trim_matches([' ', '\t', '\r', '\n']);
         if value.contains(['\r', '\n', '\0']) {

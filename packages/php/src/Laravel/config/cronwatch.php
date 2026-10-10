@@ -6,7 +6,7 @@
 
 return [
 
-    // Off: nothing is watched, no check is scheduled and the dashboard is
+    // Off: nothing is watched, no check is scheduled, and the dashboard is
     // not mounted. The client (app(Cronwatch\Cronwatch::class)) still works.
     'enabled' => env('CRONWATCH_ENABLED', true),
 
@@ -16,8 +16,8 @@ return [
     // taken out of the schedule.
     'app_id' => env('CRONWATCH_APP_ID'),
 
-    // Where jobs, runs and state are kept.
-    //   database  the app's database (MySQL, MariaDB, Postgres or SQLite), through
+    // Where jobs, runs, and state are kept.
+    //   database  the app's database (MySQL, MariaDB, Postgres, or SQLite), through
     //             a connection of CronWatch's own made from that connection's
     //             settings, so its writes never join the app's transactions
     //   sqlite    a SQLite file of its own (path)
@@ -31,11 +31,11 @@ return [
         'migrations' => env('CRONWATCH_MIGRATIONS', true),
     ],
 
-    // The tables' names start with this. (Before 1.0: store.prefix, still read.)
+    // The tables' names start with this. (Before 0.11: store.prefix, still read.)
     'table_prefix' => env('CRONWATCH_TABLE_PREFIX', 'cronwatch_'),
     // Whether each process may run CREATE TABLE IF NOT EXISTS itself. Turn it
     // off when the migration made the tables and the app's database user may
-    // not create tables. (Before 1.0: store.create_tables, still read.)
+    // not create tables. (Before 0.11: store.create_tables, still read.)
     'create_tables' => env('CRONWATCH_CREATE_TABLES', true),
 
     // Where alerts go. With none set, alerts are written to the log.
@@ -71,7 +71,7 @@ return [
     // The secret a job's handler() and the dashboard's /api/check take.
     'cron_secret' => env('CRON_SECRET'),
     'retention' => env('CRONWATCH_RETENTION', '30d'),
-    // grace, timeout, timezone and failuresBeforeAlert for every job that sets none.
+    // grace, timeout, timezone, and failuresBeforeAlert for every job that sets none.
     'defaults' => [],
     // "check" queues alerts for the check to send, for processes that cannot reach the network.
     'deliver' => env('CRONWATCH_DELIVER', 'now'),
@@ -91,8 +91,8 @@ return [
         'capture_output' => env('CRONWATCH_CAPTURE_OUTPUT', false),
     ],
 
-    // The check: declares the schedule, finds missed and stuck runs and
-    // sends their alerts. (Before 1.0: schedule.check and
+    // The check: declares the schedule, finds missed and stuck runs, and
+    // sends their alerts. (Before 0.11: schedule.check and
     // schedule.check_cron, still read.)
     'check' => [
         // Schedule `cronwatch:check` in the app's own scheduler; false for a

@@ -81,7 +81,7 @@ public class SuiteTests
     [Fact]
     public void Nothing_public_hands_out_a_secret()
     {
-        // A logger that walks public getters, a debugger's view and a record's ToString must find
+        // A logger that walks public getters, a debugger's view, and a record's ToString must find
         // no secret: the options that hold one read it through an internal getter.
         // A webhook's URL and Sentry's DSN are credentials too. The one exception is what a
         // transport is handed to send: it must read the URL and the headers to post them.

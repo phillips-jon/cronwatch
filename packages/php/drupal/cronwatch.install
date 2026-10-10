@@ -28,7 +28,7 @@ function cronwatch_uninstall(): void {
 }
 
 /**
- * Adds the settings for Discord, the email providers, Twilio and the error trackers.
+ * Adds the settings for Discord, the email providers, Twilio, and the error trackers.
  */
 function cronwatch_update_10001(): void {
   $config = \Drupal::configFactory()->getEditable('cronwatch.settings');

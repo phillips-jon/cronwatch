@@ -5,8 +5,8 @@ import java.util.List;
 
 /**
  * Cron expressions for the parity check and the properties: valid and not, nicknames, names,
- * ranges, steps, lists, L, W, LW, #, ?, +, six and seven fields. The generator is the Go, Python,
- * PHP and Rust ports', over SplitMix64, so a seed gives the same expressions in every port.
+ * ranges, steps, lists, L, W, LW, #, ?, +, six, and seven fields. The generator is the Go, Python,
+ * PHP, and Rust ports', over SplitMix64, so a seed gives the same expressions in every port.
  */
 final class CronFuzzer {
   static final String[] ZONES = {
@@ -43,7 +43,7 @@ final class CronFuzzer {
     this.state = seed;
   }
 
-  /** SplitMix64: small, seeded and the same on every platform. */
+  /** SplitMix64: small, seeded, and the same on every platform. */
   long next() {
     state += 0x9e3779b97f4a7c15L;
     long z = state;

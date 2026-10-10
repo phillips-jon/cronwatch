@@ -13,7 +13,7 @@ use Craft;
 /**
  * Sends alerts as email through Craft's mailer, so they go however the site
  * sends its mail (the transport under Settings, Email). The subject, plain
- * text and HTML are the library's email channels' (Email::compose()); the
+ * text, and HTML are the library's email channels' (Email::compose()); the
  * sender is Craft's system address.
  */
 final class MailChannel implements AlertChannel

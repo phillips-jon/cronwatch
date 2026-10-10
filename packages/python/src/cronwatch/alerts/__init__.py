@@ -7,9 +7,9 @@ alone, and a plain function works as a channel too.
 
 ``Console`` (the default) and ``Custom`` are here, with the SDK's channels,
 request for request: ``Slack``, ``Discord``, ``Webhook``, the email
-providers ``Resend``, ``Postmark``, ``Sendgrid``, ``Mailgun`` and ``Ses``,
+providers ``Resend``, ``Postmark``, ``Sendgrid``, ``Mailgun``, and ``Ses``,
 ``Twilio`` for SMS, and the trackers ``Sentry``, ``Honeybadger``,
-``Datadog``, ``Rollbar``, ``Bugsnag`` and ``NewRelic``. They use the
+``Datadog``, ``Rollbar``, ``Bugsnag``, and ``NewRelic``. They use the
 standard library only, and each takes ``http=`` (anything with
 ``post(url, body, headers)`` returning a ``Response``) so tests can stand in
 for the network."""

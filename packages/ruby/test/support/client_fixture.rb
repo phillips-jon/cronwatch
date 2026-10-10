@@ -3,9 +3,9 @@
 require "json"
 
 # conformance/client.json, the first fixture driven through the client's
-# public API: the run ids start, resume and record_run take, and stored data
+# public API: the run ids start, resume, and record_run take, and stored data
 # a newer release wrote surviving a check, a silence, an unsilence, a
-# summary and a run. Shared by the memory store's replay and the
+# summary, and a run. Shared by the memory store's replay and the
 # ActiveRecord store's.
 module ClientFixture
   FIXTURE = JSON.parse(File.read(File.expand_path("../../../../conformance/client.json", __dir__)))

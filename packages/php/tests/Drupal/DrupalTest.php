@@ -23,7 +23,7 @@ use PHPUnit\Framework\TestCase;
  * under a prefix of their own, dropped afterwards; default a SQLite file in
  * the site), enables the module and fixtures/cwt_fixtures, and drives it as
  * a site is driven: `drush cron`, `drush queue:run`, `drush cronwatch:check`,
- * /cron/<key> and the admin pages under PHP's built-in server, signed in
+ * /cron/<key>, and the admin pages under PHP's built-in server, signed in
  * with one-time login links.
  *
  * Drupal's own test runner (a KernelTestBase or BrowserTestBase in a

@@ -136,7 +136,7 @@ module Cronwatch
       uri
     end
 
-    # A header value without the spaces, tabs and line breaks around it, as fetch sends it.
+    # A header value without the spaces, tabs, and line breaks around it, as fetch sends it.
     def trim_header(value)
       value.to_s.gsub(/\A[ \t\r\n]+|[ \t\r\n]+\z/, "")
     end

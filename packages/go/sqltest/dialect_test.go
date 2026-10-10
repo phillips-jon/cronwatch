@@ -51,7 +51,7 @@ func stateOf(t *testing.T, text string) cronwatch.JobState {
 }
 
 // jsonOf is the SDK's JSON of a value. A type's own MarshalJSON is called
-// directly: encoding/json would escape U+2028, U+2029 and HTML characters
+// directly: encoding/json would escape U+2028, U+2029, and HTML characters
 // in what it returns, which JSON.stringify does not.
 func jsonOf(t *testing.T, v any) string {
 	if m, ok := v.(json.Marshaler); ok {
@@ -257,7 +257,7 @@ func TestPostgresNulCharactersAreStillRecorded(t *testing.T) {
 	if st.ConsecutiveFailures != 1 {
 		t.Error("the state, with its alert, was written too")
 	}
-	// So are a trigger, metric names and a definition's text.
+	// So are a trigger, metric names, and a definition's text.
 	nul2 := cw.MustJob("nul2", cronwatch.Description("a\x00b"), cronwatch.Tags("t\x00"), cronwatch.Budget("c\x00", 5))
 	must(t, nul2.Run(ctx, func(_ context.Context, job *cronwatch.JobContext) error {
 		return job.Metric("ro\x00ws", 2)

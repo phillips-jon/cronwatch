@@ -132,7 +132,7 @@ test("a secret split by the 16 KB cut is redacted whole: redaction comes before 
   assert.doesNotMatch(bearerOutput, /opaqueTOKEN/);
   assert.ok(bearerOutput.length <= OUTPUT_CAP + "[earlier output trimmed]\n".length);
 
-  // Errors, recorded runs and flushed lines the same way.
+  // Errors, recorded runs, and flushed lines the same way.
   await assert.rejects(cw.run("thrown", async () => { throw new Error(`${"e".repeat(OUTPUT_CAP)} ${bearer} ${"z".repeat(OUTPUT_CAP - 40)}`); }));
   assert.doesNotMatch((await cw.runs("thrown"))[0]!.error!, /opaqueTOKEN/);
   cw.job("imported");

@@ -10,7 +10,7 @@ use Cronwatch\Run;
 use Cronwatch\StoredJob;
 
 /**
- * Where jobs, runs and state live: the SDK's Store. A store that also
+ * Where jobs, runs, and state live: the SDK's Store. A store that also
  * implements UpdatesRunIf and ComparesAndSetsState (all of this package's
  * do) keeps several processes sharing it from finishing one run twice or
  * overwriting each other's state; without them the client falls back to a
@@ -29,13 +29,13 @@ interface Store
     /** @return list<StoredJob> by name, in byte order */
     public function listJobs(): array;
 
-    /** Removes the job, its runs and its state. */
+    /** Removes the job, its runs, and its state. */
     public function deleteJob(string $name): void;
 
     /** Throws for an id already stored: a run is never overwritten. */
     public function insertRun(Run $run): void;
 
-    /** Writes a run's status, finishedAt, durationMs, error, output and metrics. A run that is gone stays gone. */
+    /** Writes a run's status, finishedAt, durationMs, error, output, and metrics. A run that is gone stays gone. */
     public function updateRun(Run $run): void;
 
     public function getRun(string $id): ?Run;

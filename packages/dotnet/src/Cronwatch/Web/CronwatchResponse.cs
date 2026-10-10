@@ -7,7 +7,7 @@ using Cronwatch.Internal;
 namespace Cronwatch.Web;
 
 /// <summary>
-/// An answer: a status, headers in order (names lowercase, as fetch and HTTP/2 write them) and a
+/// An answer: a status, headers in order (names lowercase, as fetch and HTTP/2 write them), and a
 /// body. Immutable; <see cref="WithHeader"/> and <see cref="WithBody(byte[])"/> give copies. An
 /// adapter writes it with its <c>content-length</c>. A job's handler function may return one,
 /// which is then the handler's answer, and fails the run at 400 or more.
@@ -26,7 +26,7 @@ public sealed class CronwatchResponse
         Result = result;
     }
 
-    /// <summary>An answer with this status, no headers and no body.</summary>
+    /// <summary>An answer with this status, no headers, and no body.</summary>
     public CronwatchResponse(int status)
         : this(status, [], [], null)
     {

@@ -109,7 +109,7 @@ const SECRET_PATTERNS: [RegExp, string | ((match: string, ...groups: string[]) =
   // Incoming webhook URLs carry their secret in the path.
   [/(\bhooks\.slack\.com\/(?:services|workflows|triggers)\/)[A-Za-z0-9/_-]{1,255}/gi, `$1${REDACTED}`],
   [/(\bdiscord(?:app)?\.com\/api\/(?:v\d{1,2}\/)?webhooks\/)[A-Za-z0-9/_-]{1,255}/gi, `$1${REDACTED}`],
-  // Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI and Google style keys.
+  // Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI, and Google style keys.
   [/\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g, REDACTED],
   [/\b(?:gh[pousr]_[A-Za-z0-9]{30,255}|github_pat_[A-Za-z0-9_]{20,255})\b/g, REDACTED],
   [/\bxox[abposr]-[A-Za-z0-9-]{10,255}/g, REDACTED],
@@ -122,8 +122,8 @@ const SECRET_PATTERNS: [RegExp, string | ((match: string, ...groups: string[]) =
 /**
  * The default `redact`: blanks values that look like secrets (key=value pairs
  * with secret-ish names, Authorization headers, URL credentials, bearer
- * tokens, JWTs, PEM private keys, webhook URLs and well-known token formats)
- * before output or an error is stored, shown or sent anywhere.
+ * tokens, JWTs, PEM private keys, webhook URLs, and well-known token formats)
+ * before output or an error is stored, shown, or sent anywhere.
  */
 export function redactSecrets(text: string): string {
   let out = text;

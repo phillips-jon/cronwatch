@@ -12,7 +12,7 @@ namespace Cronwatch.Alerts;
 /// <summary>
 /// Sends one POST and answers its status and body, whatever the status: the one request every
 /// channel and Claude triage make. <see cref="HttpClientTransport"/> is the default; an app that
-/// wants its <c>IHttpClientFactory</c> client, a proxy or its own trust store writes one and gives
+/// wants its <c>IHttpClientFactory</c> client, a proxy, or its own trust store writes one and gives
 /// it to the client (<see cref="CronwatchOptions.Transport"/>) or to a channel's options.
 /// </summary>
 /// <remarks>
@@ -35,7 +35,7 @@ public interface ITransport
 /// <summary>
 /// One POST, as an <see cref="ITransport"/> is asked to send it: an http or https URL as the WHATWG
 /// URL parser (and so fetch) writes it, the headers in the order they are sent, and the body. Its
-/// <see cref="ToString"/> shows the URL's origin, the header names and the body's length only,
+/// <see cref="ToString"/> shows the URL's origin, the header names, and the body's length only,
 /// since the rest carries the channel's credentials.
 /// </summary>
 public sealed class TransportRequest
@@ -74,7 +74,7 @@ public sealed class TransportRequest
         return null;
     }
 
-    /// <summary>The URL's origin, the header names and the body's length.</summary>
+    /// <summary>The URL's origin, the header names, and the body's length.</summary>
     public override string ToString() =>
         "TransportRequest(origin " + Post.Origin(Url) + ", headers [" + string.Join(", ", Headers.Select(h => h.Key)) + "], body "
         + _body.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) + " bytes)";

@@ -9,8 +9,8 @@ use Cronwatch\Bridge\ChannelSettings;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The channels the WordPress, Drupal and Craft settings pages offer beyond
- * their own email, Slack and webhook: the settings' names, what a form
+ * The channels the WordPress, Drupal, and Craft settings pages offer beyond
+ * their own email, Slack, and webhook: the settings' names, what a form
  * refuses, and the channels made from what it saved.
  */
 final class ChannelSettingsTest extends TestCase

@@ -1,6 +1,6 @@
 package cronwatch_test
 
-// Lambda: REST API, HTTP API and function URL events, read from their JSON
+// Lambda: REST API, HTTP API, and function URL events, read from their JSON
 // as aws-lambda-go's lambda.Start would read them, through a job's handler
 // and the dashboard.
 

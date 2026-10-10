@@ -81,7 +81,7 @@ public final class AnthropicOptions {
     }
 
     /**
-     * How hard the model thinks: {@code low}, {@code medium} or {@code high}. Default {@code
+     * How hard the model thinks: {@code low}, {@code medium}, or {@code high}. Default {@code
      * medium}; a stack trace rarely needs more.
      */
     public Builder effort(String effort) {

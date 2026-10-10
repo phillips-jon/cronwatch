@@ -25,10 +25,10 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Watches pg_cron jobs, which run inside Postgres where nothing can wrap them: the SDK's {@code
- * pgCron()} source ({@code sources/pgcron.ts}), line for line as the Go, Rust and Elixir ports have
- * it. As a source, on every check it reads {@code cron.job} and declares each job with its
+ * pgCron()} source ({@code sources/pgcron.ts}), line for line as the Go, Rust, and Elixir ports
+ * have it. As a source, on every check it reads {@code cron.job} and declares each job with its
  * schedule, then copies new rows of {@code cron.job_run_details} in as runs (ids {@code
- * pgcron:<prefix><runid>}), so the usual evaluation raises missed, failed, stuck and slow alerts.
+ * pgcron:<prefix><runid>}), so the usual evaluation raises missed, failed, stuck, and slow alerts.
  *
  * <pre>{@code
  * Cronwatch cw = Cronwatch.builder()
@@ -38,7 +38,7 @@ import org.jspecify.annotations.Nullable;
  * cw.startChecking();
  * }</pre>
  *
- * <p>A job that is renamed, unscheduled or no longer picked keeps its old name's runs and history,
+ * <p>A job that is renamed, unscheduled, or no longer picked keeps its old name's runs and history,
  * and that name is declared again without a schedule, so it is never reported missed. Its
  * description says why.
  *
@@ -202,7 +202,7 @@ public final class PgCron {
 
   /**
    * The default CronWatch name for a pg_cron job, before the prefix ({@code pgCronJobName}): its
-   * jobname with each run of anything other than letters, digits, {@code .}, {@code _}, {@code :}
+   * jobname with each run of anything other than letters, digits, {@code .}, {@code _}, {@code :},
    * and {@code -} turned into {@code -}, what leads up to the first letter or digit dropped, at
    * most 100 characters, or {@code pg_cron:<jobid>} when nothing is left.
    */

@@ -9,7 +9,7 @@ defmodule Cronwatch.Alerts.Rollbar do
   Options: `:access_token` (required, with the `post_server_item` scope),
   `:environment` (default `"production"`), `:recovered` (default true:
   recoveries are sent, as info items; `false` leaves them out), `:link`
-  (sent as custom data) and `:transport`.
+  (sent as custom data), and `:transport`.
   """
   @behaviour Cronwatch.Channel
 

@@ -601,7 +601,7 @@ func ptr[T any](v T) *T { return &v }
 
 // The second review: an alert of a type this release does not know (a
 // newer release's, retried from the queue) went out with an empty Datadog
-// alert_type, Honeybadger class and a Discord colour of 0, where the SDK
+// alert_type, Honeybadger class, and a Discord colour of 0, where the SDK
 // leaves each key out. Datadog may refuse an empty alert_type for good.
 func TestAnUnknownTypeLeavesOutTheKeysMappedFromIt(t *testing.T) {
 	cases := []struct {

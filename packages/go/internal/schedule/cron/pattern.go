@@ -6,7 +6,7 @@
 // happens twice is the earlier one. The names and the order of every step
 // follow croner's source, as the Python port's _cron.py and the PHP port's
 // src/Cron do, so the four agree on every expression they read, every one
-// they refuse and every fire time.
+// they refuse, and every fire time.
 //
 // Where it departs from croner, as the SDK's parseSchedule does:
 //

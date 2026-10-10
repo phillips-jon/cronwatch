@@ -184,7 +184,7 @@ public final class Durations {
   }
 
   private static String notADuration(String label, String value) {
-    return label + " \"" + value + "\" is not a duration like \"15m\", \"1h30m\" or \"90s\"";
+    return label + " \"" + value + "\" is not a duration like \"15m\", \"1h30m\", or \"90s\"";
   }
 
   /** Refuses a value over {@link #MAX_LENGTH} characters, quoting its first {@link #QUOTED}. */

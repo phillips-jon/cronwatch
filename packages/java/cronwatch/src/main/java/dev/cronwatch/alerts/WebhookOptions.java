@@ -25,7 +25,7 @@ public final class WebhookOptions {
     return new Builder();
   }
 
-  /** Names what is set, never the URL, a header's value or the secret. */
+  /** Names what is set, never the URL, a header's value, or the secret. */
   @Override
   public String toString() {
     return "WebhookOptions[url=set, headers="
@@ -60,7 +60,7 @@ public final class WebhookOptions {
      * An extra request header, an {@code authorization} header say, sent in the order given; a name
      * given again keeps its place and takes the new value. Values are trimmed of the spaces and
      * newlines a paste leaves. {@code host}, {@code connection}, {@code content-length}, {@code
-     * expect} and {@code upgrade} are set by the JDK's transport itself, which drops them.
+     * expect}, and {@code upgrade} are set by the JDK's transport itself, which drops them.
      */
     public Builder header(String name, String value) {
       Objects.requireNonNull(name, "name");

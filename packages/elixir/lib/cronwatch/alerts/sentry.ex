@@ -8,7 +8,7 @@ defmodule Cronwatch.Alerts.Sentry do
   Options: `:dsn` (required, `https://<key>@o0.ingest.sentry.io/<project>`),
   `:environment` (default `"production"`), `:release`, `:recovered` (default
   true: recoveries are sent, as info events; `false` leaves them out),
-  `:link` (a function of the alert, sent as extra data) and `:transport`.
+  `:link` (a function of the alert, sent as extra data), and `:transport`.
   """
   @behaviour Cronwatch.Channel
 

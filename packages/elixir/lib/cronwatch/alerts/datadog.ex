@@ -10,7 +10,7 @@ defmodule Cronwatch.Alerts.Datadog do
   `:site` (default `"datadoghq.com"`; `"datadoghq.eu"`,
   `"us3.datadoghq.com"`, `"us5.datadoghq.com"`, `"ap1.datadoghq.com"`,
   `"ddog-gov.com"`), `:tags` (added to every event), `:host` (the host the
-  event is about), `:link` (put in the event's text) and `:transport`.
+  event is about), `:link` (put in the event's text), and `:transport`.
   """
   @behaviour Cronwatch.Channel
 

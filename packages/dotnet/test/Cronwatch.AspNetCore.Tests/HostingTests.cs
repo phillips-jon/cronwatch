@@ -14,7 +14,7 @@ using Xunit;
 
 namespace Cronwatch.AspNetCore.Tests;
 
-/// <summary><c>AddCronwatch</c>: the client from the container, configuration, the hosted check and the app's logger.</summary>
+/// <summary><c>AddCronwatch</c>: the client from the container, configuration, the hosted check, and the app's logger.</summary>
 public class HostingTests
 {
     /// <summary>Counts the checks: every check syncs its sources first.</summary>

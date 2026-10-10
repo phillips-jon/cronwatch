@@ -190,7 +190,7 @@ const appJS = `"use strict";
 `
 
 // swJS is the service worker. It caches the app shell (the offline page,
-// the manifest, the icons and app.js) and nothing else: every other request
+// the manifest, the icons, and app.js) and nothing else: every other request
 // goes to the network as the page made it, and its answer is never stored,
 // since the pages and the JSON carry job data. When a page cannot be
 // reached it shows the offline page. Its scope gives the base, so it is the

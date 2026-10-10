@@ -13,7 +13,7 @@ import java.util.concurrent.TimeoutException;
 /**
  * Sending alerts: the outbox, channels, triage, and the queue of alerts no channel accepted,
  * retried once per check (the SDK's {@code outbox}, {@code dispatch}, {@code retryUndelivered},
- * {@code recordDelivery}, {@code deliver} and {@code addTriage}).
+ * {@code recordDelivery}, {@code deliver}, and {@code addTriage}).
  */
 final class Delivery {
   private final Core core;

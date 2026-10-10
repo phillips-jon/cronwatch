@@ -20,7 +20,7 @@ use Cronwatch\StoredJob;
  * Keeps everything in the site's own database through $wpdb: the library's
  * three tables in MySQL's dialect (Sql::mysqlSchema), named with the site's
  * table prefix plus "cronwatch_" (wp_cronwatch_jobs, wp_cronwatch_runs,
- * wp_cronwatch_state), with the same statements, parameters and JSON as
+ * wp_cronwatch_state), with the same statements, parameters, and JSON as
  * MysqlStore, so the stored bytes are the same whichever wrote them.
  *
  * Each statement's values go through $wpdb->prepare() with placeholders,

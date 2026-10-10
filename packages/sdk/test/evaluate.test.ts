@@ -293,7 +293,7 @@ test("muteOpens keeps closes and drops new opens", () => {
   assert.deepEqual(muted.open, {});
 });
 
-test("jobHealth ranks silence, stuck, failing, late, never ran and healthy", () => {
+test("jobHealth ranks silence, stuck, failing, late, never ran, and healthy", () => {
   const d = { timeout: "5m" };
   const ok = run("j", "ok", T0 - HOUR);
   assert.equal(jobHealth(d, ok, { ...emptyState("j"), silencedUntil: T0 + 1, open: { failed: 1 } }, T0), "silenced");

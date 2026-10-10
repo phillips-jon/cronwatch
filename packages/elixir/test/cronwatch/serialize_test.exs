@@ -22,7 +22,7 @@ defmodule Cronwatch.SerializeTest do
     end
   end
 
-  test "conformance: format.json's capOutput, toStored and checkExpectation" do
+  test "conformance: format.json's capOutput, toStored, and checkExpectation" do
     f = fixture("format")
     caps = list(f, "capOutput")
     stored = list(f, "toStored")

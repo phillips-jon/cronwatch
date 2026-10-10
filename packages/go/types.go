@@ -8,10 +8,10 @@ import (
 	"cronwatch.dev/go/internal/js"
 )
 
-// Everything public about a job, a run and an alert. Each type writes the
+// Everything public about a job, a run, and an alert. Each type writes the
 // SDK's JSON (MarshalJSON): the same field names, in the same order, with
 // numbers as JavaScript prints them, so a Go process and a Node, Ruby,
-// Python or PHP process can share one store and @cronwatch/mcp reads any of
+// Python, or PHP process can share one store and @cronwatch/mcp reads any of
 // them.
 
 // RunStatus is where a run stands.
@@ -194,7 +194,7 @@ type Run struct {
 	// Lines logged, or the string the job returned. Capped at 16 KB.
 	Output  *string
 	Metrics Metrics
-	// What started the run: "run", "handler", "start" or a value of yours.
+	// What started the run: "run", "handler", "start", or a value of yours.
 	Trigger string
 }
 
@@ -256,8 +256,8 @@ func runFrom(v any) (Run, error) {
 // writer added are kept.
 //
 // A store that reads a definition that is not a JSON object (a foreign,
-// hand-edited or damaged row's) gives the zero Definition: the client
-// reads that job as one it cannot evaluate, reports it and shows it as
+// hand-edited, or damaged row's) gives the zero Definition: the client
+// reads that job as one it cannot evaluate, reports it, and shows it as
 // failing, and the other jobs carry on.
 type Definition struct {
 	o *js.Object
@@ -295,7 +295,7 @@ func (d Definition) Tags() []string {
 }
 
 // Get is a field as JSON reads it (a string, a float64, a bool, nil, a
-// []any or a map), and whether it is there.
+// []any, or a map), and whether it is there.
 func (d Definition) Get(key string) (any, bool) {
 	v, ok := d.o.Get(key)
 	return plain(v), ok
@@ -309,7 +309,7 @@ func (d Definition) get(key string) (any, bool) { return d.o.Get(key) }
 func (d Definition) clone() Definition { return Definition{d.o.Clone(), d.unreadable} }
 
 // readStoredJob is a stored job as the client reads it, so a foreign,
-// hand-edited or damaged row affects only its own job (the SDK's
+// hand-edited, or damaged row affects only its own job (the SDK's
 // readStoredJob): a definition that is not a JSON object (the zero
 // Definition) becomes {name} and is unreadable, and tags are kept only as
 // a list of strings. Every other field is kept as stored.
@@ -530,7 +530,7 @@ type JobState struct {
 	Version *int64
 
 	// Keys after the known ones, in stored order: "version", "sending",
-	// "underFloor" and
+	// "underFloor", and
 	// any a newer writer added (their values in extra), so a state is
 	// written back as the SDK's spread would write it.
 	tail  []string
@@ -566,7 +566,7 @@ func (s *JobState) setUnderFloor(breaches []BudgetBreach) {
 
 // version is the version the state counts as for CompareAndSetState, as
 // the SDK's stateVersion() reads it: a whole number from 0 to 2^53 - 1,
-// else 0. The SQL stores read it the same way, so a foreign row's 1.5, "x"
+// else 0. The SQL stores read it the same way, so a foreign row's 1.5, "x",
 // or -1 is written over by the next update instead of refusing every
 // compare-and-set of its job for good.
 func (s JobState) version() int64 {
@@ -703,7 +703,7 @@ var stateKeys = map[string]bool{
 }
 
 // readState is a stored state read leniently: one that is not a JSON
-// object (a foreign or damaged row's 5, "x" or []) is no state, nil.
+// object (a foreign or damaged row's 5, "x", or []) is no state, nil.
 func readState(v any) *JobState {
 	s, err := stateFrom(v)
 	if err != nil {
@@ -719,7 +719,7 @@ func stateFrom(v any) (JobState, error) {
 	}
 	s := JobState{Job: str(o, "job"), Open: []OpenCondition{}}
 	// Read leniently, as the SDK's normalizeState does, so a foreign,
-	// hand-edited or damaged state affects only its own job and the next
+	// hand-edited, or damaged state affects only its own job and the next
 	// write puts it right: open keeps only its entries whose value is a
 	// number (anything but an object reads as none open), silencedUntil and
 	// lastAlertAt that are not numbers read as nil, pendingRecovery keeps
@@ -814,7 +814,7 @@ func (b BudgetBreach) jsValue() any {
 
 // AlertDetails is what an alert carries beyond its title and message: a
 // MissedDetails, FailureDetails (failed and stuck), SlowDetails,
-// OverBudgetDetails, UnderFloorDetails or RecoveredDetails.
+// OverBudgetDetails, UnderFloorDetails, or RecoveredDetails.
 type AlertDetails interface {
 	jsValue() any
 }
@@ -924,7 +924,7 @@ type Alert struct {
 	rawAt *float64
 	// read is the alert as read from a job's state when it holds a key
 	// this release does not write (one a newer release adds, at the top,
-	// in its details or in a breach) or is of a type this release does not
+	// in its details, or in a breach) or is of a type this release does not
 	// know, so the queued alert is written back and retried with it, as
 	// the SDK carries the object it read.
 	read *js.Object
@@ -1099,7 +1099,7 @@ type otherDetails struct{}
 func (otherDetails) jsValue() any { return &js.Object{} }
 
 // keepsUnknown is whether an alert as read is of a type this release does
-// not know, or holds a key it does not write, at its top, in its details
+// not know, or holds a key it does not write, at its top, in its details,
 // or in a breach of over_budget or under_floor.
 func keepsUnknown(t AlertType, o *js.Object) bool {
 	known, ok := detailKeys[t]
@@ -1372,7 +1372,7 @@ func str(o *js.Object, key string) string {
 // SDK's failureCount() reads it: a whole number, held at 2^53 - 1, and 0
 // when it is negative or not a whole number. A foreign row's count at a
 // 64-bit limit stays at the top instead of wrapping negative, and a 1.5,
-// "3" or -1 counts as none.
+// "3", or -1 counts as none.
 func failureCount(v any) int {
 	f := toFloat(v)
 	if math.IsNaN(f) || math.IsInf(f, 0) || f != math.Trunc(f) || f <= 0 {

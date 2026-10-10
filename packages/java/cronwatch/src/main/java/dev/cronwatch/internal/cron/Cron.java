@@ -10,8 +10,8 @@ import java.util.List;
  * with its checks and its messages word for word) and its walk to the next matching time
  * (CronDate), habits included: a day the month does not have rolls over, a wall-clock time in a
  * spring-forward gap moves forward by the gap, and a time that happens twice is the earlier one.
- * The names and the order of every step follow croner's source, as the Go, Python, PHP, Rust and
- * Elixir ports do, so they agree on every expression they read, every one they refuse and every
+ * The names and the order of every step follow croner's source, as the Go, Python, PHP, Rust, and
+ * Elixir ports do, so they agree on every expression they read, every one they refuse, and every
  * fire time.
  *
  * <p>Where it departs from croner, it answers as the SDK does (the SDK's {@code parseSchedule}

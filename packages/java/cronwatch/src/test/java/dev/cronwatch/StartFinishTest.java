@@ -33,7 +33,7 @@ import org.sqlite.SQLiteDataSource;
 
 /**
  * The SDK's {@code start-finish.test.ts}, ported: runs that span calls, started with {@code start},
- * found again with {@code resume}, flushed and finished, perhaps by another client on the same
+ * found again with {@code resume}, flushed, and finished, perhaps by another client on the same
  * store: the memory store, SQLite, and Postgres when {@code CRONWATCH_TEST_PG} is set.
  */
 class StartFinishTest {
@@ -414,7 +414,7 @@ class StartFinishTest {
     }
     m.clock().advance(11 * MIN);
     Thread check = Support.background(() -> m.cw().check());
-    // The first run's stuck alert is being sent; the other run logs, reports and flushes.
+    // The first run's stuck alert is being sent; the other run logs, reports, and flushes.
     sending.await();
     RunHandle other = m.cw().getRun(a.id()).status().equals(RunStatus.TIMEOUT) ? b : a;
     other.log(other.job() + " flushed");
@@ -501,7 +501,7 @@ class StartFinishTest {
         Support.builder(clock, new Capture(), new Errors())
             .alerts(List.of(held(sending, gate, order, "send")))
             .store(store);
-    // The cross-port check: close gave up on the check after its five seconds, interrupted it and
+    // The cross-port check: close gave up on the check after its five seconds, interrupted it, and
     // closed the store under it. The check is waited for to its end, as the SDK's close awaits it.
     builder.timings.closeWaitMs = 20;
     Cronwatch cw = builder.build();

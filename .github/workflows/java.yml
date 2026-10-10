@@ -1,6 +1,6 @@
 # A release tag -> the Java build in packages/java published to Maven Central
 # (dev.cronwatch:cronwatch, cronwatch-servlet, cronwatch-quartz,
-# cronwatch-jobrunr and cronwatch-spring-boot-starter). Maven Central has no
+# cronwatch-jobrunr, and cronwatch-spring-boot-starter). Maven Central has no
 # trusted publishing (packages/java/DESIGN.md, Releasing), so this takes a
 # Portal user token and a signing key from the environment's secrets; when
 # Central ships it, this moves to OIDC and the token is revoked. Can also be
@@ -8,12 +8,12 @@
 # for the ones after.
 #
 # Three jobs. "ci" waits for CI to pass on the tagged commit (ci-passed.yml).
-# "build" resolves the dependencies, runs the tests and builds the jars, the
-# sources and javadoc jars and the flattened POMs with the release profile,
+# "build" resolves the dependencies, runs the tests, and builds the jars, the
+# sources and javadoc jars, and the flattened POMs with the release profile,
 # with no credential, and uploads them, laid out as Central's bundle with
 # their checksums, as the artifact "maven-bundle". "publish" holds the token
 # and the key and runs no build and no dependency's code: it signs each file
-# with gpg, zips the bundle and uploads it to the Central Publisher Portal's
+# with gpg, zips the bundle, and uploads it to the Central Publisher Portal's
 # API with curl, which publishes it once it has validated it.
 #
 # Stays off until the repository variable MAVEN_ENABLED is "true". Before
@@ -99,9 +99,9 @@ jobs:
       - name: ./mvnw -P release verify
         working-directory: packages/java
         run: ./mvnw -B -P release -Dgpg.skip verify
-      # Every module but webtest, webserver and the example is published
+      # Every module but webtest, webserver, and the example is published
       # (the release profile's excludeArtifacts; the parent is not either,
-      # since the flattened POMs stand alone), each as its POM, its jar and
+      # since the flattened POMs stand alone), each as its POM, its jar, and
       # its sources and javadoc jars, with the checksums Central asks for.
       - name: Lay out the bundle
         working-directory: packages/java
@@ -133,7 +133,7 @@ jobs:
           path: ${{ runner.temp }}/bundle
           if-no-files-found: error
 
-  # Holds the token and the key, and runs only gpg, zip and curl: the
+  # Holds the token and the key, and runs only gpg, zip, and curl: the
   # deployment is published once the Portal has validated it, and the job
   # waits until it is, so a green run is a release on Central.
   publish:

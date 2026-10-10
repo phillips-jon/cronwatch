@@ -5,7 +5,7 @@ namespace Cronwatch.Internal;
 /// <summary>
 /// Croner's CronDate: a wall-clock time whose fields are moved forward to the next match, a field
 /// at a time, spilling into the next month or year as croner does. The fields are year, month (0
-/// based), day, hour, minute, second and milliseconds.
+/// based), day, hour, minute, second, and milliseconds.
 /// </summary>
 internal sealed class CronDate
 {

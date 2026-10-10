@@ -64,7 +64,7 @@ export function silenceEnd(now: number, ms: number): number {
  * The version a stored state counts as for compareAndSetState: its
  * `version` when that is a whole number from 0 to MAX_DURATION_MS (2^53 - 1),
  * else 0, as when it is absent. The SQL stores read it the same way, so a
- * foreign row's `1.5`, `"x"` or `-1` is written over by the next update
+ * foreign row's `1.5`, `"x"`, or `-1` is written over by the next update
  * instead of refusing every compare-and-set of its job for good.
  */
 export function stateVersion(state: Pick<JobState, "version"> | null | undefined): number {
@@ -77,7 +77,7 @@ export function stateVersion(state: Pick<JobState, "version"> | null | undefined
  * when that is a whole number, held at MAX_DURATION_MS (2^53 - 1), and 0 when
  * it is negative or not a whole number. A foreign row's count past 2^53, or at
  * a 64-bit limit, stays at the top instead of losing precision or wrapping
- * negative, and a `1.5`, `"3"` or `-1` counts as none.
+ * negative, and a `1.5`, `"3"`, or `-1` counts as none.
  */
 export function failureCount(state: Pick<JobState, "consecutiveFailures"> | null | undefined): number {
   const count: unknown = state?.consecutiveFailures;
@@ -99,7 +99,7 @@ export function isObject(value: unknown): value is Record<string, unknown> {
  * an older version lacks the newer fields. `sending` and `underFloor` are the
  * exceptions: each is there only while it holds something.
  *
- * Read leniently, since a foreign, hand-edited or damaged row must affect
+ * Read leniently, since a foreign, hand-edited, or damaged row must affect
  * only its own job, and the next write puts it right: a state that is not
  * an object reads as none; `open` keeps only its entries whose value is a
  * number (anything but an object reads as {}); `silencedUntil` and
@@ -348,7 +348,7 @@ export function onRunStart(state: JobState): JobState {
 }
 
 /**
- * Called when a run finishes with status ok, failed or timeout. `history` is
+ * Called when a run finishes with status ok, failed, or timeout. `history` is
  * the job's earlier runs, newest first, not including this one.
  */
 export function onRunFinish(
@@ -524,7 +524,7 @@ export function staleAlert(alert: AlertDraft & { at: number }, state: JobState):
   return typeof alert.at !== "number" || state.open[alert.type] !== alert.at;
 }
 
-/** How a job looks at a glance. Silence wins, then stuck, failing and late. */
+/** How a job looks at a glance. Silence wins, then stuck, failing, and late. */
 export function jobHealth(def: Pick<JobDefinition, "timeout">, lastRun: Run | null, state: JobState, now: number): JobHealth {
   const open = openConditions(state);
   if (isSilenced(state, now)) return "silenced";

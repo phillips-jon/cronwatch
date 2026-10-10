@@ -283,7 +283,7 @@ public final class StoreContract {
             + "\"definition\":{\"name\":\"a\"},\"title\":\"a failed\",\"message\":\"boom\",\"at\":7}}]}";
     must("setState", () -> store.setState(state(full)));
     sameJson(
-        "pendingRecovery, undelivered and sending round-trip",
+        "pendingRecovery, undelivered, and sending round-trip",
         json(get("getState", () -> store.getState("a"))),
         full);
     must("setState", () -> store.setState(state(plain)));

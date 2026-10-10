@@ -78,7 +78,7 @@ internal static class Support
 
     /// <summary>
     /// The SDK tests' <c>make()</c>: a client on a fake clock, a capturing channel, errors
-    /// collected, no cron secret and no process-exit hook.
+    /// collected, no cron secret, and no process-exit hook.
     /// </summary>
     public static Made Make(
         IStore? store = null,

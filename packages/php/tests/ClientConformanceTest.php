@@ -18,10 +18,10 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Replays conformance/client.json, the cases driven through the client's
- * public API: the run ids start(), resume() and recordRun() take, and stored
+ * public API: the run ids start(), resume(), and recordRun() take, and stored
  * data a newer release wrote (an unknown state field, condition, definition
- * key, run status and trigger) kept through a check, a silence, an
- * unsilence, a summary and a run, over the memory store and SQLite (and the
+ * key, run status, and trigger) kept through a check, a silence, an
+ * unsilence, a summary, and a run, over the memory store and SQLite (and the
  * servers, when they are set).
  */
 final class ClientConformanceTest extends TestCase

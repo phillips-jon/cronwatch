@@ -6,7 +6,7 @@ namespace Cronwatch.Bridge;
 
 /// <summary>
 /// Each cron's check against its scheduler's own fire times (<see cref="SchedulerBridge.CheckFires"/>),
-/// kept by the job, the expression, the zone and the year, so an integration that reads its
+/// kept by the job, the expression, the zone, and the year, so an integration that reads its
 /// scheduler every minute walks only what changed: a cron that fires each second in a zone with
 /// daylight saving takes most of a second to walk. Only what the last read saw is kept. Safe to
 /// use from many threads at once.
@@ -28,7 +28,7 @@ public sealed class FireTimeChecks
     /// <summary>
     /// The schedule to declare for a cron, or the problem to report: <paramref name="walk"/>'s
     /// answer (the schedule as CronWatch reads it, or a <see cref="ScheduleException"/>), kept by
-    /// <paramref name="job"/>, <paramref name="expression"/>, <paramref name="zone"/> and the UTC
+    /// <paramref name="job"/>, <paramref name="expression"/>, <paramref name="zone"/>, and the UTC
     /// year of <paramref name="now"/>, so it is walked again only when one of them changes.
     /// </summary>
     public (string? Schedule, string? Problem) Check(string job, string expression, string zone, long now, Func<string> walk)

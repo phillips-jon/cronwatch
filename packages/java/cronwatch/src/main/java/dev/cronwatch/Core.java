@@ -34,7 +34,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * What a client holds and what its parts share: the configuration, the declared jobs, the threads,
  * and the store calls every part makes (the SDK's {@code client.ts} fields and its {@code sync},
- * {@code serial}, {@code updateState} and {@code writeState}).
+ * {@code serial}, {@code updateState}, and {@code writeState}).
  */
 final class Core {
   /**

@@ -36,7 +36,7 @@ public record Entry(
     Objects.requireNonNull(options, "options");
   }
 
-  /** An entry with no problem, no defaults and no options of the app's. */
+  /** An entry with no problem, no defaults, and no options of the app's. */
   public static Entry of(String name, String label, String schedule, String timezone) {
     return new Entry(
         name, label, schedule, timezone, null, JobOptions.builder(), JobOptions.builder());

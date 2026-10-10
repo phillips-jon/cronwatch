@@ -1,6 +1,6 @@
 package cronwatch_test
 
-// client-hardening.test.ts. The hung channel, triage timeout, retry budget
+// client-hardening.test.ts. The hung channel, triage timeout, retry budget,
 // and Start/Stop cases need the package's own waits shortened, so they are
 // in timing_internal_test.go; the handler case waits for phase 3.
 
@@ -241,7 +241,7 @@ func TestJobRejectsNumbersThatWouldTurnACheckOff(t *testing.T) {
 	if _, err := d.Job("a"); err == nil || !strings.Contains(err.Error(), "failuresBeforeAlert") {
 		t.Error(err)
 	}
-	if _, err := cronwatch.New(cronwatch.WithDefaults(cronwatch.Schedule("@hourly"))); err == nil || !strings.Contains(err.Error(), "WithDefaults takes grace, timeout, timezone and failuresBeforeAlert") {
+	if _, err := cronwatch.New(cronwatch.WithDefaults(cronwatch.Schedule("@hourly"))); err == nil || !strings.Contains(err.Error(), "WithDefaults takes grace, timeout, timezone, and failuresBeforeAlert") {
 		t.Error(err)
 	}
 	must[*cronwatch.Job](t)(k.cw.Job("a", cronwatch.Budget("errors", 0), cronwatch.FailuresBeforeAlert(2), cronwatch.Timeout("5m")))

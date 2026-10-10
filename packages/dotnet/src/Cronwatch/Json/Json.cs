@@ -34,13 +34,13 @@ public sealed class JsonParseException : Exception
 
 /// <summary>
 /// <c>JSON.stringify</c> and <c>JSON.parse</c>, byte for byte, for everything CronWatch writes to a
-/// store or reads from one, so a .NET process and a Node, Ruby, Python, PHP, Go, Rust, Elixir or
+/// store or reads from one, so a .NET process and a Node, Ruby, Python, PHP, Go, Rust, Elixir, or
 /// Java process can share one database.
 /// </summary>
 /// <remarks>
 /// Numbers are written as JavaScript prints them (<c>2</c>, not <c>2.0</c>; <c>1e-7</c>;
 /// <c>1e+21</c>), a number that is not finite as <c>null</c>, and a <c>long</c> beyond 2^53 as the
-/// double JavaScript would hold. Strings escape only control characters, quotes and backslashes,
+/// double JavaScript would hold. Strings escape only control characters, quotes, and backslashes,
 /// and a lone surrogate as <c>\ud83d</c>, as a well-formed <c>JSON.stringify</c> does. Objects
 /// keep JavaScript's key order (see <see cref="JsObject"/>).
 /// </remarks>
@@ -50,12 +50,12 @@ public static class Json
     [Obsolete(Internal)]
     public const int MaxDepth = JsonText.MaxDepth;
 
-    /// <summary>The message on the helpers 1.0 made internal.</summary>
-    private const string Internal = "An internal helper, public by accident: only Parse, ParseObject and Stringify are promised. It still works, and is removed in 1.0.";
+    /// <summary>The message on the helpers 0.11 deprecated.</summary>
+    private const string Internal = "An internal helper, public by accident: only Parse, ParseObject, and Stringify are promised. It still works, and is removed in 1.0.";
 
     /// <summary>
     /// <c>JSON.stringify</c> of a value: <c>null</c>, a <see cref="bool"/>, a number, a
-    /// <see cref="string"/>, a list, a <see cref="JsObject"/> or a dictionary with string keys
+    /// <see cref="string"/>, a list, a <see cref="JsObject"/>, or a dictionary with string keys
     /// (written in its enumeration order, array-index keys first, as JavaScript orders them).
     /// </summary>
     /// <exception cref="ArgumentException">For a value of any other type.</exception>

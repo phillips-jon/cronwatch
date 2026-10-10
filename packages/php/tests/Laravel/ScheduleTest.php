@@ -257,7 +257,7 @@ final class ScheduleTest extends TestCase
         $cw = $this->client();
         $event = $this->schedule()->exec('backup')->daily()->runInBackground()->cronwatch(['name' => 'backup']);
         [$handle] = $this->app->make(ScheduledTasks::class)->handleFor($event);
-        // A run 0.x started, with the trigger it wrote then; the upgrade happens while it runs.
+        // A run a release before 0.11 started, with the trigger it wrote then; the upgrade happens while it runs.
         $handle->start(trigger: 'schedule');
         file_put_contents(storage_path('framework/schedule-cronwatch-' . sha1($event->mutexName()) . '.log'), 'backed up');
         $this->artisan('schedule:finish', ['id' => $event->mutexName(), 'code' => 0])->assertExitCode(0);

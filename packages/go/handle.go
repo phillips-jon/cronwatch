@@ -27,7 +27,7 @@ const reservedRunIDPrefix = "pgcron:"
 const ReservedRunIDPrefix = reservedRunIDPrefix
 
 // maxRunID is the longest run id, in UTF-16 code units (JavaScript's string
-// length): what Start, Resume and RecordRun take, and every store holds.
+// length): what Start, Resume, and RecordRun take, and every store holds.
 const maxRunID = 200
 
 // checkRunID is the SDK's error for a run id no store could hold, or one
@@ -267,7 +267,7 @@ func (h *RunHandle) ignored(why string) {
 }
 
 // Flush appends the lines and metrics added so far to the stored run,
-// which must still be running and belong to this job. A read, change and
+// which must still be running and belong to this job. A read, change, and
 // write of the run's row, written only while it is still running: two
 // processes appending to one run at the same moment can lose one's lines,
 // but a flush never undoes a finish. Problems go to the error handler.
@@ -347,7 +347,7 @@ func (h *RunHandle) Flush(ctx context.Context) {
 }
 
 // Finish finishes the run successfully (unless an expect rule says
-// otherwise), judges it like any other and sends what that produces. It
+// otherwise), judges it like any other, and sends what that produces. It
 // returns the run as recorded, or nil when nothing was recorded: the run
 // was already finished (here or elsewhere), was not found, or belongs to
 // another job, which is reported to the error handler. When several

@@ -1,6 +1,6 @@
 """What the pages need to write values the way the SDK's templates do:
 escapeHtml, String(value), JavaScript truthiness, encodeURIComponent,
-toFixed and Object.entries."""
+toFixed, and Object.entries."""
 
 from __future__ import annotations
 

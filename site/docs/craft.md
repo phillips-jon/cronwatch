@@ -1,13 +1,13 @@
 ---
 title: Craft CMS
-description: The CronWatch plugin for Craft CMS: the console commands your crontab runs and the queue jobs you choose, craft cronwatch/check, the store in Craft's database and the dashboard in the Control Panel.
+description: The CronWatch plugin for Craft CMS: the console commands your crontab runs and the queue jobs you choose, craft cronwatch/check, the store in Craft's database, and the dashboard in the Control Panel.
 order: 3.75
 group: PHP
 ---
 
 # Craft CMS
 
-The CronWatch plugin watches the work a Craft CMS site does in the background: the console commands its crontab runs and the queue jobs you choose. Every run is recorded in the site's own database, and you are told when a run is missed, fails, gets stuck or runs much slower than usual, and again when it recovers. It is the Craft CMS plugin of the PHP library, [`cronwatch/cronwatch`](/docs/php/), with the same rules, alert text and stored rows. It needs Craft CMS 5.3 or newer, PHP 8.2 or newer, and Craft's own database (MySQL 8.0.13 or newer, MariaDB 10.6 or newer, or Postgres).
+The CronWatch plugin watches the work a Craft CMS site does in the background: the console commands its crontab runs and the queue jobs you choose. Every run is recorded in the site's own database, and you are told when a run is missed, fails, gets stuck, or runs much slower than usual, and again when it recovers. It is the Craft CMS plugin of the PHP library, [`cronwatch/cronwatch`](/docs/php/), with the same rules, alert text, and stored rows. It needs Craft CMS 5.3 or newer, PHP 8.2 or newer, and Craft's own database (MySQL 8.0.13 or newer, MariaDB 10.6 or newer, or Postgres).
 
 ## Install
 
@@ -16,7 +16,7 @@ composer require cronwatch/craft
 php craft plugin/install cronwatch
 ```
 
-Or install it from the [Plugin Store](https://plugins.craftcms.com/cronwatch) in the Control Panel. Installing makes three tables in Craft's database (`cronwatch_jobs`, `cronwatch_runs` and `cronwatch_state`, after Craft's table prefix) with the library's own `CREATE` statements; uninstalling drops them.
+Or install it from the [Plugin Store](https://plugins.craftcms.com/cronwatch) in the Control Panel. Installing makes three tables in Craft's database (`cronwatch_jobs`, `cronwatch_runs`, and `cronwatch_state`, after Craft's table prefix) with the library's own `CREATE` statements; uninstalling drops them.
 
 ## What is watched
 
@@ -42,7 +42,7 @@ The options are `name` and a job's (`schedule`, `timezone`, `grace`, `timeout`, 
 
 ### Commands
 
-A listed command's run is recorded as `craft <route>` runs it, with the trigger `"craft-command"` (`"command"` on runs recorded before 1.0; see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)): ok, failed with `Exited with code N` for a non-zero exit, or failed with the exception that ended it. A listed command that another runs, and whose exception that one catches, is failed when the caller finishes. Its job is `craft:<route>` with slashes as colons (`craft:resave:entries`) unless `name` says otherwise (the `craft:` prefix keeps it apart from the app's own jobs), and its schedule is what you give, so a command the crontab stopped running is reported missed.
+A listed command's run is recorded as `craft <route>` runs it, with the trigger `"craft-command"` (`"command"` on runs recorded before 0.11; see [Triggers, tags, and job names](/docs/dashboard/#triggers-tags-and-job-names)): ok, failed with `Exited with code N` for a non-zero exit, or failed with the exception that ended it. A listed command that another runs, and whose exception that one catches, is failed when the caller finishes. Its job is `craft:<route>` with slashes as colons (`craft:resave:entries`) unless `name` says otherwise (the `craft:` prefix keeps it apart from the app's own jobs), and its schedule is what you give, so a command the crontab stopped running is reported missed.
 
 A command of your own can carry its options in code instead, with the `WatchCommand` behavior (`actions` limits it to some of the controller's actions):
 
@@ -73,7 +73,7 @@ public function actionSend(): int
 
 ### Queue jobs
 
-A listed class, or one marked with the attribute, is recorded wherever the queue runs it (`craft queue/run`, `queue/listen`, or the runner a Control Panel request starts), with the trigger `"craft-queue"` (`"queue"` on runs recorded before 1.0):
+A listed class, or one marked with the attribute, is recorded wherever the queue runs it (`craft queue/run`, `queue/listen`, or the runner a Control Panel request starts), with the trigger `"craft-queue"` (`"queue"` on runs recorded before 0.11):
 
 ```php
 use Cronwatch\Watch;
@@ -96,7 +96,7 @@ Missed and stuck runs are found by a check. Craft CMS has nothing to run it on a
 */5 * * * *  cd /var/www/site && php craft cronwatch/check
 ```
 
-`craft cronwatch/check` declares every listed command and queue job, finds missed and stuck runs, sends their alerts, retries alerts no channel accepted and prunes old runs, and prints `cronwatch: checked 4 jobs, sent 0 alerts`; an error is one line on standard error and exit status 1. Run one checker per store.
+`craft cronwatch/check` declares every listed command and queue job, finds missed and stuck runs, sends their alerts, retries alerts no channel accepted, prunes old runs, and prints `cronwatch: checked 4 jobs, sent 0 alerts`; an error is one line on standard error and exit status 1. Run one checker per store.
 
 ## The store
 
@@ -106,9 +106,9 @@ The tables are in Craft's database, through a connection of CronWatch's own made
 
 Settings, Plugins, CronWatch:
 
-- **Email alerts to** (`emailTo`): sent through Craft's mailer, with the library's subject, text and HTML.
-- **Slack incoming webhook URL** (`slackWebhookUrl`), **Webhook URL** (`webhookUrl`) and **Webhook signing secret** (`webhookSecret`): the library's channels; the webhook is signed with the secret in `X-CronWatch-Signature` when there is one.
-- **More channels**, each folded under its name until one of its fields is set: Discord; email through Resend, Postmark, SendGrid, Mailgun or Amazon SES, for a site whose own mail is not reliable; text messages through Twilio; and the error trackers Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic. Each asks for what its provider needs (an API key, a from address on a domain the provider has verified, the addresses or numbers to send to, and the provider's options such as the region) and sends once every required field is set. A provider only partly filled in is refused beside the field it lacks. Their names are the provider and the field in camel case: `discordWebhookUrl`, `resendApiKey`, `resendFrom`, `resendTo`, `sesRegion`, `twilioAccountSid`, `newrelicLicenseKey`.
+- **Email alerts to** (`emailTo`): sent through Craft's mailer, with the library's subject, text, and HTML.
+- **Slack incoming webhook URL** (`slackWebhookUrl`), **Webhook URL** (`webhookUrl`), and **Webhook signing secret** (`webhookSecret`): the library's channels; the webhook is signed with the secret in `X-CronWatch-Signature` when there is one.
+- **More channels**, each folded under its name until one of its fields is set: Discord; email through Resend, Postmark, SendGrid, Mailgun, or Amazon SES, for a site whose own mail is not reliable; text messages through Twilio; and the error trackers Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, and New Relic. Each asks for what its provider needs (an API key, a from address on a domain the provider has verified, the addresses or numbers to send to, and the provider's options such as the region) and sends once every required field is set. A provider only partly filled in is refused beside the field it lacks. Their names are the provider and the field in camel case: `discordWebhookUrl`, `resendApiKey`, `resendFrom`, `resendTo`, `sesRegion`, `twilioAccountSid`, `newrelicLicenseKey`.
 - **Grace** (`grace`, 10 minutes by default).
 
 "Send a test alert" sends one to every channel the saved settings name (and any a listener adds) and shows what each answered, including a partial failure (one address of several refused, say); with none set, it says so and sends nothing. It is for admins, as the settings are.
@@ -143,7 +143,7 @@ Event::on(Plugin::class, Plugin::EVENT_ALERTS, function (AlertsEvent $event) {
 
 ## The dashboard
 
-CronWatch in the Control Panel's navigation (`admin/cronwatch`), for users with access to the plugin: the jobs' health, the last 24 hours as a lane per job, each job's week, runs and output. These are the library's pages ([Dashboard and API](/docs/dashboard/)), shown in the Control Panel with Craft's sign-in standing for the dashboard's token. Silencing, forgetting and "Run check now" need the "Silence, forget and check jobs from the dashboard" permission as well, and carry Craft's CSRF token.
+CronWatch in the Control Panel's navigation (`admin/cronwatch`), for users with access to the plugin: the jobs' health, the last 24 hours as a lane per job, each job's week, runs, and output. These are the library's pages ([Dashboard and API](/docs/dashboard/)), shown in the Control Panel with Craft's sign-in standing for the dashboard's token. Silencing, forgetting, and "Run check now" need the "Silence, forget, and check jobs from the dashboard" permission as well, and carry Craft's CSRF token.
 
 The JSON API that [`@cronwatch/mcp`](/docs/mcp/) talks to is off (404) until a token is set (`apiToken`, or the `CRONWATCH_TOKEN` environment variable); it is then at `/cronwatch/api` on the site's URL, answering requests that carry the token as a bearer:
 

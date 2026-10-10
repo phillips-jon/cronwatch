@@ -33,7 +33,7 @@ export function checkExpectation(expect: JobDefinition["expect"], output: string
 }
 
 /**
- * A stored job as the client reads it, so a foreign, hand-edited or damaged
+ * A stored job as the client reads it, so a foreign, hand-edited, or damaged
  * row affects only its own job. A definition that is not a JSON object (a
  * SQL store reads text that does not parse as null) becomes `{ name }` and
  * `readable` is false: the client reports the job and shows it as failing,

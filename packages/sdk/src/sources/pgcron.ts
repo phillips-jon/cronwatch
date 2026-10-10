@@ -30,14 +30,14 @@ export interface PgCronOptions {
   prefix?: string;
   /**
    * The CronWatch name for a job. Default its jobname with anything other
-   * than letters, digits, ".", "_", ":" and "-" turned into "-", or
+   * than letters, digits, ".", "_", ":", and "-" turned into "-", or
    * "pg_cron:<jobid>" when it has none. The prefix goes in front either way.
    * One that throws or returns no string, like a `jobs` or `options`
    * function that throws, is reported once and fails only that job, which
    * keeps its last declaration until the callback works again.
    */
   jobName?: (job: PgCronJob) => string;
-  /** Grace, timeout, maxDuration, expect and the rest, for every job or per job. The schedule always comes from pg_cron. */
+  /** Grace, timeout, maxDuration, expect, and the rest, for every job or per job. The schedule always comes from pg_cron. */
   options?: Omit<JobOptions, "schedule" | "timezone"> | ((job: PgCronJob) => Omit<JobOptions, "schedule" | "timezone">);
   /**
    * The timezone pg_cron reads its cron expressions in. Default the server's
@@ -160,9 +160,9 @@ const keyOf = (definition: JobOptions) =>
  * them. As a source, on every check it reads cron.job and declares each job
  * with its schedule, then copies new rows of cron.job_run_details in as runs
  * (ids "pgcron:<runid>"), so the usual evaluation raises missed, failed,
- * stuck and slow alerts.
+ * stuck, and slow alerts.
  *
- * A job that is renamed, unscheduled or no longer picked keeps its old name's
+ * A job that is renamed, unscheduled, or no longer picked keeps its old name's
  * runs and history, and that name is declared again without a schedule, so
  * it is never reported missed. Its description says why.
  *
@@ -339,7 +339,7 @@ export function pgCron(db: Queryable, options: PgCronOptions = {}): Source {
         }
       }
 
-      // A name this source used for a job that has since been renamed, unscheduled or dropped from `jobs`.
+      // A name this source used for a job that has since been renamed, unscheduled, or dropped from `jobs`.
       const inUse = new Set(names.values());
       for (const name of inUse) retired.delete(name);
       for (const [jobid, previous] of known) {
@@ -375,7 +375,7 @@ export function pgCron(db: Queryable, options: PgCronOptions = {}): Source {
       const alerts: Alert[] = [];
       // The names declared now, after the retires above. A run copied under
       // a retired name that was then forgotten (the dashboard's forget) has
-      // no job to go to: it is let go, never recorded and never read again.
+      // no job to go to: it is let go, never recorded, and never read again.
       const declaredNow = host.definedJobs ? new Set(host.definedJobs().map((d) => d.name)) : null;
       /** Copies one row. A row that cannot be recorded is reported and skipped; it never stops the others. */
       const record = async (row: DetailRow, evaluate: boolean): Promise<void> => {

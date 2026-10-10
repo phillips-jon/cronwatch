@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Cronwatch;
 
-/** A job at a glance: its health, open conditions, last run, next due time and recent stats. */
+/** A job at a glance: its health, open conditions, last run, next due time, and recent stats. */
 final class JobSummary
 {
     /**

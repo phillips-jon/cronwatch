@@ -52,7 +52,7 @@ defmodule Cronwatch.Test.ServerStoreTests do
       end
 
       # A client from end to end: jobs declared, runs that succeed and fail,
-      # a check that finds a stuck run and a missed one, the alerts sent and
+      # a check that finds a stuck run and a missed one, the alerts sent, and
       # the state's version moving on every write.
       test "a client records and checks" do
         {EctoStore, h} = store = Servers.store(@kind)

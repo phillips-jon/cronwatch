@@ -1,5 +1,5 @@
 """The dashboard and the small JSON API: the SDK's routes (routes/index.ts)
-with the same URLs, JSON, auth, CSRF rules, headers and pages, byte for byte,
+with the same URLs, JSON, auth, CSRF rules, headers, and pages, byte for byte,
 so @cronwatch/mcp works against a Python app as it does against a Node one.
 
 One core takes a Request and returns a Response (Web.handle). A Web is a WSGI
@@ -96,7 +96,7 @@ _COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 _MAX_BODY = 1024 * 1024
 
 # 'self' only for what the app shell needs: app.js (which registers the
-# service worker and nothing else), the manifest, the worker and the icons.
+# service worker and nothing else), the manifest, the worker, and the icons.
 # No inline script, and the pages work without any.
 _CSP = (
     "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; "
@@ -586,7 +586,7 @@ class Web:
         self._origin = _origin.parse(origin)
         self._trust_proxy = trust_proxy is True
         # A request handler cannot tell a local caller from a remote one
-        # (proxies, tunnels and a server bound to every interface all look
+        # (proxies, tunnels, and a server bound to every interface all look
         # alike), so development gets a token too: made here, and shown only
         # in the server log.
         self._generated = configured is None and not self._opted_out and _env.is_development()
@@ -708,7 +708,7 @@ class Web:
         if self._generated and not self._announced:
             self._announce(public_origin, base)
 
-        # The app shell: the manifest, icons, service worker, app.js and the
+        # The app shell: the manifest, icons, service worker, app.js, and the
         # offline page. Served to anyone, since a browser fetches some of it
         # without cookies and none of it says anything about the jobs.
         if method in ("GET", "HEAD"):

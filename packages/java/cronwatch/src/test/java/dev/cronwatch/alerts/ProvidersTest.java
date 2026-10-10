@@ -28,7 +28,7 @@ import org.junit.jupiter.api.function.Executable;
  * What the SDK's channel tests and the other ports' provider tests hold beyond the fixture: the AWS
  * SigV4 test suite, DSNs, Datadog sites and addresses read as the SDK reads them, every option the
  * SDK refuses refused with its message, nothing a channel holds printed by {@code toString},
- * recoveries per channel, the mail's content, Twilio's limits and its partial delivery through a
+ * recoveries per channel, the mail's content, Twilio's limits, and its partial delivery through a
  * client.
  */
 class ProvidersTest {

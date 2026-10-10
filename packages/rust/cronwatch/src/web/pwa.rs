@@ -1,5 +1,5 @@
 //! What makes the dashboard an installable web app (routes/pwa.ts): a
-//! manifest, icons, a service worker, the script that registers it and a
+//! manifest, icons, a service worker, the script that registers it, and a
 //! page to show offline. None of it says anything about the jobs, so it is
 //! served without the token (a browser fetches the manifest and icons
 //! without cookies in some flows). The files are the SDK's, byte for byte:
@@ -53,7 +53,7 @@ pub(crate) fn manifest(base: &str) -> String {
         .with("id", format!("{base}/"))
         .with("name", "CronWatch")
         .with("short_name", "CronWatch")
-        .with("description", "The scheduled jobs of this app: their health, their last day and their runs.")
+        .with("description", "The scheduled jobs of this app: their health, their last day, and their runs.")
         .with("start_url", format!("{base}/"))
         .with("scope", format!("{base}/"))
         .with("display", "standalone")

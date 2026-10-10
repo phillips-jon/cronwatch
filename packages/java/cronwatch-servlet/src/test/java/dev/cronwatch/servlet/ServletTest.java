@@ -39,7 +39,7 @@ import org.junit.jupiter.api.Test;
 /**
  * The servlet adapter under a real Jetty 12: the golden replay through {@link CronwatchFilter}, its
  * base path found from the context and the filter's path, and what only a servlet container has: a
- * context path, a form a filter ahead already read, the body cap and a body cut short over the
+ * context path, a form a filter ahead already read, the body cap, and a body cut short over the
  * wire, and a job's handler as {@link CronwatchServlet}.
  */
 class ServletTest {

@@ -12,7 +12,7 @@ use crate::store::BoxError;
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub enum Error {
-    /// An option, a name, a schedule or a run id the SDK refuses.
+    /// An option, a name, a schedule, or a run id the SDK refuses.
     Invalid(String),
     /// The store failed.
     Store(Arc<dyn std::error::Error + Send + Sync + 'static>),

@@ -1,13 +1,13 @@
 ---
 title: Laravel
-description: cronwatch/cronwatch in a Laravel app: every scheduled task watched with no code changes, per-task options, queued jobs, the check in the scheduler, the store in the app's database and the dashboard behind a gate.
+description: cronwatch/cronwatch in a Laravel app: every scheduled task watched with no code changes, per-task options, queued jobs, the check in the scheduler, the store in the app's database, and the dashboard behind a gate.
 order: 3.71
 group: PHP
 ---
 
 # Laravel
 
-`cronwatch/cronwatch` is the PHP port of `@cronwatch/sdk`: the same conditions, the same alert text and the same stored rows. In a Laravel app it watches every task in the schedule with no code changes, records queued jobs that opt in, schedules its own check, keeps its tables in the app's database and serves the dashboard behind a gate. It needs PHP 8.2 or newer and is tested on Laravel 12 and 13.
+`cronwatch/cronwatch` is the PHP port of `@cronwatch/sdk`: the same conditions, the same alert text, and the same stored rows. In a Laravel app it watches every task in the schedule with no code changes, records queued jobs that opt in, schedules its own check, keeps its tables in the app's database, and serves the dashboard behind a gate. It needs PHP 8.2 or newer and is tested on Laravel 12 and 13.
 
 ## Install
 
@@ -16,7 +16,7 @@ composer require cronwatch/cronwatch
 php artisan migrate
 ```
 
-Package discovery registers the service provider, so there is nothing to add to `bootstrap/providers.php`. The migration it loads makes the three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) in the app's database, so another language can share them: on SQLite or Postgres any port, on MySQL or MariaDB the Go, Rust, Elixir, Java and .NET ports.
+Package discovery registers the service provider, so there is nothing to add to `bootstrap/providers.php`. The migration it loads makes the three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) in the app's database, so another language can share them: on SQLite or Postgres any port, on MySQL or MariaDB the Go, Rust, Elixir, Java, and .NET ports.
 
 Then say where alerts go, in `.env`:
 
@@ -39,7 +39,7 @@ php artisan vendor:publish --tag=cronwatch-migrations   # optional: the migratio
 
 Every task in the app's schedule (`routes/console.php`, or `withSchedule()` in `bootstrap/app.php`) is a job, and every run `schedule:run` makes of it is recorded, through the scheduler's own events:
 
-- A run starts when Laravel starts the task, with the trigger `"laravel-scheduler"` (runs recorded before 1.0 carry `"schedule"`, and a background task started then is still finished; see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)).
+- A run starts when Laravel starts the task, with the trigger `"laravel-scheduler"` (runs recorded before 0.11 carry `"schedule"`, and a background task started then is still finished; see [Triggers, tags, and job names](/docs/dashboard/#triggers-tags-and-job-names)).
 - A command that exits non-zero fails with `Exited with code N`; a callback that throws fails with the exception, and one that returns `false` with `Returned false`. A callback's return value is treated as `run()`'s: a string is the output, and an HTTP response of 400 or more fails the run.
 - A command's output is what it wrote: its own file (`->sendOutputTo()`, or `->appendOutputTo()` read from where the file stood when the run started), or, for a task that sends its output nowhere (Laravel's default), nothing. Set `CRONWATCH_CAPTURE_OUTPUT=true` to record that output too: it goes to a temporary file of CronWatch's own for the run, which holds all of it until the run ends. At most the last 256 KB is read. A failed command's output is kept with its error.
 - A task Laravel skips (a filter said no, the schedule is paused, `->withoutOverlapping()` found the last run still going) records nothing.
@@ -66,7 +66,7 @@ A job is named after:
 
 The schedule is the task's own cron expression and timezone (`->timezone()`, else the app's). What CronWatch expects is exactly what the scheduler runs, so a task that stops running is reported missed.
 
-A task with filters (`->when()`, `->skip()`, `->between()`, `->unlessBetween()`) does not run at every time its expression names, so its job has no schedule: its failures, slow runs and stuck runs are still watched, and it is never reported missed. A task outside the current environment (`->environments()`) is not watched. Two tasks with one name on different schedules are one job without a schedule, reported once to the log; give each its own name.
+A task with filters (`->when()`, `->skip()`, `->between()`, `->unlessBetween()`) does not run at every time its expression names, so its job has no schedule: its failures, slow runs, and stuck runs are still watched, and it is never reported missed. A task outside the current environment (`->environments()`) is not watched. Two tasks with one name on different schedules are one job without a schedule, reported once to the log; give each its own name.
 
 Jobs are declared as `schedule:run` starts and at every check, so a task that has never run is known. A task taken out of the schedule keeps its history and is declared again without its schedule at the next check, so it is never reported missed. Jobs are tagged `laravel-scheduler` and `laravel-scheduler:<app>`, the app's name (`CRONWATCH_APP_ID`, else `APP_NAME`). Two apps sharing one database and table prefix need different names (Laravel's default `APP_NAME` is `Laravel`), or each would take the other's tasks for its own tasks taken out.
 
@@ -86,7 +86,7 @@ Schedule::command('orders:sync')->everyFifteenMinutes()->when(fn () => config('s
 Schedule::command('cache:prune-stale-tags')->hourly()->cronwatch(false);
 ```
 
-It takes `name` and the options of a job declared by hand: `schedule`, `timezone`, `grace`, `timeout`, `maxDuration`, `budget`, `floor`, `expect`, `failuresBeforeAlert`, `description` and `tags` (see [PHP](/docs/php/#api)). `defaults` in `config/cronwatch.php` applies `grace`, `timeout`, `timezone` and `failuresBeforeAlert` to every job that sets none, and `schedule.exclude` lists job names to leave out. `CRONWATCH_WATCH_SCHEDULE=false` stops watching the schedule altogether; the check is still scheduled unless `CRONWATCH_SCHEDULE_CHECK=false`.
+It takes `name` and the options of a job declared by hand: `schedule`, `timezone`, `grace`, `timeout`, `maxDuration`, `budget`, `floor`, `expect`, `failuresBeforeAlert`, `description`, and `tags` (see [PHP](/docs/php/#api)). `defaults` in `config/cronwatch.php` applies `grace`, `timeout`, `timezone`, and `failuresBeforeAlert` to every job that sets none, and `schedule.exclude` lists job names to leave out. `CRONWATCH_WATCH_SCHEDULE=false` stops watching the schedule altogether; the check is still scheduled unless `CRONWATCH_SCHEDULE_CHECK=false`.
 
 ## Queued jobs
 
@@ -110,7 +110,7 @@ final class SendNightlyReport implements ShouldQueue
 
 `implements Cronwatch\Laravel\ShouldBeWatched` does the same, with the options from a static `cronwatch()` method returning the options array when the class has one. `#[Watch(enabled: false)]` leaves a subclass out. The job is named after its class, backslashes as dots (`App.Jobs.SendNightlyReport`), unless `name` says otherwise.
 
-Every attempt is a run of its own, recorded in the worker that ran it with the trigger `"laravel-queue"` (`"queue"` on runs recorded before 1.0), so the rules of every other port's queues hold: failing attempts open one failed alert, the attempt that succeeds closes it with a recovery, and `failuresBeforeAlert` rides through retries. A job that hits its timeout is failed before the worker kills itself. A job released back onto the queue without an exception (a `RateLimited` or `WithoutOverlapping` middleware, or `$this->release()`) did not run, so its attempt is taken back: nothing is recorded or alerted, and the job's count of failures in a row is left as it was. So is one a middleware skips without releasing it (`->dontRelease()` on those middleware, or `Skip`), which Laravel deletes unrun. A queued listener, mailable or notification is watched by its own class. The sync queue records the same way.
+Every attempt is a run of its own, recorded in the worker that ran it with the trigger `"laravel-queue"` (`"queue"` on runs recorded before 0.11), so the rules of every other port's queues hold: failing attempts open one failed alert, the attempt that succeeds closes it with a recovery, and `failuresBeforeAlert` rides through retries. A job that hits its timeout is failed before the worker kills itself. A job released back onto the queue without an exception (a `RateLimited` or `WithoutOverlapping` middleware, or `$this->release()`) did not run, so its attempt is taken back: nothing is recorded or alerted, and the job's count of failures in a row is left as it was. So is one a middleware skips without releasing it (`->dontRelease()` on those middleware, or `Skip`), which Laravel deletes unrun. A queued listener, mailable, or notification is watched by its own class. The sync queue records the same way.
 
 A watched class that the scheduler dispatches (`Schedule::job(new SendNightlyReport)->dailyAt('02:00')`) is one job: the scheduler declares the schedule under the queued job's name and options, and the worker records the runs, so a job that is dispatched but never handled is still reported missed.
 
@@ -128,7 +128,7 @@ app(Cronwatch::class)->job('partner-export', ['schedule' => '0 3 * * *', 'timeou
     });
 ```
 
-Declare such a job in a service provider's `boot()` as well if it must be reported missed before its first run. A platform cron that calls a URL can call a route: `handler()` checks `Authorization: Bearer <CRON_SECRET>`, runs the job and answers with how it went.
+Declare such a job in a service provider's `boot()` as well if it must be reported missed before its first run. A platform cron that calls a URL can call a route: `handler()` checks `Authorization: Bearer <CRON_SECRET>`, runs the job, and answers with how it went.
 
 ```php
 // routes/api.php (routes/web.php would put Laravel's CSRF check in the way)
@@ -147,7 +147,7 @@ Route::post('/cron/nightly', app(Cronwatch::class)
 
 ## The check
 
-A task that never ran records nothing, so something has to look. The provider schedules `cronwatch:check` every five minutes in the app's own scheduler, which is already running every minute wherever scheduled tasks work, so there is no step to add. It declares the schedule, finds missed and stuck runs, sends their alerts, retries alerts no channel accepted and prunes old runs. `CRONWATCH_CHECK_CRON` changes how often, and `CRONWATCH_SCHEDULE_CHECK=false` leaves it out, for a crontab line of your own:
+A task that never ran records nothing, so something has to look. The provider schedules `cronwatch:check` every five minutes in the app's own scheduler, which is already running every minute wherever scheduled tasks work, so there is no step to add. It declares the schedule, finds missed and stuck runs, sends their alerts, retries alerts no channel accepted, and prunes old runs. `CRONWATCH_CHECK_CRON` changes how often, and `CRONWATCH_SCHEDULE_CHECK=false` leaves it out, for a crontab line of your own:
 
 ```
 */5 * * * *  cd /var/www/app && php artisan cronwatch:check
@@ -161,7 +161,7 @@ If the scheduler itself stops (its crontab line is gone, the server is down), th
 
 `CRONWATCH_STORE` picks it:
 
-- `database`, the default: the app's database (MySQL 8.0.13 or newer, MariaDB 10.6 or newer, Postgres or SQLite), the default connection or `CRONWATCH_DB_CONNECTION`. CronWatch reads that connection's settings as Laravel resolved them (a `DB_URL`, the write side of a read and write split, SSL options, Postgres's `sslmode` and `search_path`) and opens a connection of its own with them, so its writes never join a transaction the app has open: a run recorded inside `DB::transaction()` stays recorded when the transaction rolls back. The tables are CronWatch's names (`CRONWATCH_TABLE_PREFIX`, default `cronwatch_`); the connection's own table prefix does not apply, so every port reads the same tables. SQL Server is not supported.
+- `database`, the default: the app's database (MySQL 8.0.13 or newer, MariaDB 10.6 or newer, Postgres, or SQLite), the default connection or `CRONWATCH_DB_CONNECTION`. CronWatch reads that connection's settings as Laravel resolved them (a `DB_URL`, the write side of a read and write split, SSL options, Postgres's `sslmode` and `search_path`) and opens a connection of its own with them, so its writes never join a transaction the app has open: a run recorded inside `DB::transaction()` stays recorded when the transaction rolls back. The tables are CronWatch's names (`CRONWATCH_TABLE_PREFIX`, default `cronwatch_`); the connection's own table prefix does not apply, so every port reads the same tables. SQL Server is not supported.
 - `sqlite`: a file of its own, `storage/cronwatch/cronwatch.db` unless `CRONWATCH_SQLITE_PATH` says otherwise.
 - `memory`: forgets when the process ends; for tests.
 
@@ -171,7 +171,7 @@ If the scheduler itself stops (its crontab line is gone, the server is down), th
 
 | Variable | |
 |---|---|
-| `CRONWATCH_MAIL_TO` | one address or several, separated by commas, sent through the app's mailer with the library's subject, text and HTML |
+| `CRONWATCH_MAIL_TO` | one address or several, separated by commas, sent through the app's mailer with the library's subject, text, and HTML |
 | `CRONWATCH_MAIL_FROM`, `CRONWATCH_MAILER`, `CRONWATCH_MAIL_SUBJECT_PREFIX` | the sender (default the mailer's `mail.from`), a mailer from `config/mail.php`, and a subject prefix |
 | `CRONWATCH_SLACK_WEBHOOK_URL` | a Slack incoming webhook |
 | `CRONWATCH_DISCORD_WEBHOOK_URL` | a Discord webhook |
@@ -179,13 +179,13 @@ If the scheduler itself stops (its crontab line is gone, the server is down), th
 | `CRONWATCH_LOG_CHANNEL` | a channel from `config/logging.php`, written to as well |
 | `CRONWATCH_TRIAGE=true` | Claude triage, reading `ANTHROPIC_API_KEY`; `CRONWATCH_TRIAGE_MODEL` and `CRONWATCH_TRIAGE_CONTEXT` |
 
-Email, Slack and Discord alerts link to the job's page on the dashboard, at `APP_URL` (or the dashboard's `CRONWATCH_DOMAIN`), never at the host of whatever request sent the alert. `alerts.channels` in `config/cronwatch.php` takes more: any of the library's channels (Resend, Postmark, SES, Twilio, Sentry and the rest; see [PHP](/docs/php/#email-sms-and-error-trackers)), or class names the container makes. `CRON_SECRET`, `CRONWATCH_RETENTION` (default `30d`) and `CRONWATCH_DELIVER` (`check` for a process that cannot reach the network) are read too. Failures outside jobs (the store, a channel) go to the app's log.
+Email, Slack, and Discord alerts link to the job's page on the dashboard, at `APP_URL` (or the dashboard's `CRONWATCH_DOMAIN`), never at the host of whatever request sent the alert. `alerts.channels` in `config/cronwatch.php` takes more: any of the library's channels (Resend, Postmark, SES, Twilio, Sentry, and the rest; see [PHP](/docs/php/#email-sms-and-error-trackers)), or class names the container makes. `CRON_SECRET`, `CRONWATCH_RETENTION` (default `30d`), and `CRONWATCH_DELIVER` (`check` for a process that cannot reach the network) are read too. Failures outside jobs (the store, a channel) go to the app's log.
 
 To build the client yourself, bind `Cronwatch\Cronwatch` again in one of your own providers' `register()`, which runs after the package's.
 
 ## The dashboard
 
-The dashboard and JSON API are at `/cronwatch` (`CRONWATCH_PATH`, or `CRONWATCH_DOMAIN` for a domain of its own): the jobs' health, the last 24 hours as a lane per job, each job's week, runs and output, and the endpoints the [MCP server](/docs/mcp/) uses. They are the SDK's pages and API; see [Dashboard and API](/docs/dashboard/).
+The dashboard and JSON API are at `/cronwatch` (`CRONWATCH_PATH`, or `CRONWATCH_DOMAIN` for a domain of its own): the jobs' health, the last 24 hours as a lane per job, each job's week, runs, and output, and the endpoints the [MCP server](/docs/mcp/) uses. They are the SDK's pages and API; see [Dashboard and API](/docs/dashboard/).
 
 Who may open it is the `viewCronwatch` gate, asked with the signed-in user. Until you define it, it lets anyone in the `local` environment in, and no one elsewhere, as Horizon's and Telescope's gates do. Define it in a service provider's `boot()`:
 
@@ -234,7 +234,7 @@ Every key of `config/cronwatch.php` (publish it with `php artisan vendor:publish
 
 `dashboard.token` and `cron_secret` are read only as Laravel reads them. A value in the config is used as written, and an empty one, or one of only spaces, means none. When the config's value is null, the variable is read through `env()`, so `CRONWATCH_TOKEN=null` (or `(null)`, `empty`, `true`) in `.env` means no token, never the word. `cron_secret` set to `false` turns the secret off.
 
-Releases before 1.0 spelled four of these differently: `store.prefix` (now `table_prefix`), `store.create_tables` (now `create_tables`), `schedule.check` (now `check.schedule`) and `schedule.check_cron` (now `check.frequency`). The variables did not change, so a config file that was never published needs nothing. A published one that still has an old key keeps working through 1.x: the old key is read in place of the new one, with a deprecation notice (Laravel writes those to its `deprecations` log channel when one is set) naming the key to rename it to. The old keys go in 2.0.
+Releases before 0.11 spelled four of these differently: `store.prefix` (now `table_prefix`), `store.create_tables` (now `create_tables`), `schedule.check` (now `check.schedule`), and `schedule.check_cron` (now `check.frequency`). The variables did not change, so a config file that was never published needs nothing. A published one that still has an old key keeps working through 1.x: the old key is read in place of the new one, with a deprecation notice (Laravel writes those to its `deprecations` log channel when one is set) naming the key to rename it to. The old keys go in 2.0.
 
 ## Tests
 
@@ -246,4 +246,4 @@ In tests, keep runs in memory, or turn CronWatch off:
 <env name="CRONWATCH_ENABLED" value="false"/>
 ```
 
-`CRONWATCH_ENABLED=false` watches nothing, schedules no check and mounts no dashboard; `app(Cronwatch::class)` still works, so code that runs jobs by hand runs the same. The `testing` environment counts as development, so the in-memory store does not warn. With the memory store, a test can run the schedule with `$this->artisan('schedule:run')` and assert on `app(Cronwatch::class)->runs('prune-orders')`.
+`CRONWATCH_ENABLED=false` watches nothing, schedules no check, and mounts no dashboard; `app(Cronwatch::class)` still works, so code that runs jobs by hand runs the same. The `testing` environment counts as development, so the in-memory store does not warn. With the memory store, a test can run the schedule with `$this->artisan('schedule:run')` and assert on `app(Cronwatch::class)->runs('prune-orders')`.

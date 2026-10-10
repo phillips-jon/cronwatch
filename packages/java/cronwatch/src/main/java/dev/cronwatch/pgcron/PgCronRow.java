@@ -8,7 +8,7 @@ import org.jspecify.annotations.Nullable;
  * @param runId the run's id
  * @param jobId its job's id
  * @param status pg_cron's status: {@code starting}, {@code running}, {@code sending}, {@code
- *     connecting}, {@code succeeded} or {@code failed}
+ *     connecting}, {@code succeeded}, or {@code failed}
  * @param returnMessage what the command answered, or its error
  * @param startTime when it started, epoch milliseconds, or null for a run queued and not started
  *     (or one a server restart cut off)

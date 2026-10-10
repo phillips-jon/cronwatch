@@ -10,9 +10,9 @@ namespace Cronwatch.Tests;
 
 /// <summary>
 /// Replays conformance/client.json, the client driven through its public API on a fixed clock:
-/// the run ids a run's start, <c>ResumeAsync</c> and <c>RecordRunAsync</c> take
+/// the run ids a run's start, <c>ResumeAsync</c>, and <c>RecordRunAsync</c> take
 /// (<c>runIds</c>), and stored data a newer release wrote kept through a check, a silence, an
-/// unsilence, a summary and a run (<c>unknownFields</c>), over the memory store, SQLite, and
+/// unsilence, a summary, and a run (<c>unknownFields</c>), over the memory store, SQLite, and
 /// Postgres when <c>CRONWATCH_TEST_PG</c> is set.
 /// </summary>
 public class ClientConformanceTests

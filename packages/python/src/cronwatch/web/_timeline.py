@@ -24,6 +24,7 @@ from typing import Any, TypeVar
 from .. import _js
 from .._duration import FIRST_DATE_MS, LAST_DATE_MS, format_duration
 from .._evaluate import grace_ms, is_stuck, timeout_ms
+from .._format import and_list
 from .._schedule import ParsedSchedule, expectation, fires_between, parse_schedule
 from ..types import JobSummary, Run
 from ._escape import encode_uri_component, entries, h, name_html, text, to_fixed, truthy
@@ -314,10 +315,10 @@ def lane_note(job: JobSummary, missed: int | None, now: int) -> str | None:
         return "stuck"
     if _is_open(job, "over_budget") and last is not None:
         over = _over_ceilings(job)
-        return f"went over budget{' on ' + ' and '.join(over) if over else ''} at {when(last.started_at, now)}"
+        return f"went over budget{' on ' + and_list(over) if over else ''} at {when(last.started_at, now)}"
     if _is_open(job, "under_floor") and last is not None:
         under = _under_floors(job)
-        return f"fell short{' on ' + ' and '.join(under) if under else ''} at {when(last.started_at, now)}"
+        return f"fell short{' on ' + and_list(under) if under else ''} at {when(last.started_at, now)}"
     if _is_open(job, "slow") and last is not None and last.duration_ms is not None:
         return f"slow: took {format_duration(last.duration_ms)}"
     if _is_open(job, "failed"):
@@ -483,7 +484,7 @@ def _legend() -> str:
         (box("run ok"), "ran"),
         (box("run bad"), "failed"),
         (box("run timeout"), "timed out"),
-        (box("run warn"), "over budget, under floor or slow"),
+        (box("run warn"), "over budget, under floor, or slow"),
         (box("run running"), "running"),
         (box("missed"), "missed"),
     ]

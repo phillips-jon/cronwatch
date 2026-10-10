@@ -49,7 +49,7 @@ func kept[T any](v json.Marshaler, from func(any) (T, error), fallback T) T {
 	return out
 }
 
-// keptRun is a copy of run without NUL in its trigger, output, error or
+// keptRun is a copy of run without NUL in its trigger, output, error, or
 // metric names. Its id and job are identifiers, kept as given.
 func keptRun(run Run) Run {
 	c := run.clone()

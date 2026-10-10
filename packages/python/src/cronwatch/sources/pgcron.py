@@ -259,20 +259,20 @@ class PgCron:
     them. As a source, on every check it reads cron.job and declares each job
     with its schedule, then copies new rows of cron.job_run_details in as
     runs (ids "pgcron:<runid>"), so the usual evaluation raises missed,
-    failed, stuck and slow alerts.
+    failed, stuck, and slow alerts.
 
-    A job that is renamed, unscheduled or no longer picked keeps its old
+    A job that is renamed, unscheduled, or no longer picked keeps its old
     name's runs and history, and that name is declared again without a
     schedule, so it is never reported missed. Its description says why.
 
     jobs:     which jobs to watch: names or ids, or a function that picks them (given a Job). Default every job the role can see.
     prefix:   put before every job name, to keep them apart from your own ("db:"). Also keeps run ids apart.
     job_name: a function giving the CronWatch name for a Job. Default its jobname with anything other than
-              letters, digits, ".", "_", ":" and "-" turned into "-", or "pg_cron:<jobid>" when it has none.
+              letters, digits, ".", "_", ":", and "-" turned into "-", or "pg_cron:<jobid>" when it has none.
               The prefix goes in front either way. One that raises or returns no string, like a `jobs` or
               `options` function that raises, is reported once and fails only that job, which keeps its
               last declaration until the callback works again.
-    options: grace, timeout, max_duration, expect and the rest, for every job (a dict) or per job (a function
+    options: grace, timeout, max_duration, expect, and the rest, for every job (a dict) or per job (a function
               given a Job). The schedule and timezone always come from pg_cron.
     timezone: the timezone pg_cron reads its cron expressions in. Default the server's cron.timezone, read from
               pg_settings, which shows it only to roles with pg_read_all_settings; UTC (pg_cron's default) is

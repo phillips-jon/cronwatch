@@ -29,7 +29,7 @@ if Code.ensure_loaded?(Plug.Conn) do
         on each request, so a release does not bake in its build machine's
         value. `false` serves the dashboard open to anyone, for one behind the
         app's own auth. With no token in development (`CRONWATCH_ENV`,
-        `APP_ENV` or `MIX_ENV` naming it), the dashboard makes one and prints
+        `APP_ENV`, or `MIX_ENV` naming it), the dashboard makes one and prints
         a sign-in link on its first request; with none otherwise it answers
         503. `/api/check` also takes the instance's cron secret as a bearer.
       * `:base_path` - where the dashboard is mounted, when a router's mount

@@ -9,7 +9,7 @@ import (
 	"github.com/jonboulle/clockwork"
 )
 
-// TestWallRunsAreGocronsOwn holds the runs the daily, weekly and monthly
+// TestWallRunsAreGocronsOwn holds the runs the daily, weekly, and monthly
 // checks walk to gocron's own: a scheduler on a fake clock, set before each
 // of New York's clock changes and a month end, asked for its next runs.
 func TestWallRunsAreGocronsOwn(t *testing.T) {

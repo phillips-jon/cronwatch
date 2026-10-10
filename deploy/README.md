@@ -19,7 +19,7 @@ As root:
 2. The vhost: install `deploy/nginx.conf` as `/etc/nginx/sites-available/cronwatch.dev`, symlink into `sites-enabled` with only the port 80 block active, `nginx -t`, reload, then `certbot certonly --webroot -w /var/www/certbot -d cronwatch.dev -d www.cronwatch.dev`, enable the 443 blocks, `nginx -t`, reload. The 443 blocks put `http2` on the listen line for nginx 1.24; on 1.25.1 or newer, switch to `http2 on;`.
 3. The deploy key: generate a keypair for GitHub Actions and add the public half to `/home/joncphillips/.ssh/authorized_keys` as
    `restrict,command="/usr/bin/flock -w 900 /home/joncphillips/.build.lock /var/www/cronwatch.dev/deploy/release-deploy" ssh-ed25519 ...`
-   (`restrict` turns off forwarding, the pty and anything OpenSSH adds later. The 900 second wait for the shared build lock leaves room for the build itself inside the workflow's 20 minute timeout.) The forced command never runs what the client asks for. The workflow sends `deploy <commit>`, which OpenSSH puts in `SSH_ORIGINAL_COMMAND`, and `release-deploy` accepts only `deploy` or `deploy` followed by a 40-character lower-case commit id, and refuses anything else.
+   (`restrict` turns off forwarding, the pty, and anything OpenSSH adds later. The 900 second wait for the shared build lock leaves room for the build itself inside the workflow's 20 minute timeout.) The forced command never runs what the client asks for. The workflow sends `deploy <commit>`, which OpenSSH puts in `SSH_ORIGINAL_COMMAND`, and `release-deploy` accepts only `deploy` or `deploy` followed by a 40-character lower-case commit id, and refuses anything else.
 
 As joncphillips:
 
@@ -56,7 +56,7 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## Contact form
 
-The site is static except for one thing: the form on `/contact/` posts to `/contact`, which nginx hands to `deploy/contact/server.mjs` on `127.0.0.1:3790`. The service checks the form (a honeypot field, a minimum fill time, field lengths, a sane email address), sends one email to the maintainer through Amazon SES with the sender's address as Reply-To, and redirects the browser to `/contact/sent/` or `/contact/error/`. It has no dependencies, so it runs straight from the live release with the Node the builds use. nginx limits it to 5 posts a minute per address (burst 3), 20 a minute from everyone together (burst 10) and 16 KB a post, and sends the error page when the service is down or a limit is hit. The service itself sends at most 10 messages an hour per IPv4 address or IPv6 /64 (a host handed a whole /64 cannot take a new address per post), and 30 an hour and 100 a day in all, so a flood cannot use up the SES quota; past a limit it logs `rate-limited` or `over-cap` and sends the error page (`LIMITS` in `server.mjs`). A sender's name is put on one line, so it cannot add lines that pass for the Email or IP lines. The service logs one line per post to the journal: time, outcome, reason and IP address, never the message, the sender's details or a credential.
+The site is static except for one thing: the form on `/contact/` posts to `/contact`, which nginx hands to `deploy/contact/server.mjs` on `127.0.0.1:3790`. The service checks the form (a honeypot field, a minimum fill time, field lengths, a sane email address), sends one email to the maintainer through Amazon SES with the sender's address as Reply-To, and redirects the browser to `/contact/sent/` or `/contact/error/`. It has no dependencies, so it runs straight from the live release with the Node the builds use. nginx limits it to 5 posts a minute per address (burst 3), 20 a minute from everyone together (burst 10), and 16 KB a post, and sends the error page when the service is down or a limit is hit. The service itself sends at most 10 messages an hour per IPv4 address or IPv6 /64 (a host handed a whole /64 cannot take a new address per post), and 30 an hour and 100 a day in all, so a flood cannot use up the SES quota; past a limit it logs `rate-limited` or `over-cap` and sends the error page (`LIMITS` in `server.mjs`). A sender's name is put on one line, so it cannot add lines that pass for the Email or IP lines. The service logs one line per post to the journal: time, outcome, reason, and IP address, never the message, the sender's details, or a credential.
 
 Its credentials live only in an env file on the server, never in the repository. To set it up:
 
@@ -110,7 +110,7 @@ Its credentials live only in an env file on the server, never in the repository.
    ```
    The journal should say `listening on 127.0.0.1:3790`. If a variable is missing, the service names it and exits (and systemd keeps retrying every 5 seconds until it is fixed).
 
-5. **nginx.** The vhost in `deploy/nginx.conf` now has a `limit_req_zone` line at the top (the file is included inside the `http` block, where that directive belongs) and a `location = /contact`. Compare, install and reload:
+5. **nginx.** The vhost in `deploy/nginx.conf` now has a `limit_req_zone` line at the top (the file is included inside the `http` block, where that directive belongs) and a `location = /contact`. Compare, install, and reload:
    ```
    sudo diff /etc/nginx/sites-available/cronwatch.dev /var/www/cronwatch.dev/deploy/nginx.conf
    sudo cp /var/www/cronwatch.dev/deploy/nginx.conf /etc/nginx/sites-available/cronwatch.dev

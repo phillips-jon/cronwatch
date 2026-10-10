@@ -34,7 +34,7 @@ async function seeded() {
   return { cw, c, get };
 }
 
-test("the board draws a day timeline: due ticks, runs as wide as they took, a missed box and a now line", async () => {
+test("the board draws a day timeline: due ticks, runs as wide as they took, a missed box, and a now line", async () => {
   const { get } = await seeded();
   const html = await get("/cronwatch/");
   const lanes = /<ol class="lanes">([\s\S]*?)<\/ol>/.exec(html)![1]!;

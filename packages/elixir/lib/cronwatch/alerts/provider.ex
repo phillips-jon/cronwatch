@@ -1,7 +1,7 @@
 defmodule Cronwatch.Alerts.Provider do
   @moduledoc false
   # Reading the provider channels' options: text options, the link, the
-  # recovered switch and the clock, each checked the same way.
+  # recovered switch, and the clock, each checked the same way.
 
   alias Cronwatch.Alerts.Shared
   alias Cronwatch.Transport

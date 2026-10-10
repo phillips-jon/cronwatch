@@ -1,14 +1,14 @@
 # cronwatch for Rust
 
-Cron and scheduled-job monitoring that lives inside your Rust service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
+Cron and scheduled-job monitoring that lives inside your Rust service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget, or quietly does nothing. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
 
-This is the Rust port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Rust process and a Node, Ruby, Python, PHP, Go, Elixir, Java or .NET process can share one database, and every port reads the tables the others write. It has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook), the memory store, the blocking client, the SQL store in `cronwatch-sqlx` (SQLite, Postgres, MySQL and MariaDB) with the pg_cron source, the alert channels, Claude triage, the dashboard and its JSON API, and a job's HTTP handler for a platform cron, each framework-free with tower and axum adapters, and the scheduler integrations for tokio-cron-scheduler and apalis ([DESIGN.md](https://github.com/cronwatchdev/cronwatch/blob/main/packages/rust/DESIGN.md) has how each part works).
+This is the Rust port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text, and the same stored rows, so a Rust process and a Node, Ruby, Python, PHP, Go, Elixir, Java, or .NET process can share one database, and every port reads the tables the others write. It has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery, and the triage hook), the memory store, the blocking client, the SQL store in `cronwatch-sqlx` (SQLite, Postgres, MySQL, and MariaDB) with the pg_cron source, the alert channels, Claude triage, the dashboard and its JSON API, and a job's HTTP handler for a platform cron, each framework-free with tower and axum adapters, and the scheduler integrations for tokio-cron-scheduler and apalis ([DESIGN.md](https://github.com/cronwatchdev/cronwatch/blob/main/packages/rust/DESIGN.md) has how each part works).
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
 ## Install
 
-Rust 1.85 or newer for `cronwatch`, `cronwatch-tokio-cron-scheduler` and `cronwatch-apalis`; `cronwatch-sqlx` needs 1.94, as sqlx 0.9 does. The core depends on tokio, `getrandom`, `jiff`, `sha2` (the dashboard's cookie) and `md-5` (the app tag the scheduler integrations share) and nothing else: cron expressions are read by a port of [croner](https://github.com/hexagon/croner) (the parser the SDK uses), so every port agrees on every fire time. The `alerts` and `triage` features add reqwest on rustls (whose aws-lc-rs needs a C compiler) and `url`, and `alerts` also `hmac` (the webhook's signature and SES's SigV4); `tower` adds `http`, `http-body`, `http-body-util`, `bytes` and `tower-service`, and `axum` adds axum itself. `regex` lets `expect_match` take a `regex::Regex`, and `serde` gives the public types `Serialize` and `Deserialize` (the SDK's JSON, field for field) for your own use.
+Rust 1.85 or newer for `cronwatch`, `cronwatch-tokio-cron-scheduler`, and `cronwatch-apalis`; `cronwatch-sqlx` needs 1.94, as sqlx 0.9 does. The core depends on tokio, `getrandom`, `jiff`, `sha2` (the dashboard's cookie), and `md-5` (the app tag the scheduler integrations share) and nothing else: cron expressions are read by a port of [croner](https://github.com/hexagon/croner) (the parser the SDK uses), so every port agrees on every fire time. The `alerts` and `triage` features add reqwest on rustls (whose aws-lc-rs needs a C compiler) and `url`, and `alerts` also `hmac` (the webhook's signature and SES's SigV4); `tower` adds `http`, `http-body`, `http-body-util`, `bytes`, and `tower-service`, and `axum` adds axum itself. `regex` lets `expect_match` take a `regex::Regex`, and `serde` gives the public types `Serialize` and `Deserialize` (the SDK's JSON, field for field) for your own use.
 
 ```toml
 [dependencies]
@@ -89,7 +89,7 @@ job.run(|run| {
 
 ## Alerts
 
-With the `alerts` feature, `cronwatch::alerts` has the SDK's channels: Slack, Discord, a signed webhook, email through Resend, Postmark, SendGrid, Mailgun or SES, Twilio SMS, and Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic. With `triage`, `cronwatch::triage::anthropic` adds a short diagnosis from Claude to each alert.
+With the `alerts` feature, `cronwatch::alerts` has the SDK's channels: Slack, Discord, a signed webhook, email through Resend, Postmark, SendGrid, Mailgun, or SES, Twilio SMS, and Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, and New Relic. With `triage`, `cronwatch::triage::anthropic` adds a short diagnosis from Claude to each alert.
 
 ```rust
 use cronwatch::alerts::{self, SlackOptions};
@@ -109,7 +109,7 @@ Every request refuses redirects, reads at most 1 MiB of an answer, and names onl
 
 ## Dashboard
 
-`cw.routes(options)` is the dashboard and a small JSON API (the SDK's `cw.routes()`): the board with every job's last day, a page per job with its week, runs and output, silence, forget and a check, and the API `@cronwatch/mcp` talks to. It is installable as an app (a manifest, icons, a service worker and an offline page), needs no script from you, and sends a strict Content Security Policy. With the `axum` feature, nest it anywhere and it finds its base path from the mount:
+`cw.routes(options)` is the dashboard and a small JSON API (the SDK's `cw.routes()`): the board with every job's last day, a page per job with its week, runs, and output, silence, forget, and a check, and the API `@cronwatch/mcp` talks to. It is installable as an app (a manifest, icons, a service worker, and an offline page), needs no script from you, and sends a strict Content Security Policy. With the `axum` feature, nest it anywhere and it finds its base path from the mount:
 
 ```rust
 use cronwatch::web::RoutesOptions;
@@ -122,7 +122,7 @@ let app = axum::Router::new().nest_service("/cronwatch", routes);
 # }
 ```
 
-Send the token as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps you signed in. Without a token it answers 503, except in development (`CRONWATCH_ENV`, `APP_ENV` or `RUST_ENV` set to `development`, `dev`, `local`, `test` or `testing`), where it makes one and prints a sign-in link on its first request; `RoutesOptions::no_token()` serves it open behind your own auth. Writes from another site are refused. Behind a proxy, `origin("https://app.example.com")` or `trust_proxy()` says what the browser sees. With the `tower` feature `Routes` is a `tower::Service` for hyper, tonic or anything else built on tower; without it, `routes.handle(web::Request)` answers a `web::Response` for a framework of your own.
+Send the token as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps you signed in. Without a token it answers 503, except in development (`CRONWATCH_ENV`, `APP_ENV`, or `RUST_ENV` set to `development`, `dev`, `local`, `test`, or `testing`), where it makes one and prints a sign-in link on its first request; `RoutesOptions::no_token()` serves it open behind your own auth. Writes from another site are refused. Behind a proxy, `origin("https://app.example.com")` or `trust_proxy()` says what the browser sees. With the `tower` feature `Routes` is a `tower::Service` for hyper, tonic, or anything else built on tower; without it, `routes.handle(web::Request)` answers a `web::Response` for a framework of your own.
 
 ## Handler
 
@@ -170,16 +170,16 @@ A program a crontab runs needs neither: [`examples/crontab`](https://github.com/
 
 ## Changes for 1.0
 
-1.0 promises the names this README and the [Rust docs](https://cronwatch.dev/docs/rust/) document, the stored data, the dashboard's JSON API and the webhook's payload. Getting there changed a few things in 0.11.0.
+1.0 promises the names this README and the [Rust docs](https://cronwatch.dev/docs/rust/) document, the stored data, the dashboard's JSON API, and the webhook's payload. Getting there changed a few things in 0.11.0.
 
 **Breaking, for code that builds these types with a struct literal.** They are `#[non_exhaustive]` now, so a later 1.x can add a field without breaking your build:
 
-- `Run`, `StoredJob`, `OpenCondition`, `SendingAlert`, `BudgetBreach`, `Alert`, `JobState`, `Stats`, `JobSummary`, `CheckResult`, `JobWithRuns`, `TriageContext`, `alerts::Request` and `alerts::Response`: make one with `Run::new(id, job, status, started_at)`, `StoredJob::new(definition, created_at, updated_at)`, `OpenCondition::new`, `SendingAlert::new`, `BudgetBreach::new`, `Alert::new(type, job, details, at)`, `TriageContext::new`, `alerts::Request::new` or `Response::new` and set the rest of its fields, or read one with `from_json`.
-- `AlertDetails`'s variants: make one with `AlertDetails::missed`, `failure`, `slow`, `over_budget`, `under_floor` or `recovered`, and match with `..`.
-- Every channel's options (`SlackOptions`, `DiscordOptions`, `WebhookOptions`, `EmailOptions`, `ResendOptions`, `PostmarkOptions`, `SendgridOptions`, `MailgunOptions`, `SesOptions`, `TwilioOptions`, `SentryOptions`, `HoneybadgerOptions`, `DatadogOptions`, `RollbarOptions`, `BugsnagOptions`, `NewRelicOptions`), `triage::AnthropicOptions`, `cronwatch_sqlx::PgCronOptions` and the integrations' `Options`: start from `new()` and set fields with the builder method named after each, `SlackOptions::new().webhook_url(url)` where you wrote `SlackOptions { webhook_url: url, ..Default::default() }`. `cronwatch_sqlx::PgCronJob` is read only.
+- `Run`, `StoredJob`, `OpenCondition`, `SendingAlert`, `BudgetBreach`, `Alert`, `JobState`, `Stats`, `JobSummary`, `CheckResult`, `JobWithRuns`, `TriageContext`, `alerts::Request`, and `alerts::Response`: make one with `Run::new(id, job, status, started_at)`, `StoredJob::new(definition, created_at, updated_at)`, `OpenCondition::new`, `SendingAlert::new`, `BudgetBreach::new`, `Alert::new(type, job, details, at)`, `TriageContext::new`, `alerts::Request::new`, or `Response::new` and set the rest of its fields, or read one with `from_json`.
+- `AlertDetails`'s variants: make one with `AlertDetails::missed`, `failure`, `slow`, `over_budget`, `under_floor`, or `recovered`, and match with `..`.
+- Every channel's options (`SlackOptions`, `DiscordOptions`, `WebhookOptions`, `EmailOptions`, `ResendOptions`, `PostmarkOptions`, `SendgridOptions`, `MailgunOptions`, `SesOptions`, `TwilioOptions`, `SentryOptions`, `HoneybadgerOptions`, `DatadogOptions`, `RollbarOptions`, `BugsnagOptions`, `NewRelicOptions`), `triage::AnthropicOptions`, `cronwatch_sqlx::PgCronOptions`, and the integrations' `Options`: start from `new()` and set fields with the builder method named after each, `SlackOptions::new().webhook_url(url)` where you wrote `SlackOptions { webhook_url: url, ..Default::default() }`. `cronwatch_sqlx::PgCronJob` is read only.
 - `js::parse` answers `JsonError`, the error every `from_json` answers, where it answered `js::ParseError`.
 
-**On the wire.** The dashboard API's silence and unsilence answer `{"ok":true,"job":<summary>}` where they answered the stored state, and `GET <base>/api` names the library, its language and version. The webhook's body starts with `"schema": 1`. `record_run` refuses a run id longer than 200 characters, as `start` does.
+**On the wire.** The dashboard API's silence and unsilence answer `{"ok":true,"job":<summary>}` where they answered the stored state, and `GET <base>/api` names the library, its language, and its version. The webhook's body starts with `"schema": 1`. `record_run` refuses a run id longer than 200 characters, as `start` does.
 
 **Deprecated**, each still working and marked `#[deprecated]` so the compiler says what to use:
 
@@ -187,13 +187,13 @@ A program a crontab runs needs neither: [`examples/crontab`](https://github.com/
 |---|---|---|
 | `Client::start(every)`, `blocking::Client::start(every)` | `start_checking(every)`: a job's `start` opens a run, so the client's is named for what it starts | 2.0 |
 | `Routes::into_router()` | `Router::new().nest_service("/cronwatch", routes)`: axum is below 1.0, so its types stay out of this crate's API | 1.0 |
-| `ReqwestTransport::with_client(client)` | the default transport (`transport: None`, which honours `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY`), or a `Transport` of your own: reqwest is below 1.0 | 1.0 |
-| `describe_job(name, &options)` | nothing: documented before 1.0, so it stays through 1.x | 2.0 |
+| `ReqwestTransport::with_client(client)` | the default transport (`transport: None`, which honours `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY`), or a `Transport` of your own: reqwest is below 1.0 | 1.0 |
+| `describe_job(name, &options)` | nothing: documented before 0.11, so it stays through 1.x | 2.0 |
 | `run_duration`, `state_version`; `js::ParseError`; `alerts::MAX_SEGMENTS`, `alerts::post::{TIMEOUT, MAX_BODY, origin}`; `triage::{SYSTEM, REQUEST_TIMEOUT, FALLBACK_BETA}`; `cronwatch_sqlx::pgcron::{HOLD, schedule, job_name, run_of}` | nothing: internal, public by accident (`JsonError` for `ParseError`) | 1.0 |
-| everything in `storetest` but `run` (`replay_fixture`, `finish_once`, `Shared`, `Clock`, `T0` and the other fixture helpers) | `storetest::run`, the contract test | 1.0 |
+| everything in `storetest` but `run` (`replay_fixture`, `finish_once`, `Shared`, `Clock`, `T0`, and the other fixture helpers) | `storetest::run`, the contract test | 1.0 |
 
 `cronwatch::bridge`, which the scheduler integrations are built on, is for integration authors and outside the promise. `cronwatch-apalis` stays below 1.0 while apalis is a release candidate.
 
 ## Testing
 
-`cargo test --workspace --all-features` in `packages/rust`. The dashboard's tests replay the SDK's answers (`packages/ruby/test/web/golden.json`) straight into `Routes::handle`, through the tower service and through a real server with the dashboard nested in axum; the ones that need an environment of their own (development, a missing token) run in a child process of the test binary, as do the Lambda tests, against a fake Lambda runtime API. `CRONWATCH_TEST_RUST=1 npm test --workspace packages/mcp` at the repository root drives `@cronwatch/mcp` against the dashboard `webserver` serves (`cargo run -p cronwatch-webserver -- PORT`). The Postgres, MySQL, MariaDB and pg_cron tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` hold URLs of servers to use (`postgres://...`, `mysql://...`), and say they skipped otherwise; `CRONWATCH_TEST_PG` also runs `cronwatch-apalis` over apalis's Postgres storage. The scheduler tests run real schedulers on the wall clock, a few seconds in all. The workspace's `.cargo/config.toml` sets `TZ=UTC`, as the conformance fixtures are made. The croner parity check and the SQLite file shared with Node run when `node` and the built SDK (`npm run build --workspace packages/sdk`) are there, and skip with the reason otherwise. Every README's examples are doc tests, compiled with the rest of the suite. `packages/rust/fuzz` has cargo-fuzz targets for what reads untrusted input (JSON, durations, cron schedules, `jsre` patterns, a dashboard request, stored rows): `cargo +nightly fuzz run <target>` there, after `cargo install cargo-fuzz`. CI also runs the tests on macOS and Windows, checks each feature alone (`cargo hack`), the docs with warnings denied, the packaged crates and the lowest versions the manifests allow, and runs the fuzz targets once a week.
+`cargo test --workspace --all-features` in `packages/rust` runs the tests. The Postgres, MySQL, MariaDB, and pg_cron tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB`, and `CRONWATCH_TEST_PGCRON` hold URLs of servers to use (`postgres://...`, `mysql://...`), and say they skipped otherwise; `CRONWATCH_TEST_PG` also runs `cronwatch-apalis` over apalis's Postgres storage. [DESIGN.md](https://github.com/cronwatchdev/cronwatch/blob/main/packages/rust/DESIGN.md#testing) has how the suite is built and what CI runs.

@@ -1,4 +1,4 @@
-//! Runs that span calls (client.ts `start()`, `resume()` and the
+//! Runs that span calls (client.ts `start()`, `resume()`, and the
 //! `RunHandle`): a run recorded as running now and finished later, perhaps
 //! by another process.
 
@@ -20,7 +20,7 @@ use crate::types::{Metrics, Run, RunStatus, run_duration};
 pub const RESERVED_RUN_ID_PREFIX: &str = "pgcron:";
 
 /// The longest run id, in UTF-16 code units (JavaScript's string length):
-/// what `start`, `resume` and `record_run` take, and every store holds.
+/// what `start`, `resume`, and `record_run` take, and every store holds.
 pub(crate) const MAX_RUN_ID: usize = 200;
 
 /// The SDK's error for a run id no store could hold, or one reserved for the
@@ -336,7 +336,7 @@ impl RunHandle {
     }
 
     /// Appends the lines and metrics added so far to the stored run, which
-    /// must still be running and belong to this job. A read, change and write
+    /// must still be running and belong to this job. A read, change, and write
     /// of the run's row, written only while it is still running: two
     /// processes appending to one run at the same moment can lose one's
     /// lines, but a flush never undoes a finish. Problems go to the error
@@ -428,7 +428,7 @@ impl RunHandle {
     }
 
     /// Finishes the run successfully (unless an expect rule says otherwise),
-    /// judges it like any other and sends what that produces. Returns the run
+    /// judges it like any other, and sends what that produces. Returns the run
     /// as recorded, or `None` when nothing was recorded: the run was already
     /// finished (here or elsewhere), was not found, or belongs to another
     /// job, which is reported to the error handler. When several processes

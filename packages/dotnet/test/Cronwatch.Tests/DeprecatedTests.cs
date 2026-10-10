@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
@@ -67,7 +68,7 @@ public class DeprecatedTests
     }
 
     /// <summary>
-    /// A store written before 1.0 that implemented the former interfaces explicitly, as C# often
+    /// A store written before 0.11 that implemented the former interfaces explicitly, as C# often
     /// does an optional interface: it still compiles, and each method is what the client calls.
     /// </summary>
     private sealed class ExplicitlyFormer(IStore inner) : IStore, IConditionalRunStore, IStateCasStore, IRunDeletingStore
@@ -157,7 +158,7 @@ public class DeprecatedTests
         Assert.True(store.Calls > 0);
     }
 
-    /// <summary>A store of an app's own, written before 1.0 against <see cref="IStateCasStore"/>.</summary>
+    /// <summary>A store of an app's own, written before 0.11 against <see cref="IStateCasStore"/>.</summary>
     private sealed class FormerCas : Support.Wrapped, IStateCasStore
     {
         public int Calls;
@@ -194,6 +195,18 @@ public class DeprecatedTests
     {
         Assert.Equal(StoreTesting.StoreContract.MakeRun("r", "j", RunStatus.Ok, 5), StoreTesting.StoreContract.NewRun("r", "j", RunStatus.Ok, 5));
         Assert.Equal(StoreTesting.ForeignRowChecks.FarStarts, StoreTesting.ForeignRows.FarStarts);
+    }
+
+    [Fact]
+    public void The_store_kit_promises_only_the_contract()
+    {
+        foreach (var type in new[] { typeof(StoreTesting.StoreReplay), typeof(StoreTesting.FinishOnce), typeof(StoreTesting.ForeignRows) })
+        {
+            Assert.NotNull(Attribute.GetCustomAttribute(type, typeof(ObsoleteAttribute)));
+        }
+        Assert.NotNull(Attribute.GetCustomAttribute(typeof(StoreTesting.StoreContract).GetMethod("NewRun")!, typeof(ObsoleteAttribute)));
+        Assert.Null(Attribute.GetCustomAttribute(typeof(StoreTesting.StoreContract), typeof(ObsoleteAttribute)));
+        Assert.Null(Attribute.GetCustomAttribute(typeof(StoreTesting.StoreContract).GetMethod("RunAsync")!, typeof(ObsoleteAttribute)));
     }
 
     [Fact]

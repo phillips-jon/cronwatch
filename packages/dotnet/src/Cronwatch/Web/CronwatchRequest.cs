@@ -28,7 +28,7 @@ public delegate Task<byte[]> WebBodyReader(int limit, CancellationToken cancella
 /// <remarks>
 /// The target and the headers can carry the dashboard's token or a cron secret, so they have no
 /// public getter: read a header with <see cref="Header"/> and the path with <see cref="Path"/>.
-/// <see cref="ToString"/> names the method, the path and the header names, never a value.
+/// <see cref="ToString"/> names the method, the path, and the header names, never a value.
 /// </remarks>
 [DebuggerDisplay("{ToString(),nq}")]
 public sealed class CronwatchRequest
@@ -151,7 +151,7 @@ public sealed class CronwatchRequest
     }
 
     /// <summary>
-    /// Names the method, the path and the header names; the query, every value, and the scheme and
+    /// Names the method, the path, and the header names; the query, every value, and the scheme and
     /// authority of a target in the absolute form (which can carry credentials) are left out.
     /// </summary>
     public override string ToString()

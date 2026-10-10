@@ -1,6 +1,6 @@
 ---
 title: TypeScript API reference
-description: Every option on cronwatch(), cw.job(), the job handle, the job context and the client.
+description: Every option on cronwatch(), cw.job(), the job handle, the job context, and the client.
 order: 12
 group: Reference
 ---
@@ -25,7 +25,7 @@ group: Reference
 
 ## cw.job(name, options)
 
-Names are 1 to 120 characters, starting with a letter or digit, of letters, digits, `.`, `_`, `:` and `-`. Declaring the same name twice replaces the options. Options are checked when the job is declared: an unknown timezone, a schedule that does not parse or an interval under one second, a `grace`, `timeout` or `maxDuration` that is not a duration, a zero `timeout` or `maxDuration`, a `failuresBeforeAlert` that is not a whole number of 1 or more, or a budget that is not a finite number of 0 or more all throw, rather than quietly turning a check off. A duration string longer than 64 characters throws too, wherever one is read (these options, the interval in `every`, `retention`, `startChecking()` and `silence()`); no real duration comes near it.
+Names are 1 to 120 characters, starting with a letter or digit, of letters, digits, `.`, `_`, `:`, and `-`. Declaring the same name twice replaces the options. Options are checked when the job is declared: an unknown timezone, a schedule that does not parse, an interval under one second, a `grace`, `timeout`, or `maxDuration` that is not a duration, a zero `timeout` or `maxDuration`, a `failuresBeforeAlert` that is not a whole number of 1 or more, or a budget that is not a finite number of 0 or more all throw, rather than quietly turning a check off. A duration string longer than 64 characters throws too, wherever one is read (these options, the interval in `every`, `retention`, `startChecking()`, and `silence()`); no real duration comes near it.
 
 | Option | Default | |
 |---|---|---|
@@ -35,7 +35,7 @@ Names are 1 to 120 characters, starting with a letter or digit, of letters, digi
 | `timeout` | `"1h"` | a run still going after this is stuck: marked `timeout`, counted as a failure, and alerted as stuck. The job's signal aborts then |
 | `maxDuration` | baseline | a run that succeeded but took longer than this is slow: it stays `ok` and is alerted as slow. Without it, slow is more than twice the p95 of recent successful runs (and over 10 seconds) |
 | `budget` | baseline | `{ metric: ceiling }`, each ceiling a finite number, 0 or more |
-| `expect` | | string, RegExp or `(output) => boolean` the output must satisfy. A RegExp, like a function, runs without a time limit: see [expect rules](/docs/conditions/#expect-rules) |
+| `expect` | | string, RegExp, or `(output) => boolean` the output must satisfy. A RegExp, like a function, runs without a time limit: see [expect rules](/docs/conditions/#expect-rules) |
 | `failuresBeforeAlert` | `1` | alert on the Nth consecutive failure; a whole number, 1 or more |
 | `description`, `tags` | | shown on the dashboard |
 
@@ -46,9 +46,9 @@ Returns a handle:
 | Method | |
 |---|---|
 | `run(fn, { trigger? })` | runs `fn(job)`, records the run, returns its result, rethrows its error |
-| `handler(fn, { secret? })` | a `(request) => Promise<Response>` that checks the bearer secret, runs `fn(job, request)` and answers with JSON, or with the `Response` `fn` returned. `secret` defaults to the client's `cronSecret` (also when empty or only whitespace; neither a string nor `null`, it throws); `null` accepts anyone, and then the JSON leaves out the error text |
+| `handler(fn, { secret? })` | a `(request) => Promise<Response>` that checks the bearer secret, runs `fn(job, request)`, and answers with JSON, or with the `Response` `fn` returned. `secret` defaults to the client's `cronSecret` (also when empty or only whitespace; neither a string nor `null`, it throws); `null` accepts anyone, and then the JSON leaves out the error text |
 | `start({ trigger?, id? })` | records a running run now and returns a [run handle](#the-run-handle) to finish it later, perhaps in another process. `trigger` defaults to `"start"`. `id` (1 to 200 characters) is your own stable id, such as an Inngest run id: a start with an id already recorded returns a handle on that run instead of recording another. A store that fails is reported to `onError`, never thrown, and the run is written when it finishes |
-| `resume(runId)` | a run handle on a run started elsewhere, read from the store. One that already finished, or is not in the store, gives a handle whose `finish()` records nothing and reports why to `onError`. Throws only for a run of another job, or for an id that is empty, longer than 200 characters or starts with `pgcron:` (the same rules as `start({ id })`) |
+| `resume(runId)` | a run handle on a run started elsewhere, read from the store. One that already finished, or is not in the store, gives a handle whose `finish()` records nothing and reports why to `onError`. Throws only for a run of another job, or for an id that is empty, longer than 200 characters, or starts with `pgcron:` (the same rules as `start({ id })`) |
 
 ## The job context
 
@@ -71,7 +71,7 @@ What `start()` and `resume()` return, for a run that spans several calls or proc
 | `id`, `job`, `startedAt` | `startedAt` is null when a resumed run could not be read |
 | `active` | false once finished, and from the start when a resumed run has already finished or was not found |
 | `log(...parts)`, `metric(name, value)`, `metrics({ ... })` | as on the job context; kept in the handle until `flush()` or `finish()` |
-| `flush()` | appends the lines and metrics so far to the stored run, which must still be running. Output is redacted as it is written. This reads, changes and writes the run's row, so when two processes append to one run at the same moment the last write wins and the other's lines are lost |
+| `flush()` | appends the lines and metrics so far to the stored run, which must still be running. Output is redacted as it is written. This reads, changes, and writes the run's row, so when two processes append to one run at the same moment the last write wins and the other's lines are lost |
 | `finish(outcome?)` | finishes the run and judges it like any other; see [below](#finish) |
 | `fail(error)` | `finish({ error })` |
 
@@ -80,7 +80,7 @@ What `start()` and `resume()` return, for a run that spans several calls or proc
 - `finish()` or `finish({ status: "ok" })` is a success.
 - `finish({ error })` is a failure, recorded like an error `run()` caught.
 - `finish("text")` or `finish({ result })` treats the value like `run()`'s return: a string is the output when nothing was logged and is checked by `expect`, and a `Response` of 400 or above fails.
-- Lines and metrics from the handle are added to those already stored, then `expect`, redaction and the 16 KB cap apply.
+- Lines and metrics from the handle are added to those already stored, then `expect`, redaction, and the 16 KB cap apply.
 - It resolves to the recorded run, or null when nothing was recorded.
 
 A second `finish()` on a handle, or on a run another process has finished, records nothing: it resolves to null and is reported to `onError`, never thrown. When two processes finish one run at the same moment, only one records and judges it. If the store fails during `finish()`, the handle stays active so `finish()` can be called again. An id belongs to one job: `start()` or `resume()` with an id another job's run already has throws, and ids starting with `pgcron:` are reserved for the pg_cron source. A run that is never finished is marked stuck by the first check after the job's `timeout`; one finished after that follows the same rule as a late `run()`: a late failure is not counted again, and a late success closes stuck and recovers.
@@ -111,11 +111,11 @@ A second `finish()` on a handle, or on a run another process has finished, recor
 | Option | Default | |
 |---|---|---|
 | `token` | `CRONWATCH_TOKEN` | the bearer the routes require, and what the sign-in cookie holds a digest of. Empty or only whitespace counts as unset, here or in the variable; a value that is neither a string nor `null` throws. With none, [in development](/docs/dashboard/#development), the routes make a random token and print a sign-in link to the server log on their first request; otherwise they answer 503. `null` opts out and serves them open |
-| `basePath` | `"/cronwatch"` | where the routes are mounted: it routes requests, builds links and scopes the cookie |
+| `basePath` | `"/cronwatch"` | where the routes are mounted: it routes requests, builds links, and scopes the cookie |
 | `origin` | the request URL's | the public origin, such as `"https://app.example.com"`, used for the cross-site check, the sign-in redirect and cookie, and the development sign-in line. Must be an `http` or `https` URL, or the call throws |
 | `trustProxy` | `false` | take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host` instead, when present (see [behind a proxy](/docs/dashboard/#behind-a-proxy)). With neither this nor `origin`, forwarded headers are ignored |
 
-The development sign-in line names the host only when `origin` is set or the first request's host is loopback (`localhost`, a name ending in `.localhost`, `127.0.0.0/8` or `::1`); for any other host it prints the path alone, since a client controls the `Host` header. Cross-site writes are refused, only a `Bearer` `Authorization` header is read as the token (any other scheme leaves the cookie and `?token=` to sign in), the sign-in form posts the token to `<base>/signin`, `?token=` is read only on a page `GET`, and a silence `for` that is not a duration or a number of milliseconds is a 400.
+The development sign-in line names the host only when `origin` is set or the first request's host is loopback (`localhost`, a name ending in `.localhost`, `127.0.0.0/8`, or `::1`); for any other host it prints the path alone, since a client controls the `Host` header. Cross-site writes are refused, only a `Bearer` `Authorization` header is read as the token (any other scheme leaves the cookie and `?token=` to sign in), the sign-in form posts the token to `<base>/signin`, `?token=` is read only on a page `GET`, and a silence `for` that is not a duration or a number of milliseconds is a 400.
 
 ### recordRun()
 
@@ -130,21 +130,21 @@ The development sign-in line names the host only when `origin` is set or the fir
 
 ## Exports
 
-`@cronwatch/sdk`: `cronwatch`, `Cronwatch` (the client class, and its options type `CronwatchOptions`; the former spellings `CronWatch` and `CronWatchOptions` still work through 1.x, deprecated), `memory`, `custom`, `consoleChannel`, `parseDuration`, `formatDuration`, `parseSchedule`, `nextFire` (the next time a parsed schedule fires after a given time), `composeAlert`, and every type they use, including `Alert`, `AlertDraft`, `AlertDetails`, `ParsedSchedule`, `JobContext`, `RunHandle`, `StartOptions`, `RunOutcome`, `RecordRunOptions`, `Source` and `SourceHost` (the interface a source is given: `job()`, `recordRun()`, `store`, `now` and `onError`), and `FetchHandler`, `Routes` and `RoutesOptions`.
+`@cronwatch/sdk`: `cronwatch`, `Cronwatch` (the client class, and its options type `CronwatchOptions`; the former spellings `CronWatch` and `CronWatchOptions` still work through 1.x, deprecated), `memory`, `custom`, `consoleChannel`, `parseDuration`, `formatDuration`, `parseSchedule`, `nextFire` (the next time a parsed schedule fires after a given time), `composeAlert`, and every type they use, including `Alert`, `AlertDraft`, `AlertDetails`, `ParsedSchedule`, `JobContext`, `RunHandle`, `StartOptions`, `RunOutcome`, `RecordRunOptions`, `Source` and `SourceHost` (the interface a source is given: `job()`, `recordRun()`, `store`, `now`, and `onError`), and `FetchHandler`, `Routes`, and `RoutesOptions`.
 
-Stores: `@cronwatch/sdk/sqlite` (`sqlite`), `/postgres` (`postgres`) and `/d1` (`d1`). `/sqlite` needs `better-sqlite3` and `/postgres` needs `pg`, both optional peer dependencies; `/d1` needs nothing.
+Stores: `@cronwatch/sdk/sqlite` (`sqlite`), `/postgres` (`postgres`), and `/d1` (`d1`). `/sqlite` needs `better-sqlite3` and `/postgres` needs `pg`, both optional peer dependencies; `/d1` needs nothing.
 
 Sources: `@cronwatch/sdk/pg-cron` (`pgCron`), which reads pg_cron's jobs and runs through the pool you pass it. See [Supabase and pg_cron](/docs/supabase/).
 
-Alert channels, one function each, named after the entry: `/slack`, `/discord`, `/webhook`, `/resend`, `/postmark`, `/sendgrid`, `/mailgun`, `/ses`, `/twilio`, `/sentry`, `/honeybadger`, `/datadog`, `/rollbar`, `/bugsnag` and `/newrelic`. None needs a dependency. `/webhook` also has `signature(secret, body)`, for a receiver checking the [signature header](/docs/alerts/#webhook). See [Alerts](/docs/alerts/).
+Alert channels, one function each, named after the entry: `/slack`, `/discord`, `/webhook`, `/resend`, `/postmark`, `/sendgrid`, `/mailgun`, `/ses`, `/twilio`, `/sentry`, `/honeybadger`, `/datadog`, `/rollbar`, `/bugsnag`, and `/newrelic`. None needs a dependency. `/webhook` also has `signature(secret, body)`, for a receiver checking the [signature header](/docs/alerts/#webhook). See [Alerts](/docs/alerts/).
 
-Each entry point is named after the product it stores in, sends to, reads or triages with, and exports that one function, its options type and nothing else that is promised.
+Each entry point is named after the product it stores in, sends to, reads, or triages with, and exports that one function, its options type, and nothing else that is promised.
 
 Triage: `@cronwatch/sdk/anthropic` (`anthropic`) needs `@anthropic-ai/sdk`, which you install yourself.
 
-The core, `/d1`, `/pg-cron` and every channel use only `fetch` and Web Crypto, so they run on Node 22 or newer, Cloudflare Workers, Deno and Bun. `/sqlite`, `/postgres` and `/node` need Node.
+The core, `/d1`, `/pg-cron`, and every channel use only `fetch` and Web Crypto, so they run on Node 22 or newer, Cloudflare Workers, Deno, and Bun. `/sqlite`, `/postgres`, and `/node` need Node.
 
-`@cronwatch/sdk/node`: `toNodeHandler(fetchHandler, { trustProxy?, basePath? })` turns a fetch-style handler (the routes, or a job's `handler()`) into `(req, res, next?)` for `http.createServer`, Express or Connect, NestJS and Firebase `onRequest`; `toKoaMiddleware(fetchHandler, options?)` does the same for Koa; `toRequest(req, options?)` and `writeResponse(res, response)` are the two halves. Node only; see [Express, Koa and plain Node servers](/docs/node/#express-koa-and-plain-node-servers).
+`@cronwatch/sdk/node`: `toNodeHandler(fetchHandler, { trustProxy?, basePath? })` turns a fetch-style handler (the routes, or a job's `handler()`) into `(req, res, next?)` for `http.createServer`, Express or Connect, NestJS, and Firebase `onRequest`; `toKoaMiddleware(fetchHandler, options?)` does the same for Koa; `toRequest(req, options?)` and `writeResponse(res, response)` are the two halves. Node only; see [Express, Koa, and plain Node servers](/docs/node/#express-koa-and-plain-node-servers).
 
 ## Deprecated
 
@@ -156,4 +156,4 @@ These names still work, and do exactly what their replacements do, through every
 | `createRoutes(cw, options)` | `cw.routes(options)` |
 | `cw.start(every)` | `cw.startChecking(every)`: a job's `start()` opens a run, so the client's is named for what it starts |
 
-These were exported by accident. Each is marked `@deprecated` too, still works, and is no longer exported from 1.0: `hmacSha256Hex` from `/webhook` (use `signature(secret, body)`, the name every port uses), and, internal to their entry points, `MAX_SEGMENTS`, `MAX_BODY`, `smsSegments` and `smsBody` from `/twilio`; `parseDsn` from `/sentry`; `DESCRIPTION_MAX`, `embedDescription`, `codeBlockSafe` and `escapeMarkdown` from `/discord`; `PG_CRON_HOLD_MS`, `pgCronSchedule`, `pgCronJobName` and `pgCronRun` from `/pg-cron`.
+These were exported by accident. Each is marked `@deprecated` too, still works, and is no longer exported from 1.0: `hmacSha256Hex` from `/webhook` (use `signature(secret, body)`, the name every port uses), and, internal to their entry points, `MAX_SEGMENTS`, `MAX_BODY`, `smsSegments`, and `smsBody` from `/twilio`; `parseDsn` from `/sentry`; `DESCRIPTION_MAX`, `embedDescription`, `codeBlockSafe`, and `escapeMarkdown` from `/discord`; `PG_CRON_HOLD_MS`, `pgCronSchedule`, `pgCronJobName`, and `pgCronRun` from `/pg-cron`.

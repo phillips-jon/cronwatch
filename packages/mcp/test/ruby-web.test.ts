@@ -8,7 +8,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createServer } from "../src/server.js";
 
 // The same tools against the Ruby gem's Cronwatch::Web, served over HTTP by
-// packages/ruby/test/web/server.rb. Needs Ruby 3.2+ with fugit, rack and a
+// packages/ruby/test/web/server.rb. Needs Ruby 3.2+ with fugit, rack, and a
 // server rackup can start (puma or webrick), so it only runs when asked:
 //
 //   CRONWATCH_TEST_RUBY=1 npm test --workspace packages/mcp

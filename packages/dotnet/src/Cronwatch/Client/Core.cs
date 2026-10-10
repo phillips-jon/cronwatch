@@ -7,7 +7,7 @@ using Cronwatch.Internal;
 
 namespace Cronwatch;
 
-/// <summary>A job declared in this process: its name, stored definition and expect rule.</summary>
+/// <summary>A job declared in this process: its name, stored definition, and expect rule.</summary>
 internal sealed class JobDef(string name, Definition stored, Expect? expect)
 {
     public string Name { get; } = name;
@@ -17,7 +17,7 @@ internal sealed class JobDef(string name, Definition stored, Expect? expect)
     public Expect? Expect { get; } = expect;
 }
 
-/// <summary>What the client's parts share: the store, the declared jobs, the job queues and the client's own tasks.</summary>
+/// <summary>What the client's parts share: the store, the declared jobs, the job queues, and the client's own tasks.</summary>
 public sealed partial class CronwatchClient
 {
     internal const int StateAttempts = 10;
@@ -393,7 +393,7 @@ public sealed partial class CronwatchClient
 
     /// <summary>
     /// A stored job as the client reads it (the SDK's <c>readStoredJob</c>), so a foreign,
-    /// hand-edited or damaged row affects only its own job: <c>tags</c> is kept only when it is a
+    /// hand-edited, or damaged row affects only its own job: <c>tags</c> is kept only when it is a
     /// list of strings, and every other field as stored. A definition that was not a JSON object
     /// comes from the store already read as <c>{ name }</c> and marked unreadable.
     /// </summary>

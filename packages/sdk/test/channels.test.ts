@@ -281,7 +281,7 @@ test("honeybadger sends a notice with a fingerprint per job and type, and skips 
   await assertSafeFailure(t, honeybadger({ apiKey: "hb-key" }), /^Honeybadger https:\/\/api\.honeybadger\.io answered 401/, ["hb-key"]);
 });
 
-test("datadog posts a v1 event with alert_type, aggregation key, tags and a site", async (t) => {
+test("datadog posts a v1 event with alert_type, aggregation key, tags, and a site", async (t) => {
   const calls = stubFetch(t);
   await datadog({ apiKey: "dd-key", tags: ["env:prod"], link }).send(failed());
   await datadog({ apiKey: "dd-key", site: "datadoghq.eu" }).send(slow());
@@ -307,7 +307,7 @@ test("datadog posts a v1 event with alert_type, aggregation key, tags and a site
   await assertSafeFailure(t, datadog({ apiKey: "dd-key" }), /^Datadog https:\/\/api\.datadoghq\.com answered 401/, ["dd-key"]);
 });
 
-test("rollbar posts an item with level, fingerprint and a stable uuid", async (t) => {
+test("rollbar posts an item with level, fingerprint, and a stable uuid", async (t) => {
   const calls = stubFetch(t);
   await rollbar({ accessToken: "rb-token", environment: "staging", link }).send(failed({ triage: "db down" }));
   await rollbar({ accessToken: "rb-token" }).send(recovered());

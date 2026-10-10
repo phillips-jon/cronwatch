@@ -14,7 +14,7 @@ class SqlTest {
     assertEquals("cw_", Sql.tablePrefix("cw_"));
     assertEquals("_x9", Sql.tablePrefix("_x9"));
     assertEquals(
-        "cronwatch: invalid table prefix \"Monitoring_\". Use lowercase letters, digits and"
+        "cronwatch: invalid table prefix \"Monitoring_\". Use lowercase letters, digits, and"
             + " underscores, not starting with a digit, at most 47 characters.",
         assertThrows(IllegalArgumentException.class, () -> Sql.tablePrefix("Monitoring_"))
             .getMessage());

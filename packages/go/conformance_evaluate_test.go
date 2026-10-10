@@ -14,7 +14,7 @@ import (
 	"cronwatch.dev/go/internal/schedule"
 )
 
-// sim is scripts/conformance.mjs's Sim: one job, its runs and its state.
+// sim is scripts/conformance.mjs's Sim: one job, its runs, and its state.
 type sim struct {
 	def    Definition
 	stored StoredJob

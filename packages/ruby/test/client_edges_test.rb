@@ -255,7 +255,7 @@ class ClientEdgesTest < Minitest::Test
     before.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
   end
 
-  # One reading of the environment for the dashboard, the scheduler and the
+  # One reading of the environment for the dashboard, the scheduler, and the
   # in-memory store's warning (Rails.env first when Rails is loaded).
   def test_the_environment_is_read_one_way_everywhere
     skip "Rails is loaded" if defined?(::Rails)
@@ -340,7 +340,7 @@ class ClientEdgesTest < Minitest::Test
     end
   end
 
-  # Puma (preload_app), Unicorn and Sidekiq fork after the app has loaded.
+  # Puma (preload_app), Unicorn, and Sidekiq fork after the app has loaded.
   def test_start_and_check_work_in_a_forked_child
     skip "no fork on this platform" unless Process.respond_to?(:fork)
 

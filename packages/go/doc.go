@@ -1,8 +1,8 @@
 // Package cronwatch is cron and scheduled-job monitoring that lives inside
 // a Go app: wrap a job once, and every run is recorded in a database the app
 // already has, and alerts go out when a run is missed, fails, gets stuck,
-// runs slow, goes over budget or quietly does nothing. It is the Go port of
-// @cronwatch/sdk, with the same rules, alert text and stored rows, so a Go
+// runs slow, goes over budget, or quietly does nothing. It is the Go port of
+// @cronwatch/sdk, with the same rules, alert text, and stored rows, so a Go
 // process can share a database with the SDK and its other ports.
 //
 // A client is made once, jobs are declared on it, and each run of a job is
@@ -17,10 +17,10 @@
 //
 // Missed and stuck runs are found by Check, called on an interval by Start
 // in a long-running service, or from a crontab line. The sqlstore package
-// keeps everything in SQLite, Postgres or MySQL over the app's own
+// keeps everything in SQLite, Postgres, or MySQL over the app's own
 // *sql.DB; MemoryStore, the default, forgets on restart. The alerts
 // package holds the SDK's alert channels (Slack, Discord, a webhook, email,
-// SMS and error trackers), the triage package Claude triage, and the pgcron
+// SMS, and error trackers), the triage package Claude triage, and the pgcron
 // package a source that watches pg_cron's jobs.
 //
 // The dashboard and its JSON API are an http.Handler, Client.Routes, and a

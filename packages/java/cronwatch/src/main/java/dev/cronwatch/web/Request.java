@@ -26,7 +26,7 @@ import org.jspecify.annotations.Nullable;
  *     .build();
  * }</pre>
  *
- * <p>{@link #toString} names the method, the path and the header names, never a header's value or
+ * <p>{@link #toString} names the method, the path, and the header names, never a header's value or
  * the query, since a request can carry the dashboard's token in either.
  */
 public final class Request {

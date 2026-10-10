@@ -48,7 +48,7 @@ module Cronwatch
     # The version a stored state counts as for compare_and_set_state: its
     # `version` when that is a whole number from 0 to MAX_DURATION_MS
     # (2**53 - 1), else 0, as when it is absent. The SQL stores read it the
-    # same way, so a foreign row's 1.5, "x" or -1 is written over by the next
+    # same way, so a foreign row's 1.5, "x", or -1 is written over by the next
     # update instead of refusing every compare-and-set of its job for good.
     def state_version(state)
       version = state&.version
@@ -61,7 +61,7 @@ module Cronwatch
     # The failures in a row a stored state counts as: its `consecutive_failures`
     # when that is a whole number, held at MAX_DURATION_MS (2**53 - 1), and 0
     # when it is negative or not a whole number. A foreign row's count past
-    # 2**53 stays at the top, as the SDK holds it, and a 1.5, "3" or -1
+    # 2**53 stays at the top, as the SDK holds it, and a 1.5, "3", or -1
     # counts as none.
     def failure_count(state)
       count = state&.consecutive_failures
@@ -86,7 +86,7 @@ module Cronwatch
     # by an older version lacks the newer fields. `sending` and `under_floor`
     # are the exceptions: each is there only while it holds something.
     #
-    # Read leniently, since a foreign, hand-edited or damaged row must affect
+    # Read leniently, since a foreign, hand-edited, or damaged row must affect
     # only its own job, and the next write puts it right: a state that is not
     # an object reads as none; `open` keeps only its entries whose value is a
     # number (anything but an object reads as {}); `silenced_until` and
@@ -374,7 +374,7 @@ module Cronwatch
       next_state
     end
 
-    # Called when a run finishes with status ok, failed or timeout. `history` is
+    # Called when a run finishes with status ok, failed, or timeout. `history` is
     # the job's earlier runs, newest first, not including this one.
     def on_run_finish(definition, run, state, history, now)
       next_state = clone_state(state)
@@ -530,7 +530,7 @@ module Cronwatch
       !json_number?(alert.at) || state.open[alert.type] != alert.at
     end
 
-    # How a job looks at a glance. Silence wins, then stuck, failing and late.
+    # How a job looks at a glance. Silence wins, then stuck, failing, and late.
     def job_health(definition, last_run, state, now)
       open = open_conditions(state)
       return :silenced if silenced?(state, now)

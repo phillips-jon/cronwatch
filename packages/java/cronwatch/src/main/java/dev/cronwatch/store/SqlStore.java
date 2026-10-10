@@ -37,11 +37,11 @@ import javax.sql.DataSource;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Keeps CronWatch's jobs, runs and state in the app's own database through JDBC: the SDK's tables
- * ({@code stores/sql.ts}), the same names, columns and statements, and the SDK's JSON in the JSON
+ * Keeps CronWatch's jobs, runs, and state in the app's own database through JDBC: the SDK's tables
+ * ({@code stores/sql.ts}), the same names, columns, and statements, and the SDK's JSON in the JSON
  * columns byte for byte, so a Java process shares a database with a Node, Ruby, Python, PHP, Go,
- * Rust or Elixir one. The app brings its driver and its {@link DataSource} (its pool); no driver is
- * a dependency of this library. The tables are made when the client first calls {@link #init}.
+ * Rust, or Elixir one. The app brings its driver and its {@link DataSource} (its pool); no driver
+ * is a dependency of this library. The tables are made when the client first calls {@link #init}.
  *
  * <p>On SQLite (xerial's {@code sqlite-jdbc}) the store takes one connection from the data source
  * once and keeps it for its statements, in turn, as the SDK's store holds one: an in-memory
@@ -57,13 +57,13 @@ import org.jspecify.annotations.Nullable;
  * bound untyped ({@code setObject(i, text, Types.OTHER)}), so Postgres infers {@code jsonb} as it
  * does for node-postgres and the statements need no cast.
  *
- * <p>On MySQL 8.0.13 or newer and MariaDB 10.6 or newer the dialect is the PHP, Go, Rust and Elixir
- * ports': the same tables with {@code VARCHAR(255)} keys, the JSON columns as {@code LONGTEXT}
- * holding the SDK's JSON byte for byte (never MySQL's {@code JSON} type, which rewrites it), names
- * compared by byte ({@code utf8mb4_bin}), and a run's trigger cut to 255 characters. Statements run
- * as on Postgres, each on a connection of its own in autocommit. A conditional write whose answer
- * says no row changed is read back, so a connection that counts changed rather than matched rows
- * ({@code useAffectedRows=true}) cannot make a write that landed read as refused.
+ * <p>On MySQL 8.0.13 or newer and MariaDB 10.6 or newer the dialect is the PHP, Go, Rust, and
+ * Elixir ports': the same tables with {@code VARCHAR(255)} keys, the JSON columns as {@code
+ * LONGTEXT} holding the SDK's JSON byte for byte (never MySQL's {@code JSON} type, which rewrites
+ * it), names compared by byte ({@code utf8mb4_bin}), and a run's trigger cut to 255 characters.
+ * Statements run as on Postgres, each on a connection of its own in autocommit. A conditional write
+ * whose answer says no row changed is read back, so a connection that counts changed rather than
+ * matched rows ({@code useAffectedRows=true}) cannot make a write that landed read as refused.
  */
 public final class SqlStore implements Store {
   /** How long opening SQLite keeps retrying a busy database before it gives up (busy.ts). */
@@ -88,7 +88,7 @@ public final class SqlStore implements Store {
 
   /**
    * A store over the app's SQLite data source, with the tables named {@code cronwatch_jobs}, {@code
-   * cronwatch_runs} and {@code cronwatch_state}. Nothing is read or written until {@link #init}.
+   * cronwatch_runs}, and {@code cronwatch_state}. Nothing is read or written until {@link #init}.
    */
   public static SqlStore sqlite(DataSource dataSource) {
     return new SqlStore(dataSource, Dialect.SQLITE, Sql.DEFAULT_PREFIX);
@@ -106,7 +106,7 @@ public final class SqlStore implements Store {
 
   /**
    * A store over the app's MySQL (8.0.13 or newer) or MariaDB (10.6 or newer) data source, with the
-   * PHP, Go, Rust and Elixir ports' dialect: {@code LONGTEXT} holding the SDK's JSON, {@code
+   * PHP, Go, Rust, and Elixir ports' dialect: {@code LONGTEXT} holding the SDK's JSON, {@code
    * utf8mb4_bin}, {@code ON DUPLICATE KEY}. MySQL commits {@code CREATE TABLE} at once, so {@link
    * #init} is best left to the client's first use, when the app has no transaction open. Nothing is
    * read or written until {@link #init}.
@@ -117,7 +117,7 @@ public final class SqlStore implements Store {
 
   /**
    * A store for whatever database the data source reaches, as its driver names it ({@code
-   * DatabaseMetaData.getDatabaseProductName()}): SQLite, Postgres, MySQL or MariaDB. It takes a
+   * DatabaseMetaData.getDatabaseProductName()}): SQLite, Postgres, MySQL, or MariaDB. It takes a
    * connection to ask.
    *
    * @throws CronwatchException of kind {@code STORE} when no connection can be had, and of kind
@@ -147,7 +147,7 @@ public final class SqlStore implements Store {
   }
 
   /**
-   * A store like this one whose tables start with {@code prefix}: lowercase letters, digits and
+   * A store like this one whose tables start with {@code prefix}: lowercase letters, digits, and
    * underscores, not starting with a digit, at most 47 characters. Default {@code cronwatch_}. Call
    * it before the store is used; the new store holds no connection yet.
    *
@@ -166,7 +166,7 @@ public final class SqlStore implements Store {
     return prefix;
   }
 
-  /** The store's database: {@code sqlite}, {@code postgres} or {@code mysql}. */
+  /** The store's database: {@code sqlite}, {@code postgres}, or {@code mysql}. */
   public String dialect() {
     return dialect.label();
   }
@@ -186,7 +186,7 @@ public final class SqlStore implements Store {
 
   /**
    * Runs {@code work} on SQLite's kept connection, under the store's lock, or on a connection of
-   * its own from the data source, in autocommit, for Postgres, MySQL and MariaDB.
+   * its own from the data source, in autocommit, for Postgres, MySQL, and MariaDB.
    */
   private <T> T with(Work<T> work) throws SQLException {
     if (dialect == Dialect.SQLITE) {
@@ -432,7 +432,7 @@ public final class SqlStore implements Store {
   }
 
   /*
-   * Rows are read leniently: a foreign, hand-edited or damaged row (SQLite keeps whatever type it
+   * Rows are read leniently: a foreign, hand-edited, or damaged row (SQLite keeps whatever type it
    * is given, in any column) must affect only its own job, never every read, as the SDK reads them.
    */
 
@@ -558,7 +558,7 @@ public final class SqlStore implements Store {
 
   /*
    * Postgres refuses U+0000 in TEXT and JSONB, and a refused write loses the whole row, so every
-   * dialect writes text without it: a run's trigger, output, error and metric names, and every key
+   * dialect writes text without it: a run's trigger, output, error, and metric names, and every key
    * and string of a definition and a state. Identifiers (a job's name, a run's id) are written as
    * given; the client refuses one with a NUL before it gets here.
    */
@@ -638,7 +638,7 @@ public final class SqlStore implements Store {
     return out;
   }
 
-  /** Removes the job, its runs and its state in one transaction. */
+  /** Removes the job, its runs, and its state in one transaction. */
   @Override
   public void deleteJob(String name) throws SQLException {
     transaction(

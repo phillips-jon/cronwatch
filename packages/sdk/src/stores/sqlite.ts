@@ -10,7 +10,7 @@ export interface SqliteOptions {
   path?: string;
   /** Bring your own open better-sqlite3 database instead. */
   database?: Database.Database;
-  /** Table name prefix: lowercase letters, digits and underscores. Default "cronwatch_". */
+  /** Table name prefix: lowercase letters, digits, and underscores. Default "cronwatch_". */
   prefix?: string;
 }
 

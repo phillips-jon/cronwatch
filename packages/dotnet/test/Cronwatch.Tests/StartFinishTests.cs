@@ -12,7 +12,7 @@ namespace Cronwatch.Tests;
 
 /// <summary>
 /// The SDK's <c>start-finish.test.ts</c>, ported: runs that span calls, started, found again with
-/// resume, flushed and finished, perhaps by another client on the same store.
+/// resume, flushed, and finished, perhaps by another client on the same store.
 /// </summary>
 public class StartFinishTests
 {

@@ -416,7 +416,7 @@
           "grace": "15m"
         },
         "title": "nightly recovered",
-        "message": "A run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\nRan 2s.",
+        "message": "A run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed and over budget.\nRan 2s.",
         "at": 1767605460000
       }
     },
@@ -696,7 +696,7 @@
         "content-type": "application/json"
       },
       "body": {
-        "text": "{\"text\":\"nightly recovered\\nA run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.\",\"blocks\":[{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\":white_check_mark: *nightly recovered*\"}},{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"```A run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.```\"}}]}"
+        "text": "{\"text\":\"nightly recovered\\nA run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed and over budget.\\nRan 2s.\",\"blocks\":[{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\":white_check_mark: *nightly recovered*\"}},{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"```A run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed and over budget.\\nRan 2s.```\"}}]}"
       }
     },
     {
@@ -946,8 +946,8 @@
         "content-type": "application/json"
       },
       "body": {
-        "length": 415,
-        "sha256": "cd20d1c948dd356e853d2e0b34bcc9c5793a56b3a0791a2417fd7ed319a64b05"
+        "length": 421,
+        "sha256": "26a97eaf9447d6e944971740985724b886229efa3f5cafaa5242e7a45a66532d"
       }
     },
     {
@@ -1182,7 +1182,7 @@
         "content-type": "application/json"
       },
       "body": {
-        "text": "{\"content\":\"nightly recovered\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly recovered\",\"description\":\"```\\nA run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.\\n```\",\"color\":2067020,\"timestamp\":\"2026-01-05T09:31:00.000Z\"}]}"
+        "text": "{\"content\":\"nightly recovered\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly recovered\",\"description\":\"```\\nA run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed and over budget.\\nRan 2s.\\n```\",\"color\":2067020,\"timestamp\":\"2026-01-05T09:31:00.000Z\"}]}"
       }
     },
     {
@@ -1429,7 +1429,7 @@
         "content-type": "application/json"
       },
       "body": {
-        "text": "{\"content\":\"nightly recovered\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly recovered\",\"url\":\"https://app.example/cronwatch/jobs/nightly\",\"description\":\"```\\nA run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.\\n```\",\"color\":2067020,\"timestamp\":\"2026-01-05T09:31:00.000Z\"}]}"
+        "text": "{\"content\":\"nightly recovered\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly recovered\",\"url\":\"https://app.example/cronwatch/jobs/nightly\",\"description\":\"```\\nA run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed and over budget.\\nRan 2s.\\n```\",\"color\":2067020,\"timestamp\":\"2026-01-05T09:31:00.000Z\"}]}"
       }
     },
     {
@@ -1682,8 +1682,8 @@
         "user-agent": "cronwatch"
       },
       "body": {
-        "length": 481,
-        "sha256": "1dd726b2068adf6ee4d87a39d4db5a53ea983f8e1a44354d49fa569b8a1a4d3d"
+        "length": 484,
+        "sha256": "d287a874a752fb3df673137d8f5e060a0de640f2bf50e64029a2b975339369f7"
       }
     },
     {
@@ -2012,11 +2012,11 @@
         "content-type": "application/json",
         "user-agent": "cronwatch",
         "authorization": "Bearer abc",
-        "x-cronwatch-signature": "sha256=2845c7ae5103cffc70f353929eacc7feaef3f71bc0e7d5b7a87cf9a06245aa2d"
+        "x-cronwatch-signature": "sha256=1ed6c34896eea07f5d8f9fc761a3646c3cb3896cc3ba41784078265ebdc1a9e6"
       },
       "body": {
-        "length": 481,
-        "sha256": "1dd726b2068adf6ee4d87a39d4db5a53ea983f8e1a44354d49fa569b8a1a4d3d"
+        "length": 484,
+        "sha256": "d287a874a752fb3df673137d8f5e060a0de640f2bf50e64029a2b975339369f7"
       }
     },
     {
@@ -2343,8 +2343,8 @@
     {
       "alert": "recovered",
       "secret": "s3cret",
-      "body": "{\"schema\":1,\"type\":\"recovered\",\"run\":{\"id\":\"r1\",\"job\":\"nightly\",\"status\":\"ok\",\"startedAt\":1767605400000,\"finishedAt\":1767605401500,\"durationMs\":1500,\"error\":null,\"output\":null,\"metrics\":{},\"trigger\":\"run\"},\"details\":{\"after\":[\"missed\",\"over_budget\"]},\"job\":\"nightly\",\"definition\":{\"name\":\"nightly\",\"schedule\":\"0 2 * * *\",\"grace\":\"15m\"},\"title\":\"nightly recovered\",\"message\":\"A run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.\",\"at\":1767605460000}",
-      "signature": "sha256=2845c7ae5103cffc70f353929eacc7feaef3f71bc0e7d5b7a87cf9a06245aa2d"
+      "body": "{\"schema\":1,\"type\":\"recovered\",\"run\":{\"id\":\"r1\",\"job\":\"nightly\",\"status\":\"ok\",\"startedAt\":1767605400000,\"finishedAt\":1767605401500,\"durationMs\":1500,\"error\":null,\"output\":null,\"metrics\":{},\"trigger\":\"run\"},\"details\":{\"after\":[\"missed\",\"over_budget\"]},\"job\":\"nightly\",\"definition\":{\"name\":\"nightly\",\"schedule\":\"0 2 * * *\",\"grace\":\"15m\"},\"title\":\"nightly recovered\",\"message\":\"A run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed and over budget.\\nRan 2s.\",\"at\":1767605460000}",
+      "signature": "sha256=1ed6c34896eea07f5d8f9fc761a3646c3cb3896cc3ba41784078265ebdc1a9e6"
     },
     {
       "alert": "no longer scheduled",
@@ -2724,8 +2724,8 @@
             "idempotency-key": "cronwatch-97923180a31cd7fc98b5b24c8fd1b59d"
           },
           "body": {
-            "length": 857,
-            "sha256": "441b301201258dd10b36b7361e7d2ee776815cd785cf91a4c894071d9c547498"
+            "length": 863,
+            "sha256": "2b5befac818f75ce7431d257c6363200d30bb128ef65816ebadeab28e19a2c0c"
           }
         }
       ]
@@ -3107,8 +3107,8 @@
             "idempotency-key": "cronwatch-97923180a31cd7fc98b5b24c8fd1b59d"
           },
           "body": {
-            "length": 669,
-            "sha256": "ffb9bd1585afc629bc7239b7af98a9793f62610367369f7bbd52a0e4f224f405"
+            "length": 675,
+            "sha256": "6b2791423e562a3a1ae78ff68e1b0901400d91afeff2429cae5dfe2c7d5b434c"
           }
         }
       ]
@@ -3527,8 +3527,8 @@
             "x-postmark-server-token": "pm-secret"
           },
           "body": {
-            "length": 900,
-            "sha256": "bdf24b3424111e5ca337307b994d94974c61ab5f94305278fbbd07c307b70629"
+            "length": 906,
+            "sha256": "1b19567be69c336de037a8e191d510fd15a686809a751acbb71ab0ee9962b98d"
           }
         }
       ]
@@ -3933,8 +3933,8 @@
             "x-postmark-server-token": "pm-secret"
           },
           "body": {
-            "length": 725,
-            "sha256": "64f5ee4a6ae3463ede58a4f58bc1c96d9b4c7eecbaa7815792f2d6473e506ab6"
+            "length": 731,
+            "sha256": "a09f08593c75b60e27fcd79e44300fa9bc561f7d223a843ae66af7270f1eff89"
           }
         }
       ]
@@ -4346,8 +4346,8 @@
             "authorization": "Bearer SG.secret"
           },
           "body": {
-            "length": 1007,
-            "sha256": "1634526905ed4e702a22eb77c44120c1dac6396cca8aa69cbb38c8988db4969b"
+            "length": 1013,
+            "sha256": "b02d368748986ce6ac4b306f36470c9f288da8daef5b2f9b76859c5eff6c331c"
           }
         }
       ]
@@ -4723,8 +4723,8 @@
             "authorization": "Bearer SG.secret"
           },
           "body": {
-            "length": 796,
-            "sha256": "49193efe81aa0584deeba542712230a5f3ea2b6726bb619c1d6da4cf27371c05"
+            "length": 802,
+            "sha256": "c8221088ac02c47b2d8c9e7a4dcf34e6c3fd7a318cf61e6c583c763ee2ab501e"
           }
         }
       ]
@@ -5143,8 +5143,8 @@
             "authorization": "Basic YXBpOmtleS1zZWNyZXQ="
           },
           "body": {
-            "length": 1074,
-            "sha256": "06ff5188a760e4d5eccbf8412ba582a3a6acfd4605c2b15a43bf59c938d975dd"
+            "length": 1076,
+            "sha256": "890ffd45c12404ec854cc1162285a01c1edec13e8abd32f56c87533335cc3ae2"
           }
         }
       ]
@@ -5536,8 +5536,8 @@
             "authorization": "Basic YXBpOmtleS1zZWNyZXQ="
           },
           "body": {
-            "length": 827,
-            "sha256": "81a797102b2d742bfc6db0454597f76f2cc6e0aa675e670567f343ea637f26ef"
+            "length": 829,
+            "sha256": "edb34c171258ac2c70b5054e509135fb79ac5692fc260bd2bf7acf31a25ad88f"
           }
         }
       ]
@@ -5995,11 +5995,11 @@
           "headers": {
             "content-type": "application/json",
             "x-amz-date": "20260105T093000Z",
-            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date, Signature=92d23c293744fa8ed5e746b72a0adda00843f58bbadeaeec1fcf6411b9071e84"
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date, Signature=360841fb7cc05af222b7c3b853202673948ab6bde4375f461ece1ea9420b2c8f"
           },
           "body": {
-            "length": 1052,
-            "sha256": "38dc0cc2308a3cf0bcee9b78a0acef640e8f5ca9fc6305c6e1e4be3b4f182a1e"
+            "length": 1058,
+            "sha256": "887921d7679c7ae2d95ddabe4b93e1ccbdc70256bd11a43dafdcd8ef7d017177"
           }
         }
       ]
@@ -6462,11 +6462,11 @@
             "content-type": "application/json",
             "x-amz-date": "20260105T103000Z",
             "x-amz-security-token": "session-token",
-            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/eu-west-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=4b66dcac5ce16a795a9b4fbae88eb5bfafa996c4e36685dc8bebf4d8f9339609"
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/eu-west-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=2a754546cf903dbe8266d81bb28539f03e6fb757dacfb12a03c3b5fe3ffe51c1"
           },
           "body": {
-            "length": 903,
-            "sha256": "a305507cbb2ab8ab40f5940bcd85cff3391e877928d26211e6571e6eed9a9daf"
+            "length": 909,
+            "sha256": "1441aeae1c92fb46f743c6753d0378874de480136b23240ad43080c1567f3066"
           }
         }
       ]
@@ -7417,7 +7417,7 @@
             "authorization": "Basic U0swMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDpzay1zZWNyZXQ="
           },
           "body": {
-            "text": "To=%2B15551110000&MessagingServiceSid=MG00000000000000000000000000000000&Body=nightly+recovered%0AA+run+2026-01-05+09%3A30%3A00+UTC+%281m+ago%29+succeeded+after%3A+missed%2C+over+budget.%0ARan+2s."
+            "text": "To=%2B15551110000&MessagingServiceSid=MG00000000000000000000000000000000&Body=nightly+recovered%0AA+run+2026-01-05+09%3A30%3A00+UTC+%281m+ago%29+succeeded+after%3A+missed+and+over+budget.%0ARan+2s."
           }
         }
       ]
@@ -7764,8 +7764,8 @@
             "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
           },
           "body": {
-            "length": 729,
-            "sha256": "835c87d36a60e0d8accbbe2cc78eebda337da011ab0d5f43590be1cfa7ca2753"
+            "length": 732,
+            "sha256": "8e05b2f45f0e70457ada1d723b9944e57a7a0d78a942460fff586195edfcccc4"
           }
         }
       ]
@@ -8809,8 +8809,8 @@
             "x-api-key": "hb-secret"
           },
           "body": {
-            "length": 667,
-            "sha256": "c883825ceac2741970ee81cd43c94a8ecb4af6677470d3915312408c169cbe7d"
+            "length": 670,
+            "sha256": "a222cd98bd18a7894eb28a12c283b5503e95914b75a961b0d2b4c46e2f99c59f"
           }
         }
       ]
@@ -9164,7 +9164,7 @@
             "dd-api-key": "dd-secret"
           },
           "body": {
-            "text": "{\"title\":\"nightly recovered\",\"text\":\"nightly recovered\\n\\nA run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.\\n\\nOpen: https://app.example/cronwatch/jobs/nightly\",\"alert_type\":\"success\",\"aggregation_key\":\"cronwatch:nightly:recovered\",\"date_happened\":1767605460,\"priority\":\"normal\",\"tags\":[\"cronwatch\",\"job:nightly\",\"alert:recovered\"]}"
+            "text": "{\"title\":\"nightly recovered\",\"text\":\"nightly recovered\\n\\nA run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed and over budget.\\nRan 2s.\\n\\nOpen: https://app.example/cronwatch/jobs/nightly\",\"alert_type\":\"success\",\"aggregation_key\":\"cronwatch:nightly:recovered\",\"date_happened\":1767605460,\"priority\":\"normal\",\"tags\":[\"cronwatch\",\"job:nightly\",\"alert:recovered\"]}"
           }
         }
       ]
@@ -9563,7 +9563,7 @@
             "dd-api-key": "dd-secret"
           },
           "body": {
-            "text": "{\"title\":\"nightly recovered\",\"text\":\"nightly recovered\\n\\nA run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.\",\"alert_type\":\"success\",\"aggregation_key\":\"cronwatch:nightly:recovered\",\"date_happened\":1767605460,\"priority\":\"normal\",\"tags\":[\"cronwatch\",\"job:nightly\",\"alert:recovered\",\"env:prod\"],\"host\":\"worker-1\"}"
+            "text": "{\"title\":\"nightly recovered\",\"text\":\"nightly recovered\\n\\nA run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed and over budget.\\nRan 2s.\",\"alert_type\":\"success\",\"aggregation_key\":\"cronwatch:nightly:recovered\",\"date_happened\":1767605460,\"priority\":\"normal\",\"tags\":[\"cronwatch\",\"job:nightly\",\"alert:recovered\",\"env:prod\"],\"host\":\"worker-1\"}"
           }
         }
       ]
@@ -9912,8 +9912,8 @@
             "x-rollbar-access-token": "rb-secret"
           },
           "body": {
-            "length": 589,
-            "sha256": "40291221a9736bbe113d299817bb7c1563abc1e47c9c591bcd55f296fa74ec86"
+            "length": 592,
+            "sha256": "9af080d5375fad505a2f7847413cf75456ddf8bd4fae5ab1e3df420be11b139d"
           }
         }
       ]
@@ -10997,8 +10997,8 @@
             "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
           },
           "body": {
-            "length": 773,
-            "sha256": "694ee1992784c9f92ef17da6cf32d818a0fab460d7d6390bfedf60ca5b15dfde"
+            "length": 776,
+            "sha256": "f1642b81a332d129fd018d8a6bf7d8ffc2cc2063cebc89688a13ea34043fa5f3"
           }
         }
       ]
@@ -11357,7 +11357,7 @@
             "api-key": "nr-secret"
           },
           "body": {
-            "text": "[{\"eventType\":\"CronWatchAlert\",\"timestamp\":1767605460000,\"job\":\"nightly\",\"alertType\":\"recovered\",\"severity\":\"info\",\"title\":\"nightly recovered\",\"message\":\"A run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.\",\"link\":\"https://app.example/cronwatch/jobs/nightly\",\"runId\":\"r1\",\"runStatus\":\"ok\",\"durationMs\":1500}]"
+            "text": "[{\"eventType\":\"CronWatchAlert\",\"timestamp\":1767605460000,\"job\":\"nightly\",\"alertType\":\"recovered\",\"severity\":\"info\",\"title\":\"nightly recovered\",\"message\":\"A run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed and over budget.\\nRan 2s.\",\"link\":\"https://app.example/cronwatch/jobs/nightly\",\"runId\":\"r1\",\"runStatus\":\"ok\",\"durationMs\":1500}]"
           }
         }
       ]
@@ -11713,7 +11713,7 @@
             "api-key": "nr-secret"
           },
           "body": {
-            "text": "[{\"eventType\":\"CronJobAlert\",\"timestamp\":1767605460000,\"job\":\"nightly\",\"alertType\":\"recovered\",\"severity\":\"info\",\"title\":\"nightly recovered\",\"message\":\"A run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.\",\"runId\":\"r1\",\"runStatus\":\"ok\",\"durationMs\":1500}]"
+            "text": "[{\"eventType\":\"CronJobAlert\",\"timestamp\":1767605460000,\"job\":\"nightly\",\"alertType\":\"recovered\",\"severity\":\"info\",\"title\":\"nightly recovered\",\"message\":\"A run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed and over budget.\\nRan 2s.\",\"runId\":\"r1\",\"runStatus\":\"ok\",\"durationMs\":1500}]"
           }
         }
       ]
@@ -12078,8 +12078,8 @@
             "idempotency-key": "cronwatch-97923180a31cd7fc98b5b24c8fd1b59d"
           },
           "body": {
-            "length": 669,
-            "sha256": "ffb9bd1585afc629bc7239b7af98a9793f62610367369f7bbd52a0e4f224f405"
+            "length": 675,
+            "sha256": "6b2791423e562a3a1ae78ff68e1b0901400d91afeff2429cae5dfe2c7d5b434c"
           }
         }
       ]
@@ -12508,11 +12508,11 @@
             "content-type": "application/json",
             "x-amz-date": "20260105T093000Z",
             "x-amz-security-token": "session-token",
-            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=c17bcac84581895047f40c34aed8ea5ebff3f0d9fce4513f67c1b4aa8a1ce3a8"
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=25ecbf627d2e8f674cc13cbb2929a751b3bb42e7f88e9c51577b9e04e6a28587"
           },
           "body": {
-            "length": 871,
-            "sha256": "5b9f6e81c573aae6208bb0ffb7e2586dc044a666b9ff07ac327d256630961853"
+            "length": 877,
+            "sha256": "957ff20fe23399e5a9257073088f5436fb41ecb0934d16ee106baaa52754b11e"
           }
         }
       ]
@@ -13527,8 +13527,8 @@
             "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
           },
           "body": {
-            "length": 677,
-            "sha256": "25642f92fa903010ac4202ed014f303e289828acbc32b69206f1a42d666be01e"
+            "length": 680,
+            "sha256": "85abfd965ac243a61b71ac02e42e7b617308b447949b98742fb2441d74c3b4e2"
           }
         }
       ]

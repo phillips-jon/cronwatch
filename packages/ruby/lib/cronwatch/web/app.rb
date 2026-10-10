@@ -7,7 +7,7 @@ require "uri"
 
 module Cronwatch
   # The dashboard and the small JSON API, as a Rack app: the SDK's routes
-  # (routes/index.ts) with the same URLs, JSON, auth, CSRF rules and headers,
+  # (routes/index.ts) with the same URLs, JSON, auth, CSRF rules, and headers,
   # so @cronwatch/mcp works against a Ruby app as it does against a Node one.
   #
   # Made by Client#routes, the one way to mount it:
@@ -29,7 +29,7 @@ module Cronwatch
   #            anything but a String or nil (false, a number, a Symbol) raises TypeError.
   #            With no token while Cronwatch::Environment is development or
   #            test (Environment.stated_development?: under Puma, Unicorn,
-  #            Thin or rackup, which set RACK_ENV=development by default,
+  #            Thin, or rackup, which set RACK_ENV=development by default,
   #            RACK_ENV alone does not count), the app makes a random one and
   #            prints a sign-in link to stdout on its first request; with no
   #            token otherwise it answers 503. Pass `token: nil` to opt out and serve it open everywhere,
@@ -62,7 +62,7 @@ module Cronwatch
     COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 
     # 'self' only for what the app shell needs: app.js (which registers the
-    # service worker and nothing else), the manifest, the worker and the icons.
+    # service worker and nothing else), the manifest, the worker, and the icons.
     # No inline script, and the pages work without any.
     CSP = "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; " \
           "manifest-src 'self'; worker-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
@@ -112,7 +112,7 @@ module Cronwatch
       @token = @opted_out ? nil : given || Environment.secret("CRONWATCH_TOKEN")
       @base_path = base_path&.to_s&.sub(%r{/+\z}, "")
       # A Rack app cannot reliably tell a local caller from a remote one
-      # (proxies, tunnels and a server bound to every interface all look
+      # (proxies, tunnels, and a server bound to every interface all look
       # alike), so development gets a token too: made here, and shown only in
       # the server log.
       @generated = @token.nil? && !@opted_out && Environment.stated_development?
@@ -129,7 +129,7 @@ module Cronwatch
 
     # The line a development token is announced with, printed once to stdout
     # on the app's first request. `origin` is the `origin:` option when set,
-    # otherwise that request's origin (scheme, host and any port) when its
+    # otherwise that request's origin (scheme, host, and any port) when its
     # host is loopback, and nil for any other host: the request's host is
     # the client's to choose, so the line then leaves it out rather than
     # point the link, token and all, somewhere else. `base` is the base path
@@ -203,7 +203,7 @@ module Cronwatch
 
       announce(request, base) if @generated && !@announced
 
-      # The app shell: the manifest, icons, service worker, app.js and the
+      # The app shell: the manifest, icons, service worker, app.js, and the
       # offline page. Served to anyone, since a browser fetches some of it
       # without cookies and none of it says anything about the jobs.
       if %w[GET HEAD].include?(method)

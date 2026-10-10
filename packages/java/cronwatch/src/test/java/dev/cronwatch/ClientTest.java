@@ -17,8 +17,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The SDK's {@code client.test.ts}, ported: runs, failures, expect, the checks for missed and stuck
- * runs, baselines and budgets, silence, triage, forget and a failing channel. The handler cases are
- * in {@code web.HandlerTest}.
+ * runs, baselines and budgets, silence, triage, forget, and a failing channel. The handler cases
+ * are in {@code web.HandlerTest}.
  */
 class ClientTest {
   @Test

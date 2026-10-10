@@ -49,7 +49,7 @@ fn find_zone(name: &str) -> Option<TimeZone> {
     jiff::tz::db().get(name).ok()
 }
 
-/// Reads "+HH", "+HHMM" or "+HH:MM" (or "-"), as `Intl` reads an offset
+/// Reads "+HH", "+HHMM", or "+HH:MM" (or "-"), as `Intl` reads an offset
 /// time zone.
 fn fixed_offset(name: &str) -> Option<TimeZone> {
     let b = name.as_bytes();

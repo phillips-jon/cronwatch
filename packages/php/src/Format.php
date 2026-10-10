@@ -40,6 +40,22 @@ final class Format
         return implode("\n", array_slice($lines, max(0, count($lines) - $n)));
     }
 
+    /**
+     * Words joined as an English list, with a serial comma from three on:
+     * "a", "a and b", "a, b, and c". Every port joins the same way.
+     *
+     * @param list<string> $words
+     */
+    public static function andList(array $words): string
+    {
+        $words = array_values($words);
+        if (count($words) <= 2) {
+            return implode(' and ', $words);
+        }
+        $last = array_pop($words);
+        return implode(', ', $words) . ", and {$last}";
+    }
+
     /** "Error: x" for a bare message, but not "Error: TypeError: x" for one that already names itself. */
     private static function errorLine(string $error): string
     {
@@ -134,7 +150,7 @@ final class Format
                     break;
                 }
                 $title = "{$name} recovered";
-                $after = implode(', ', array_map(fn ($c) => preg_replace('/_/', ' ', (string) $c, 1), $d['after'] ?? []));
+                $after = self::andList(array_map(fn ($c) => preg_replace('/_/', ' ', (string) $c, 1), $d['after'] ?? []));
                 $lines[] = 'A run ' . ($run !== null ? self::when($run->startedAt, $now) : 'just now') . ' succeeded' . ($after !== '' ? " after: {$after}" : '') . '.';
                 if ($run !== null && $run->durationMs !== null) {
                     $lines[] = 'Ran ' . Duration::format($run->durationMs) . '.';

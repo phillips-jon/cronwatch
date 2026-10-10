@@ -11,7 +11,7 @@ use Cronwatch\Alerts\Email;
 
 /**
  * Sends each alert through the app's mailer (config/mail.php), composed as
- * every email channel composes it: the same subject, plain text and HTML.
+ * every email channel composes it: the same subject, plain text, and HTML.
  * The from address defaults to the mailer's (mail.from).
  */
 final class MailChannel implements AlertChannel

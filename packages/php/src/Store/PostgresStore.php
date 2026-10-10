@@ -9,9 +9,9 @@ use Cronwatch\JobState;
 
 /**
  * Keeps everything in Postgres through PDO (stores/postgres.ts): the same
- * tables, statements and JSON as the SDK's store, so a Node, a Ruby, a
- * Python and a PHP process can share the database. For apps on Heroku,
- * Laravel Cloud, Fly, Neon, Supabase and the like, where there is no disk to
+ * tables, statements, and JSON as the SDK's store, so a Node, a Ruby, a
+ * Python, and a PHP process can share the database. For apps on Heroku,
+ * Laravel Cloud, Fly, Neon, Supabase, and the like, where there is no disk to
  * keep a SQLite file on. Times are stored as BIGINT epoch milliseconds.
  *
  *     new PostgresStore('postgres://user:password@db.internal:5432/app?sslmode=require')
@@ -53,7 +53,7 @@ final class PostgresStore extends PdoStore
         }
         $url ??= self::databaseUrl();
         if ($url === null) {
-            throw new \InvalidArgumentException('PostgresStore needs a postgres:// URL, a PDO DSN or a PDO (or DATABASE_URL set to a postgres:// URL)');
+            throw new \InvalidArgumentException('PostgresStore needs a postgres:// URL, a PDO DSN, or a PDO (or DATABASE_URL set to a postgres:// URL)');
         }
         [$this->dsn, $this->username, $this->password] = self::connection($url, $username, $password);
     }
@@ -66,7 +66,7 @@ final class PostgresStore extends PdoStore
     }
 
     /**
-     * A PDO DSN, user and password from a postgres:// (or postgresql://) URL,
+     * A PDO DSN, user, and password from a postgres:// (or postgresql://) URL,
      * its query parameters (sslmode and the rest) passed on as libpq takes
      * them, or a pgsql: DSN passed through.
      *

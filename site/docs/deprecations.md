@@ -9,12 +9,12 @@ group: Reference
 
 Every name that is deprecated today, in every language, with its replacement and the release it goes in. A deprecated name still works, and does what its replacement does, until then. How deprecation works is on the [Stability](/docs/stability/#deprecations) page.
 
-Two kinds of name are deprecated while preparing 1.0, and they go at different times:
+Two kinds of name were deprecated in 0.11, while preparing 1.0, and they go at different times:
 
-- **Renames of documented API** (a class, method or option the docs showed, renamed so the names agree across languages) keep their old name as a deprecated alias through every 1.x release, and go in 2.0. So 1.0 breaks nothing the docs showed.
-- **Names that were public by accident** (helpers, constants, the JSON and pg_cron helpers, the store test kits' internals) are deprecated now, still work, and go in 1.0 itself, as the [changelog](https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md) will list.
+- **Renames of documented API** (a class, method, or option the docs showed, renamed so the names agree across languages) keep their old name as a deprecated alias through every 1.x release, and go in 2.0. So 1.0 breaks nothing the docs showed.
+- **Names that were public by accident** (helpers, constants, the JSON and pg_cron helpers, the store test kits' internals) were deprecated in 0.11, still work, and go in 1.0 itself, as the [changelog](https://github.com/cronwatchdev/cronwatch/blob/main/CHANGELOG.md) will list.
 
-Two Rust names go in 1.0 for a reason of their own: `Routes::into_router()` and `ReqwestTransport::with_client` hand out types of axum and reqwest, both below 1.0, which no 1.x promise could hold. A few internals were made internal outright, with no deprecation; they are [listed at the end](#hidden-in-1-0-without-a-deprecation).
+Two Rust names go in 1.0 for a reason of their own: `Routes::into_router()` and `ReqwestTransport::with_client` hand out types of axum and reqwest, both below 1.0, which no 1.x promise could hold. A few internals were made internal outright, with no deprecation; they are [listed at the end](#hidden-in-0-11-without-a-deprecation).
 
 ## TypeScript
 
@@ -32,7 +32,7 @@ Marked `@deprecated`, so an editor strikes the name through. See [the API refere
 
 ## Ruby
 
-Each warns in Ruby's deprecation category, shown under `ruby -w`, `-W:deprecated` or `Warning[:deprecated] = true`, naming the line that called it. See [Ruby](/docs/ruby/#deprecated).
+Each warns in Ruby's deprecation category, shown under `ruby -w`, `-W:deprecated`, or `Warning[:deprecated] = true`, naming the line that called it. See [Ruby](/docs/ruby/#deprecated).
 
 | Deprecated | Use instead | Goes in |
 |---|---|---|
@@ -52,7 +52,7 @@ Each warns with a `DeprecationWarning`. See [Python](/docs/python/#deprecated).
 | `AnthropicTriage` from `cronwatch.triage.anthropic` | `Anthropic` | 2.0 |
 | `Slack(url)`, `Discord(url)` with the URL given positionally | `Slack(webhook_url=url)`, `Discord(webhook_url=url)` | 2.0 |
 | `hmac_sha256_hex(secret, body)` from `cronwatch.alerts.webhook` | `signature(secret, body)` | 1.0 |
-| the modules that only implement the client under their old names (`cronwatch.client`, `duration`, `stats`, `output`, `schedule`, `evaluate`, `format`, `serialize`, `job`, `run_handle`, `handler`, `alerts.email`, `alerts.sigv4`), and the helpers and constants of the public modules (`cronwatch.types.camel`, `cronwatch.alerts.twilio.sms_segments` and the like) | the documented API: each module's `__all__` lists what it promises | 1.0 |
+| the modules that only implement the client under their old names (`cronwatch.client`, `duration`, `stats`, `output`, `schedule`, `evaluate`, `format`, `serialize`, `job`, `run_handle`, `handler`, `alerts.email`, `alerts.sigv4`), and the helpers and constants of the public modules (`cronwatch.types.camel`, `cronwatch.alerts.twilio.sms_segments`, and the like) | the documented API: each module's `__all__` lists what it promises | 1.0 |
 
 ## PHP
 
@@ -66,7 +66,7 @@ Marked `@deprecated` in their docblocks; Laravel's renamed settings keys also ra
 | `Cronwatch\Alerts\Webhook::hmacSha256Hex($secret, $body)` | `Webhook::signature($secret, $body)` | 1.0 |
 | `Twilio::MAX_SEGMENTS`, `MAX_BODY`, `smsSegments`, `smsBody`, `fits`, `segmentBudget`, `maskNumber`; `Sentry::parseDsn`; `Discord::DESCRIPTION_MAX`, `embedDescription`, `codeBlockSafe`, `escapeMarkdown`; `Sources\PgCron::HOLD_MS`, `BACKFILL`, `PAGE`, `MAX_PAGES`, the `*_SQL` constants, `schedule`, `jobName`, `run`, `epochMs`, `adapter` | nothing: internal to their channel or source | 1.0 |
 
-The Symfony, WordPress, Drupal and Craft CMS integrations have nothing deprecated.
+The Symfony, WordPress, Drupal, and Craft CMS integrations have nothing deprecated.
 
 ## Go
 
@@ -78,7 +78,7 @@ Marked `Deprecated:` in their doc comments, which editors and `staticcheck` poin
 | `robfigcron.Watch(cw, o)`, `cwgocron.Watch(cw, o)` | `robfigcron.New(cw, o).Option()`, `cwgocron.New(cw, o).Option()` | 2.0 |
 | `cwgocron.Converted` | `robfigcron.Converted` | 1.0 |
 | `cwgocron.Panic` | `cwgocron.PanicError` | 1.0 |
-| `JSValue()` on `Alert`, `CheckResult`, `Definition`, `JobState`, `JobSummary`, `Metrics` and `Run` | `MarshalJSON`, or `encoding/json` | 1.0 |
+| `JSValue()` on `Alert`, `CheckResult`, `Definition`, `JobState`, `JobSummary`, `Metrics`, and `Run` | `MarshalJSON`, or `encoding/json` | 1.0 |
 | `cronwatch.Stderr`, `cronwatch.Stdout` | `WithErrorHandler`, and a channel of your own in place of `Console` | 1.0 |
 | `cronwatch.MaxBody`, `cronwatch.ReservedRunIDPrefix` | nothing: internal | 1.0 |
 | `pgcron.Hold`, `pgcron.Schedule`, `pgcron.JobName`, `pgcron.RunOf` | nothing: internal | 1.0 |
@@ -87,7 +87,7 @@ Marked `Deprecated:` in their doc comments, which editors and `staticcheck` poin
 
 ## Rust
 
-Marked `#[deprecated]`, so the compiler names the replacement. See [Rust](/docs/rust/#deprecated-and-what-changed-for-1-0).
+Marked `#[deprecated]`, so the compiler names the replacement. See [Rust](/docs/rust/#deprecated-and-what-changed-in-0-11).
 
 | Deprecated | Use instead | Goes in |
 |---|---|---|
@@ -100,7 +100,7 @@ Marked `#[deprecated]`, so the compiler names the replacement. See [Rust](/docs/
 
 ## Elixir
 
-`start/0`, the `StoreCase` helpers and the channels', pg_cron's and triage's helpers are marked `@deprecated`, so the compiler warns; a keyword list given to `start/1` warns when it is called. See [Elixir](/docs/elixir/#deprecated).
+`start/0`, the `StoreCase` helpers, and the channels', pg_cron's, and triage's helpers are marked `@deprecated`, so the compiler warns; a keyword list given to `start/1` warns when it is called. See [Elixir](/docs/elixir/#deprecated).
 
 | Deprecated | Use instead | Goes in |
 |---|---|---|
@@ -110,7 +110,7 @@ Marked `#[deprecated]`, so the compiler names the replacement. See [Rust](/docs/
 
 ## Java
 
-Marked `@Deprecated(since = "1.0", forRemoval = true)`, so the compiler warns where each is used. See [Java](/docs/java/#deprecated).
+Marked `@Deprecated(since = "0.11", forRemoval = true)`, so the compiler warns where each is used. See [Java](/docs/java/#deprecated).
 
 | Deprecated | Use instead | Goes in |
 |---|---|---|
@@ -136,11 +136,11 @@ Marked `[Obsolete]`, so the compiler points at the replacement. See [.NET](/docs
 
 The Hangfire and Quartz.NET packages have nothing deprecated.
 
-## Hidden in 1.0 without a deprecation
+## Hidden in 0.11 without a deprecation
 
-A few internals that were public before 1.0 became internal in the same change, with no deprecated name left behind, because nothing documented used them:
+A few internals that were public before 0.11 became internal in the same change, with no deprecated name left behind, because nothing documented used them:
 
 - **Ruby**: the constants the docs do not name are `private_constant`, and the internal modules are marked `@api private`. See [Ruby](/docs/ruby/#public-and-internal).
-- **Java**: `Json.quote`, `Json.kind`, `Json.copy`, `Json.MAX_DEPTH`; `PgCron.schedule`, `PgCron.jobName`, `PgCron.run`, `PgCron.HOLD_MS` and `PgCronRow`; `Twilio.MAX_SEGMENTS`; and in `dev.cronwatch.storetest` everything but `StoreContract.run`.
-- **Elixir**: the port's machinery, which the package itself calls from module to module (`Cronwatch.JS`, `JSRE`, `Cron`, `Zone`, `Duration`, `Schedule`, `Output`, `Serialize`, `Alerts.Post`, `Store.SQL`, and helpers such as `Alerts.Email.compose/2`, `Transport.check/2` and `JobState.sending/2`), is hidden from HexDocs. It still works, since the package needs it public, but may change in any release.
-- **PHP**: the classes and methods marked `@internal` (`Evaluate`, `Schedule`, `Format`, `Serialize`, `Output`, `Duration` and the client's execution methods among them). They still work, since the package's own classes call them, but may change in any release.
+- **Java**: `Json.quote`, `Json.kind`, `Json.copy`, `Json.MAX_DEPTH`; `PgCron.schedule`, `PgCron.jobName`, `PgCron.run`, `PgCron.HOLD_MS`, and `PgCronRow`; `Twilio.MAX_SEGMENTS`; and in `dev.cronwatch.storetest` everything but `StoreContract.run`.
+- **Elixir**: the port's machinery, which the package itself calls from module to module (`Cronwatch.JS`, `JSRE`, `Cron`, `Zone`, `Duration`, `Schedule`, `Output`, `Serialize`, `Alerts.Post`, `Store.SQL`, and helpers such as `Alerts.Email.compose/2`, `Transport.check/2`, and `JobState.sending/2`), is hidden from HexDocs. It still works, since the package needs it public, but may change in any release.
+- **PHP**: the classes and methods marked `@internal` (`Evaluate`, `Schedule`, `Format`, `Serialize`, `Output`, `Duration`, and the client's execution methods among them). They still work, since the package's own classes call them, but may change in any release.

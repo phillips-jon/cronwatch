@@ -7,7 +7,7 @@
 const VARIABLES: [&str; 3] = ["CRONWATCH_ENV", "APP_ENV", "RUST_ENV"];
 
 /// The environment's name, lowercased, or `""` when no variable names one.
-/// `development`, `dev`, `local`, `test` and `testing` count as
+/// `development`, `dev`, `local`, `test`, and `testing` count as
 /// `development` and `prod` as `production`, as in the PHP and Go ports. A
 /// debug build is not development: `cfg!(debug_assertions)` says how the
 /// code was compiled, not where it runs.
@@ -42,7 +42,7 @@ pub(crate) fn is_blank(value: &str) -> bool {
 }
 
 /// A secret from the environment (`CRONWATCH_TOKEN`, `CRON_SECRET`): `None`
-/// when the variable is unset, empty or only whitespace (see [`is_blank`]),
+/// when the variable is unset, empty, or only whitespace (see [`is_blank`]),
 /// so a blank value counts as not set and the routes and handlers fail
 /// closed. Any other value is used as it is, untrimmed.
 pub(crate) fn secret_var(name: &str) -> Option<String> {

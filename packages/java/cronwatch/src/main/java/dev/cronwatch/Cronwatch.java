@@ -39,7 +39,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Watches an app's scheduled jobs: it records their runs in a store, judges each one, sends
  * alerts, and runs the checks that find missed and stuck runs. The same library as {@code
- * @cronwatch/sdk}, sharing its stores, its alert text and every byte it stores.
+ * @cronwatch/sdk}, sharing its stores, its alert text, and every byte it stores.
  *
  * <pre>{@code
  * var cw = Cronwatch.builder()
@@ -82,7 +82,7 @@ public final class Cronwatch implements AutoCloseable {
   public static final String RESERVED_RUN_ID_PREFIX = "pgcron:";
 
   /**
-   * The longest run id, in UTF-16 code units: what {@code start}, {@code resume} and {@code
+   * The longest run id, in UTF-16 code units: what {@code start}, {@code resume}, and {@code
    * recordRun} take, and every store holds.
    */
   static final int MAX_RUN_ID = 200;
@@ -161,7 +161,7 @@ public final class Cronwatch implements AutoCloseable {
       throw CronwatchException.invalid(
           "job name "
               + Json.stringify(name)
-              + " must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\" or \"-\"");
+              + " must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\", or \"-\"");
     }
     JsObject fields = core.defaults.copy();
     for (Map.Entry<String, @Nullable Object> e : options.fields.entries()) {
@@ -705,7 +705,7 @@ public final class Cronwatch implements AutoCloseable {
   }
 
   /**
-   * Removes a job, its runs and its state from the store. A job still declared in code comes back:
+   * Removes a job, its runs, and its state from the store. A job still declared in code comes back:
    * here on its next run, and in any other process that declares it on its next run there, or at
    * that process's next check or dashboard read.
    *
@@ -754,7 +754,7 @@ public final class Cronwatch implements AutoCloseable {
    *
    * @deprecated use {@link #startChecking()}, which does the same; removed in 2.0
    */
-  @Deprecated(since = "1.0", forRemoval = true)
+  @Deprecated(since = "0.11", forRemoval = true)
   public void start() {
     startChecking();
   }
@@ -764,7 +764,7 @@ public final class Cronwatch implements AutoCloseable {
    *
    * @deprecated use {@link #startChecking(Duration)}, which does the same; removed in 2.0
    */
-  @Deprecated(since = "1.0", forRemoval = true)
+  @Deprecated(since = "0.11", forRemoval = true)
   public void start(Duration every) {
     startChecking(every);
   }
@@ -775,7 +775,7 @@ public final class Cronwatch implements AutoCloseable {
    * @throws CronwatchException for text that is not a duration
    * @deprecated use {@link #startChecking(String)}, which does the same; removed in 2.0
    */
-  @Deprecated(since = "1.0", forRemoval = true)
+  @Deprecated(since = "0.11", forRemoval = true)
   public void start(String every) {
     startChecking(every);
   }
@@ -786,7 +786,7 @@ public final class Cronwatch implements AutoCloseable {
   }
 
   /**
-   * Stops the interval, waits for a check under way to end (bounded by its own channel, triage and
+   * Stops the interval, waits for a check under way to end (bounded by its own channel, triage, and
    * retry timeouts, as the SDK's close awaits it), waits up to five seconds for the other sends and
    * recordings in flight, then interrupts what is left, removes the shutdown hook, and closes the
    * store. A servlet container or Spring context should call it when the app stops, so no thread of
@@ -868,11 +868,11 @@ public final class Cronwatch implements AutoCloseable {
 
   /**
    * The dashboard and its JSON API, the SDK's {@code cw.routes()}: {@link Routes#handle} answers a
-   * request, and {@code WebServer}, the servlet filter and the Spring Boot starter serve it.
+   * request, and {@code WebServer}, the servlet filter, and the Spring Boot starter serve it.
    *
    * @throws CronwatchException for an {@code origin} that is not an http or https URL
    */
-  @SuppressWarnings("removal") // Routes.of is this, under the name it had before 1.0
+  @SuppressWarnings("removal") // Routes.of is this, under the name it had before 0.11
   public Routes routes(RoutesOptions options) {
     return Routes.of(this, options);
   }
@@ -884,7 +884,7 @@ public final class Cronwatch implements AutoCloseable {
 
   // ---- what a source uses
 
-  /** Where this client keeps jobs, runs and state. */
+  /** Where this client keeps jobs, runs, and state. */
   public Store store() {
     return core.store;
   }
@@ -937,9 +937,9 @@ public final class Cronwatch implements AutoCloseable {
 
     /**
      * The environment to read when neither {@code CRONWATCH_ENV} nor {@code APP_ENV} is set, as
-     * they are read ({@code dev}, {@code local}, {@code test} and {@code testing} are development):
-     * the Spring Boot starter gives the app's active profile. In development the dashboard makes a
-     * token of its own and a job's handler runs without a secret.
+     * they are read ({@code dev}, {@code local}, {@code test}, and {@code testing} are
+     * development): the Spring Boot starter gives the app's active profile. In development the
+     * dashboard makes a token of its own and a job's handler runs without a secret.
      */
     public Builder environment(String name) {
       this.environment = Objects.requireNonNull(name, "name");
@@ -947,7 +947,7 @@ public final class Cronwatch implements AutoCloseable {
     }
 
     /**
-     * Where jobs, runs and state live. The default is a {@link MemoryStore}, which forgets on
+     * Where jobs, runs, and state live. The default is a {@link MemoryStore}, which forgets on
      * restart.
      */
     public Builder store(Store store) {
@@ -1030,7 +1030,7 @@ public final class Cronwatch implements AutoCloseable {
     }
 
     /**
-     * Grace, timeout, timezone and failures before alert for every job that does not set its own.
+     * Grace, timeout, timezone, and failures before alert for every job that does not set its own.
      * {@link #build} refuses any other option.
      */
     public Builder defaults(JobOptions defaults) {
@@ -1039,7 +1039,7 @@ public final class Cronwatch implements AutoCloseable {
     }
 
     /**
-     * Replaces the default redaction of every run's output and error before it is stored, shown or
+     * Replaces the default redaction of every run's output and error before it is stored, shown, or
      * sent anywhere. A function that throws or answers null is reported ({@code redact}) and the
      * default is used.
      */
@@ -1097,12 +1097,12 @@ public final class Cronwatch implements AutoCloseable {
         for (String key : defaults.fields.keys()) {
           if (!DEFAULTABLE.contains(key)) {
             throw CronwatchException.invalid(
-                "defaults takes grace, timeout, timezone and failuresBeforeAlert, not " + key);
+                "defaults takes grace, timeout, timezone, and failuresBeforeAlert, not " + key);
           }
         }
         if (defaults.expect != null) {
           throw CronwatchException.invalid(
-              "defaults takes grace, timeout, timezone and failuresBeforeAlert, not expect");
+              "defaults takes grace, timeout, timezone, and failuresBeforeAlert, not expect");
         }
         defaultFields = defaults.fields.copy();
       }

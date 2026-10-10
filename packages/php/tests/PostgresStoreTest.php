@@ -22,8 +22,8 @@ use PHPUnit\Framework\TestCase;
  * catalogue, the SDK's statements, its own connection beside the app's
  * transaction, several processes initialising at once, and connecting
  * again after the connection broke. The store contract, the conformance
- * scripts and the finish-once tests with real processes run against it in
- * StoreConformanceTest, ConformanceTest and FinishOnceTest.
+ * scripts, and the finish-once tests with real processes run against it in
+ * StoreConformanceTest, ConformanceTest, and FinishOnceTest.
  */
 final class PostgresStoreTest extends TestCase
 {
@@ -181,7 +181,7 @@ final class PostgresStoreTest extends TestCase
             $this->assertSame('beforeafter', $run->output);
             $this->assertStringStartsWith('RuntimeException: badbyte', (string) $run->error);
             $this->assertSame(1, $cw->store->getState('nul')->consecutiveFailures, 'the state, with its alert, was written too');
-            // So are a trigger, metric names and a definition's text.
+            // So are a trigger, metric names, and a definition's text.
             $cw->job('nul2', ['description' => "a\0b", 'tags' => ["t\0"], 'budget' => ["c\0" => 5]])
                 ->run(fn (JobContext $job) => $job->metric("ro\0ws", 2), trigger: "cr\0on");
             $second = $cw->runs('nul2')[0];

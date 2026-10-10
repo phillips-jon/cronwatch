@@ -4,7 +4,7 @@
  * @file
  * Fixtures for the CronWatch module's tests.
  *
- * State keys steer them: cwt.cron_mode ("ok", "throw" or "error") picks what
+ * State keys steer them: cwt.cron_mode ("ok", "throw", or "error") picks what
  * this module's hook_cron does, every alert CronWatch sends is appended to
  * cwt.alerts (with the link the module's channels would give it),
  * cwt.bad_options (job name => options) is merged into those jobs' options,

@@ -39,8 +39,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * CronWatch for JobRunr 8: every recurring job is declared as a CronWatch job with its schedule,
- * and every attempt is recorded as a run, so a job that fails, runs late, never runs, gets stuck or
- * runs slow is reported. It is a {@link JobServerFilter}: give it to the background job server.
+ * and every attempt is recorded as a run, so a job that fails, runs late, never runs, gets stuck,
+ * or runs slow is reported. It is a {@link JobServerFilter}: give it to the background job server.
  *
  * <pre>{@code
  * CronwatchJobRunr watcher = CronwatchJobRunr.watch(cw, storageProvider, JobRunrOptions.defaults());
@@ -99,8 +99,8 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
 
   /**
    * Each recurring job's cron checked against JobRunr's own fire times, by the job, the cron, the
-   * zone and the year, so the read every minute walks only what changed: a cron that fires often in
-   * a zone with daylight saving takes most of a second to walk. Only what the last read saw is
+   * zone, and the year, so the read every minute walks only what changed: a cron that fires often
+   * in a zone with daylight saving takes most of a second to walk. Only what the last read saw is
    * kept.
    */
   private final Map<String, Checked> checked = new ConcurrentHashMap<>();
@@ -245,7 +245,7 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
         watch.reportOnce(
             "cronwatch: "
                 + label(name)
-                + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\""
+                + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\","
                 + " or \"-\"), so it is not watched; give it an id that is",
             "declaring " + label(name));
         continue;

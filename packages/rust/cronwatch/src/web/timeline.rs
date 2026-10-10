@@ -16,7 +16,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use crate::evaluate::{grace_ms, is_stuck, js_number, parsed_schedule, timeout_ms, truthy};
-use crate::format::js_text;
+use crate::format::{and_list, js_text};
 use crate::js::{self, Value};
 use crate::schedule::{self, Parsed, format_duration};
 use crate::types::{Condition, JobHealth, JobSummary, Run, RunStatus};
@@ -57,7 +57,7 @@ pub(crate) fn clock_utc(t: i64) -> String {
     js::iso_string(t)[11..16].to_string()
 }
 
-/// The UTC month (1 to 12), day and weekday (0 for Sunday) of `t`.
+/// The UTC month (1 to 12), day, and weekday (0 for Sunday) of `t`.
 fn civil(t: i64) -> (usize, i64, usize) {
     let days = js::floor_div(t, DAY_MS);
     let (_, m, d) = js::civil_from_days(days);
@@ -301,7 +301,7 @@ pub(crate) fn lane_note(job: &JobSummary, missed: Option<i64>, now: i64) -> Stri
         let mut text = "went over budget".to_string();
         let over = over_ceilings(job);
         if !over.is_empty() {
-            text.push_str(&format!(" on {}", over.join(" and ")));
+            text.push_str(&format!(" on {}", and_list(&over)));
         }
         return format!("{text} at {}", when_utc(last.started_at, now));
     }
@@ -309,7 +309,7 @@ pub(crate) fn lane_note(job: &JobSummary, missed: Option<i64>, now: i64) -> Stri
         let mut text = "fell short".to_string();
         let under = under_floors(job);
         if !under.is_empty() {
-            text.push_str(&format!(" on {}", under.join(" and ")));
+            text.push_str(&format!(" on {}", and_list(&under)));
         }
         return format!("{text} at {}", when_utc(last.started_at, now));
     }
@@ -617,7 +617,7 @@ fn timeline_legend() -> String {
         (boxed("run ok"), "ran"),
         (boxed("run bad"), "failed"),
         (boxed("run timeout"), "timed out"),
-        (boxed("run warn"), "over budget, under floor or slow"),
+        (boxed("run warn"), "over budget, under floor, or slow"),
         (boxed("run running"), "running"),
         (boxed("missed"), "missed"),
     ];

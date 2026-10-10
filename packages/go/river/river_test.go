@@ -4,7 +4,7 @@ package river_test
 
 // River end to end, against the Postgres CRONWATCH_TEST_PG names: a client
 // with CronWatch's middleware works jobs that fail and retry, snooze,
-// cancel themselves and panic, a periodic job, and the check.
+// cancel themselves, and panic; then a periodic job and the check.
 
 import (
 	"context"

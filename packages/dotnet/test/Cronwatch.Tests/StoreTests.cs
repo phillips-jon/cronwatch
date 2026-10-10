@@ -7,6 +7,8 @@ using Cronwatch.StoreTesting;
 using Microsoft.Data.Sqlite;
 using Xunit;
 
+#pragma warning disable CS0618 // StoreReplay and FinishOnce, deprecated, still run the port's own replay and finish-once checks
+
 namespace Cronwatch.Tests;
 
 public class StoreTests
@@ -102,7 +104,7 @@ public class StoreTests
         var e = Assert.Throws<CronwatchException>(() => SqlStore.Sqlite(Sqlite(dir.File("cw.db"))).WithPrefix("Bad"));
         Assert.Equal(CronwatchErrorKind.Invalid, e.Kind);
         Assert.Equal(
-            "cronwatch: invalid table prefix \"Bad\". Use lowercase letters, digits and underscores, not starting with a digit, at most 47 characters.",
+            "cronwatch: invalid table prefix \"Bad\". Use lowercase letters, digits, and underscores, not starting with a digit, at most 47 characters.",
             e.Message);
         var store = SqlStore.Sqlite(Sqlite(dir.File("p.db"))).WithPrefix("cw_");
         await using (store)

@@ -51,7 +51,7 @@ public sealed class PostmarkChannel : IChannel
     private readonly ITransport? _transport;
 
     /// <summary>The channel.</summary>
-    /// <exception cref="CronwatchException">Without a server token, a sender or a recipient.</exception>
+    /// <exception cref="CronwatchException">Without a server token, a sender, or a recipient.</exception>
     public PostmarkChannel(PostmarkOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);

@@ -172,7 +172,7 @@ class WebTimelineTest < Minitest::Test
     summary = ->(name, **options) { cw.job(name, **options) && cw.job_summary(name) }
     cw.run("plain") { nil }
     assert_equal 50, timeline.week_runs_limit(cw.job_summary("plain"), T0), "no schedule"
-    # 24 fires a day over the six days, today and tomorrow (177.5 hours): 177.5 * 1.2 + 10.
+    # 24 fires a day over the six days, today, and tomorrow (177.5 hours): 177.5 * 1.2 + 10.
     assert_equal 223, timeline.week_runs_limit(summary.call("hourly", schedule: "0 * * * *", timezone: "UTC"), T0)
     assert_equal 500, timeline.week_runs_limit(summary.call("minutely", schedule: "* * * * *"), T0), "too dense to count"
     assert_equal 50, timeline.week_runs_limit(summary.call("daily", schedule: "0 3 * * *", timezone: "UTC"), T0)

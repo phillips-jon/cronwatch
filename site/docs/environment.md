@@ -16,7 +16,7 @@ Every CronWatch library reads a handful of environment variables, so the dashboa
 | `CRONWATCH_TOKEN` | the dashboard's and the JSON API's token, when none is passed | the dashboard answers 503, or in development makes a token of its own and prints it to the log ([Access](/docs/dashboard/#access)) |
 | `CRON_SECRET` | the bearer secret a job's handler and `/api/check` accept, when none is passed | a handler refuses with 503, except in development, where it runs; `/api/check` takes only the token |
 | `CRONWATCH_ENV`, then `APP_ENV` | names the environment, before the language's own variable (below) | the language's own variable or framework decides |
-| `ANTHROPIC_API_KEY` | the API key for [Claude triage](/docs/triage/), when none is passed | triage cannot run; TypeScript, Ruby and Python leave the variable to Anthropic's own SDK, which reads it |
+| `ANTHROPIC_API_KEY` | the API key for [Claude triage](/docs/triage/), when none is passed | triage cannot run; TypeScript, Ruby, and Python leave the variable to Anthropic's own SDK, which reads it |
 
 `@cronwatch/mcp` reads two: `CRONWATCH_URL`, where the dashboard is mounted (the `--url` flag wins; with neither it exits), and `CRONWATCH_TOKEN`, the bearer it sends (the `--token` flag wins; without one it works only against an open dashboard, and says so). See [MCP server](/docs/mcp/).
 
@@ -25,13 +25,13 @@ Every CronWatch library reads a handful of environment variables, so the dashboa
 Development decides two things: a dashboard with no token makes one of its own and prints it, and a handler with no secret runs. Production decides one: the default in-memory store warns that it forgets on restart. Every library names the environment the same way:
 
 1. Take the first variable in the language's order (below) whose value, trimmed, is not empty, and lowercase it.
-2. `prod` means production. `dev`, `local`, `test` and `testing` mean development, as `development` does.
+2. `prod` means production. `dev`, `local`, `test`, and `testing` mean development, as `development` does.
 3. With nothing set, the environment is neither, so there is no development token and no unguarded handler.
 
 | Language | Order |
 |---|---|
 | TypeScript | `CRONWATCH_ENV`, `APP_ENV`, `NODE_ENV`. A Cloudflare Worker without `process` has none, and is neither |
-| Ruby | `CRONWATCH_ENV`, `APP_ENV`, then `Rails.env` when Rails is loaded, `RAILS_ENV`, `RACK_ENV`. `RACK_ENV=development` alone does not count while Puma, Unicorn, Thin or rackup is loaded, since they set it by default |
+| Ruby | `CRONWATCH_ENV`, `APP_ENV`, then `Rails.env` when Rails is loaded, `RAILS_ENV`, `RACK_ENV`. `RACK_ENV=development` alone does not count while Puma, Unicorn, Thin, or rackup is loaded, since they set it by default |
 | Python | `CRONWATCH_ENV`, `APP_ENV`, `ENVIRONMENT`, then under Django its `DEBUG` setting (on is development, off is production) |
 | PHP | `CRONWATCH_ENV`, `APP_ENV`, `WP_ENVIRONMENT_TYPE`, then the framework's own: WordPress's `wp_get_environment_type()`, Laravel's `app()->environment()`, Symfony's `kernel.environment` |
 | Go | `CRONWATCH_ENV`, `APP_ENV`, `GO_ENV` |
@@ -57,7 +57,7 @@ Besides the ones above, each library reads these.
 | `SOLID_QUEUE_RECURRING_SCHEDULE` | the Solid Queue recurring schedule file the integration reads, as Solid Queue does | `config/recurring.yml` |
 | `SOLID_QUEUE_SKIP_RECURRING` | set (and not a false value), no recurring tasks are read, as Solid Queue does | they are read |
 
-The Rails install generator writes an initializer that reads `SLACK_WEBHOOK_URL`, with `DISCORD_WEBHOOK_URL`, `CRONWATCH_WEBHOOK_URL` and `CRONWATCH_WEBHOOK_SECRET` in comments. That code is yours to change; the gem itself does not read them.
+The Rails install generator writes an initializer that reads `SLACK_WEBHOOK_URL`, with `DISCORD_WEBHOOK_URL`, `CRONWATCH_WEBHOOK_URL`, and `CRONWATCH_WEBHOOK_SECRET` in comments. That code is yours to change; the gem itself does not read them.
 
 ### Python
 
@@ -78,7 +78,7 @@ Variables are read from `getenv()`, then `$_ENV`, then `$_SERVER`.
 | `ANTHROPIC_BASE_URL` | the API triage posts to | `https://api.anthropic.com` |
 | `CRONWATCH_BOOTSTRAP` | the bootstrap file the `cronwatch` command (`vendor/bin/cronwatch`) loads (`--bootstrap` wins) | `./cronwatch.php`, then `./config/cronwatch.php` |
 
-`cronSecret`, the dashboard's `token` and a handler's `secret` read `CRON_SECRET` and `CRONWATCH_TOKEN` when left out (or given `Cronwatch\FromEnv::Read`); `null` turns them off, and so does `false`, deprecated until 2.0. Either variable holding one of the words Laravel's `env()` reads as null, true, false or empty (`null`, `(null)`, `true`, `(true)`, `false`, `(false)`, `empty` or `(empty)`, in any case) counts as not set too, so `CRON_SECRET=null` in a `.env` file is not the password `null`. The integrations:
+`cronSecret`, the dashboard's `token`, and a handler's `secret` read `CRON_SECRET` and `CRONWATCH_TOKEN` when left out (or given `Cronwatch\FromEnv::Read`); `null` turns them off, and so does `false`, deprecated until 2.0. Either variable holding one of the words Laravel's `env()` reads as null, true, false, or empty (`null`, `(null)`, `true`, `(true)`, `false`, `(false)`, `empty`, or `(empty)`, in any case) counts as not set too, so `CRON_SECRET=null` in a `.env` file is not the password `null`. The integrations:
 
 - **Laravel** reads its settings from `config/cronwatch.php`, whose values come from the variables in the table below.
 - **Symfony** has no variables of its own: write `%env(...)%` in `config/packages/cronwatch.yaml`. Left unset, `cron_secret` reads `CRON_SECRET`, `dashboard.token` reads `CRONWATCH_TOKEN`, and `store` uses `DATABASE_URL`, else `var/cronwatch.db`.
@@ -171,6 +171,6 @@ A schedule with no zone is read in the JVM's default zone, which follows `TZ` an
 |---|---|---|
 | `CRONWATCH_APP_ID` | the app the Hangfire and Quartz.NET integrations tag their jobs with, when their `App` option is not set | the host's application name (Quartz.NET), else the entry assembly's name |
 | `ANTHROPIC_BASE_URL` | the API triage posts to | `https://api.anthropic.com` |
-| `ASPNETCORE_ENVIRONMENT`, `DOTNET_ENVIRONMENT` | the environment, after `CRONWATCH_ENV`, `APP_ENV` and the host's own (above) | |
+| `ASPNETCORE_ENVIRONMENT`, `DOTNET_ENVIRONMENT` | the environment, after `CRONWATCH_ENV`, `APP_ENV`, and the host's own (above) | |
 
 `Cronwatch.Hosting` reads the `Cronwatch` configuration section (`Retention`, `Token`, `CheckEvery`, `Environment`), which the default host also fills from variables such as `Cronwatch__Token`. A schedule with no zone is read in `TimeZoneInfo.Local`, which follows `TZ` on Linux and macOS. See [.NET](/docs/dotnet/).

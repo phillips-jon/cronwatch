@@ -20,7 +20,7 @@ final class StoredJob
 
     /**
      * A job whose stored definition is not a JSON object (a foreign,
-     * hand-edited or damaged row's): its definition reads as just its name,
+     * hand-edited, or damaged row's): its definition reads as just its name,
      * and the client does not evaluate it. A check reports it, and the
      * dashboard shows it as failing, while the other jobs carry on.
      *

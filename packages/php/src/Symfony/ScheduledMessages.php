@@ -101,7 +101,7 @@ final class ScheduledMessages
      * The bundle's `app_id` names the app; without one it is "app-" and 12
      * hex characters of a hash of the project directory, the directory a
      * deploy tool gives each release (`<root>/releases/<name>`, as Deployer,
-     * Capistrano and Envoyer lay it out) read as its root, so the tag stays
+     * Capistrano, and Envoyer lay it out) read as its root, so the tag stays
      * the same across deploys. Nothing secret goes into it: the tag is shown
      * on the dashboard and in the API (see DESIGN.md).
      */
@@ -112,7 +112,7 @@ final class ScheduledMessages
     }
 
     /**
-     * The tag releases before 1.0 gave this app without an `app_id`, from a
+     * The tag releases before 0.11 gave this app without an `app_id`, from a
      * hash of the kernel's secret (APP_SECRET), which published part of a
      * fast hash of the secret; read only to recognise this app's jobs that
      * still carry it. Null with an `app_id`, or with no secret.
@@ -188,7 +188,7 @@ final class ScheduledMessages
         $cw = $this->cw();
         $report = fn (\Throwable $e, string $where) => $cw->onError($e, $where);
         Unscheduled::declare($cw, self::TAG, $this->appTag(), $report);
-        // Jobs this app tagged before 1.0, from its secret: taken out of the
+        // Jobs this app tagged before 0.11, from its secret: taken out of the
         // schedule since, they are declared without it here, as they would be
         // under the tag they carry now.
         $secretTag = $this->secretTag();

@@ -7,8 +7,8 @@ using Cronwatch.Internal;
 namespace Cronwatch.StoreTesting;
 
 /// <summary>
-/// What a store got wrong under <see cref="StoreContract"/>, <see cref="StoreReplay"/> or
-/// <c>FinishOnce</c>. Every test framework reports it as a failure.
+/// What a store got wrong under <see cref="StoreContract"/> (or the deprecated <c>StoreReplay</c>
+/// and <c>FinishOnce</c>). Every test framework reports it as a failure.
 /// </summary>
 public sealed class StoreContractException : Exception
 {

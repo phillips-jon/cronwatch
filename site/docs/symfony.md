@@ -7,7 +7,7 @@ group: PHP
 
 # Symfony
 
-`cronwatch/cronwatch` includes a Symfony bundle. It watches every recurring message of every schedule through the Scheduler's own events, records Messenger messages that opt in, adds its check to the schedule your worker already consumes, keeps its tables in the app's database and serves the dashboard behind your security. It needs PHP 8.2 or newer and is tested on Symfony 6.4, 7.4 and 8.1 (8.x needs PHP 8.4).
+`cronwatch/cronwatch` includes a Symfony bundle. It watches every recurring message of every schedule through the Scheduler's own events, records Messenger messages that opt in, adds its check to the schedule your worker already consumes, keeps its tables in the app's database, and serves the dashboard behind your security. It needs PHP 8.2 or newer and is tested on Symfony 6.4, 7.4, and 8.1 (8.x needs PHP 8.4).
 
 ## Install
 
@@ -34,11 +34,11 @@ cronwatch:
         mailer: { to: ops@example.com, from: cronwatch@example.com }
 ```
 
-The Scheduler watching needs `symfony/scheduler` and `symfony/messenger`, which an app that schedules anything already has. The three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) are made on first use, in the app's database, so another language can share them: on SQLite or Postgres any port, on MySQL or MariaDB the Go, Rust, Elixir, Java and .NET ports.
+The Scheduler watching needs `symfony/scheduler` and `symfony/messenger`, which an app that schedules anything already has. The three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) are made on first use, in the app's database, so another language can share them: on SQLite or Postgres any port, on MySQL or MariaDB the Go, Rust, Elixir, Java, and .NET ports.
 
 ## What is watched
 
-Every recurring message of every schedule (`#[AsSchedule]` providers, `#[AsCronTask]` and `#[AsPeriodicTask]`) is a job, and every time the worker consuming that schedule handles it is a run, recorded through the Scheduler's `PreRunEvent`, `PostRunEvent` and `FailureEvent`, with the trigger `"symfony-scheduler"` (`"scheduler"` on runs recorded before 1.0; see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)):
+Every recurring message of every schedule (`#[AsSchedule]` providers, `#[AsCronTask]`, and `#[AsPeriodicTask]`) is a job, and every time the worker consuming that schedule handles it is a run, recorded through the Scheduler's `PreRunEvent`, `PostRunEvent`, and `FailureEvent`, with the trigger `"symfony-scheduler"` (`"scheduler"` on runs recorded before 0.11; see [Triggers, tags, and job names](/docs/dashboard/#triggers-tags-and-job-names)):
 
 - The run ends ok with the handler's result: a string is the output, and an HTTP response of 400 or more fails the run.
 - A handler that throws fails the run with the exception (taken out of Messenger's `HandlerFailedException`), and the exception goes on as before.
@@ -68,7 +68,7 @@ A job is named after:
 
 A schedule other than `default` puts its name in front: `reports:App.Message.BuildReport`.
 
-The schedule is the trigger's: a `CronExpressionTrigger`'s expression and zone (a hashed `#` expression as Symfony resolved it), a `PeriodicalTrigger`'s interval as `every` and the interval in the largest units that fit (3600 seconds is `every 1h`, 5400 `every 1h30m`, 90 `every 1m30s`), a `JitterTrigger`'s inner trigger. A trigger that does not fire at fixed times (`ExcludeTimeTrigger`, `CallbackTrigger`, a calendar interval such as `1 month`) leaves the job without a schedule, reported once: its failures, slow runs and stuck runs are still watched, but it is never reported missed. So does a `PeriodicalTrigger` outside its `from` and `until` (`RecurringMessage::every('1 day', $message, until: '2026-12-31')`): before `from` it has not started, and once `until` has passed it fires no more. Two messages with one name on different schedules are one job without a schedule.
+The schedule is the trigger's: a `CronExpressionTrigger`'s expression and zone (a hashed `#` expression as Symfony resolved it), a `PeriodicalTrigger`'s interval as `every` and the interval in the largest units that fit (3600 seconds is `every 1h`, 5400 `every 1h30m`, 90 `every 1m30s`), a `JitterTrigger`'s inner trigger. A trigger that does not fire at fixed times (`ExcludeTimeTrigger`, `CallbackTrigger`, a calendar interval such as `1 month`) leaves the job without a schedule, reported once: its failures, slow runs, and stuck runs are still watched, but it is never reported missed. So does a `PeriodicalTrigger` outside its `from` and `until` (`RecurringMessage::every('1 day', $message, until: '2026-12-31')`): before `from` it has not started, and once `until` has passed it fires no more. Two messages with one name on different schedules are one job without a schedule.
 
 Jobs are declared by every check, so a message that has never run is known. A message taken out of a schedule keeps its history and is declared again without its schedule, so it is never reported missed. Jobs are tagged `symfony-scheduler` and `symfony-scheduler:<app>`, where the app is `app_id`, else `app-` and a hash of the project directory (a deploy tool's `<root>/releases/<name>` read as its root, so it outlives a deploy). Two apps sharing one database and table prefix need different ones: set `app_id` when they also share a path, as two containers at `/app` do.
 
@@ -97,11 +97,11 @@ cronwatch:
         exclude: ['app:heartbeat']
 ```
 
-The options are `name` and a job's (`schedule`, `timezone`, `grace`, `timeout`, `maxDuration`, `budget`, `floor`, `expect`, `failuresBeforeAlert`, `description`, `tags`; see [PHP](/docs/php/#api)); `#[Watch(enabled: false)]` and `false` leave a message out. `defaults` applies `grace`, `timeout`, `timezone` and `failuresBeforeAlert` to every job that sets none. `scheduler: { watch: false }` turns the Scheduler watching off.
+The options are `name` and a job's (`schedule`, `timezone`, `grace`, `timeout`, `maxDuration`, `budget`, `floor`, `expect`, `failuresBeforeAlert`, `description`, `tags`; see [PHP](/docs/php/#api)); `#[Watch(enabled: false)]` and `false` leave a message out. `defaults` applies `grace`, `timeout`, `timezone`, and `failuresBeforeAlert` to every job that sets none. `scheduler: { watch: false }` turns the Scheduler watching off.
 
 ## Messenger messages
 
-A message class marked `#[Cronwatch\Watch]` is recorded where a worker handles it, whatever sent it, with the trigger `"symfony-messenger"` (`"messenger"` on runs recorded before 1.0). Every attempt is a run of its own, so a retried message's failing attempts open one failed alert and the attempt that succeeds closes it with a recovery; `failuresBeforeAlert` rides through retries. A message handled synchronously never reaches a worker and is not recorded.
+A message class marked `#[Cronwatch\Watch]` is recorded where a worker handles it, whatever sent it, with the trigger `"symfony-messenger"` (`"messenger"` on runs recorded before 0.11). Every attempt is a run of its own, so a retried message's failing attempts open one failed alert and the attempt that succeeds closes it with a recovery; `failuresBeforeAlert` rides through retries. A message handled synchronously never reaches a worker and is not recorded.
 
 A watched message that a schedule sends on to a transport (`RecurringMessage` with a `RedispatchMessage`) is one job: the schedule declares the schedule under the message's name, and the worker that handles it records the runs, so a message that is sent but never handled is still reported missed. `messenger: { watch: false }` turns this off.
 
@@ -135,13 +135,13 @@ cronwatch:
 */5 * * * *  cd /var/www/app && bin/console cronwatch:check
 ```
 
-`bin/console cronwatch:check` declares every schedule's jobs, finds missed and stuck runs, sends their alerts, retries alerts no channel accepted and prunes old runs, and prints `cronwatch: checked 3 jobs, sent 1 alert`; anything that goes wrong is one line on standard error and exit status 1. The check is never a job. Run one checker per store.
+`bin/console cronwatch:check` declares every schedule's jobs, finds missed and stuck runs, sends their alerts, retries alerts no channel accepted, prunes old runs, and prints `cronwatch: checked 3 jobs, sent 1 alert`; anything that goes wrong is one line on standard error and exit status 1. The check is never a job. Run one checker per store.
 
 If the worker stops, the check stops with it, and nothing inside the app can say so. Pair it with an uptime monitor for that case (see [Limits](/docs/limits/)).
 
 ## The store
 
-`store` is a URL written as Doctrine writes one: `mysql://`, `postgresql://`, `sqlite:///<path>` or `memory`. The default is the app's `DATABASE_URL`, else `var/cronwatch.db`. MySQL 8.0.13 or newer, MariaDB 10.6 or newer, Postgres and SQLite are supported; Doctrine's `serverVersion` and a Postgres `charset` are left out. The store always opens a connection of its own, in autocommit mode, so a run recorded inside a Doctrine transaction stays recorded when the transaction rolls back.
+`store` is a URL written as Doctrine writes one: `mysql://`, `postgresql://`, `sqlite:///<path>`, or `memory`. The default is the app's `DATABASE_URL`, else `var/cronwatch.db`. MySQL 8.0.13 or newer, MariaDB 10.6 or newer, Postgres, and SQLite are supported; Doctrine's `serverVersion` and a Postgres `charset` are left out. The store always opens a connection of its own, in autocommit mode, so a run recorded inside a Doctrine transaction stays recorded when the transaction rolls back.
 
 `table_prefix` names the tables (default `cronwatch_`). Each process runs `CREATE TABLE IF NOT EXISTS` on first use; where the app's database user may not create tables, make them once from a user who may and set `create_tables: false`. `store_service` names a `Cronwatch\Store\Store` service of your own instead.
 
@@ -161,7 +161,7 @@ cronwatch:
     deliver: now                        # check: queue alerts for another process's check to send
 ```
 
-Email goes through `symfony/mailer` with the library's subject, text and HTML. `services` takes the ids of `Cronwatch\Alerts\AlertChannel` services, so any of the library's channels (Resend, Postmark, SES, Twilio, Sentry and the rest; see [PHP](/docs/php/#email-sms-and-error-trackers)) can be defined as a service and listed. With no channel, alerts go to the logger, Monolog's `cronwatch` channel when the app has Monolog, as do failures outside jobs. `cron_secret` is the secret `handler()` and `/api/check` take (default `CRON_SECRET`).
+Email goes through `symfony/mailer` with the library's subject, text, and HTML. `services` takes the ids of `Cronwatch\Alerts\AlertChannel` services, so any of the library's channels (Resend, Postmark, SES, Twilio, Sentry, and the rest; see [PHP](/docs/php/#email-sms-and-error-trackers)) can be defined as a service and listed. With no channel, alerts go to the logger, Monolog's `cronwatch` channel when the app has Monolog, as do failures outside jobs. `cron_secret` is the secret `handler()` and `/api/check` take (default `CRON_SECRET`).
 
 The client is the `Cronwatch\Cronwatch` service (alias `cronwatch`), autowired anywhere, so a job of your own is `$cw->job('partner-export', [...])->run(fn ($job) => ...)`. A platform cron that calls a URL can call a controller:
 
@@ -180,7 +180,7 @@ public function nightly(Request $request, Cronwatch $cw): Response
 }
 ```
 
-It checks `Authorization: Bearer <CRON_SECRET>`, runs the job and answers with how it went; see [handler](/docs/php/#jobs-a-url-starts).
+It checks `Authorization: Bearer <CRON_SECRET>`, runs the job, and answers with how it went; see [handler](/docs/php/#jobs-a-url-starts).
 
 ## The dashboard
 
@@ -209,7 +209,7 @@ The pages and API are the SDK's; see [Dashboard and API](/docs/dashboard/). Writ
 
 ## Settings
 
-The bundle's keys, with the variables and Laravel's keys for the same settings, are in one table on the [Laravel page](/docs/laravel/#settings); the two spell a setting the same wherever it means the same thing (`table_prefix`, `create_tables`, `check.schedule`, `check.frequency`, `dashboard.token`). None of the bundle's keys changed for 1.0.
+The bundle's keys, with the variables and Laravel's keys for the same settings, are in one table on the [Laravel page](/docs/laravel/#settings); the two spell a setting the same wherever it means the same thing (`table_prefix`, `create_tables`, `check.schedule`, `check.frequency`, `dashboard.token`). None of the bundle's keys changed in 0.11.
 
 ## Tests
 

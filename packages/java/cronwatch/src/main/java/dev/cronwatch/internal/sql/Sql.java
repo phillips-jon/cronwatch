@@ -6,12 +6,12 @@ import java.util.List;
 
 /**
  * The schema and statements of the SDK's {@code stores/sql.ts}, text for text, so a Java process
- * shares a database with a Node, Ruby, Python, PHP, Go, Rust or Elixir one and {@code
+ * shares a database with a Node, Ruby, Python, PHP, Go, Rust, or Elixir one and {@code
  * sqlite_master} reads the same whoever made the tables. {@code sql.ts} writes its statements with
  * {@code ?} and numbers them {@code $1}, {@code $2} for Postgres; JDBC takes {@code ?} on every
  * database, so these are its text before the numbering. MySQL (and MariaDB) has a dialect of its
- * own, the PHP, Go, Rust and Elixir ports' ({@code packages/go/sqlstore/sql.go}), since it has no
- * {@code ON CONFLICT}, no partial index and no {@code TEXT} primary key: the same tables, columns
+ * own, the PHP, Go, Rust, and Elixir ports' ({@code packages/go/sqlstore/sql.go}), since it has no
+ * {@code ON CONFLICT}, no partial index, and no {@code TEXT} primary key: the same tables, columns,
  * and values, with the JSON columns as {@code LONGTEXT} holding the SDK's JSON byte for byte, never
  * MySQL's {@code JSON} type, which would rewrite it.
  */
@@ -44,7 +44,7 @@ public final class Sql {
       throw new IllegalArgumentException(
           "cronwatch: invalid table prefix "
               + Json.stringify(prefix)
-              + ". Use lowercase letters, digits and underscores, not starting with a digit, at most "
+              + ". Use lowercase letters, digits, and underscores, not starting with a digit, at most "
               + MAX_PREFIX
               + " characters.");
     }
@@ -108,9 +108,9 @@ public final class Sql {
   }
 
   /**
-   * MySQL's tables (the PHP, Go, Rust and Elixir ports'): {@code VARCHAR(255)} keys, {@code BIGINT}
-   * times, {@code LONGTEXT} JSON, {@code utf8mb4_bin} so names compare and sort by byte, {@code
-   * seq} for insertion order, and a plain index where the others have a partial one.
+   * MySQL's tables (the PHP, Go, Rust, and Elixir ports'): {@code VARCHAR(255)} keys, {@code
+   * BIGINT} times, {@code LONGTEXT} JSON, {@code utf8mb4_bin} so names compare and sort by byte,
+   * {@code seq} for insertion order, and a plain index where the others have a partial one.
    */
   private static List<String> mysqlSchema(String p) {
     String table = "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin";

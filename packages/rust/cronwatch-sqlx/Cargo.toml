@@ -1,6 +1,6 @@
 [package]
 name = "cronwatch-sqlx"
-description = "CronWatch's SQL store over sqlx: runs, jobs and state in the app's own database"
+description = "CronWatch's SQL store over sqlx: runs, jobs, and state in the app's own database"
 readme = "README.md"
 version.workspace = true
 edition.workspace = true

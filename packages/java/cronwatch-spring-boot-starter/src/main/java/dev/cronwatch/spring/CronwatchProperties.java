@@ -13,7 +13,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * defaults are the SDK's.
  *
  * <pre>
- * # auto, memory or jdbc (the app's DataSource)
+ * # auto, memory, or jdbc (the app's DataSource)
  * cronwatch.store=auto
  * cronwatch.retention=30d
  * cronwatch.check-every=1m
@@ -22,7 +22,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(prefix = "cronwatch")
 public class CronwatchProperties {
-  /** Where the client keeps jobs, runs and state. */
+  /** Where the client keeps jobs, runs, and state. */
   public enum StoreKind {
     /**
      * {@code SqlStore} over the app's one {@code DataSource} when it has one, else the memory
@@ -64,7 +64,7 @@ public class CronwatchProperties {
    */
   private @Nullable String app;
 
-  /** Where jobs, runs and state live. */
+  /** Where jobs, runs, and state live. */
   private StoreKind store = StoreKind.AUTO;
 
   /** The prefix of the store's table names. */
@@ -304,7 +304,7 @@ public class CronwatchProperties {
     this.app = app;
   }
 
-  /** Where jobs, runs and state live. */
+  /** Where jobs, runs, and state live. */
   public StoreKind getStore() {
     return store;
   }

@@ -23,6 +23,13 @@ def _when(at: int | None, now: int) -> str:
     return f"{iso.replace('T', ' ', 1)[:19]} UTC ({format_relative(at, now)})"
 
 
+def and_list(words: list[str]) -> str:
+    """Words joined as an English list, with a serial comma from three on: "a", "a and b", "a, b, and c"."""
+    if len(words) <= 2:
+        return " and ".join(words)
+    return f"{', '.join(words[:-1])}, and {words[-1]}"
+
+
 def _first_lines(text: str | None, n: int) -> str:
     if not text:
         return ""
@@ -115,7 +122,7 @@ def compose_alert(draft: AlertDraft, definition: JobDefinition, now: int) -> Ale
             lines.append(f"{prefix}It has no schedule now, so nothing is due; the missed alert is closed.")
         else:
             title = f"{name} recovered"
-            after = ", ".join(str(c).replace("_", " ", 1) for c in details["after"])
+            after = and_list([str(c).replace("_", " ", 1) for c in details["after"]])
             lines.append(f"A run {_when(run.started_at, now) if run else 'just now'} succeeded{f' after: {after}' if after else ''}.")
             if run is not None and run.duration_ms is not None:
                 lines.append(f"Ran {format_duration(run.duration_ms)}.")

@@ -6,7 +6,7 @@ namespace Cronwatch.PgCron;
 
 /// <summary>
 /// How a <see cref="PgCronSource"/> watches pg_cron: the SDK's <c>PgCronOptions</c>, with its
-/// <c>jobs</c> as <see cref="Jobs"/>, <see cref="JobIds"/> and <see cref="Pick"/>, and its
+/// <c>jobs</c> as <see cref="Jobs"/>, <see cref="JobIds"/>, and <see cref="Pick"/>, and its
 /// <c>options</c> as <see cref="Options"/> or <see cref="OptionsFor"/>, as the other typed ports
 /// have them. Checked when the source is made.
 /// </summary>
@@ -41,7 +41,7 @@ public sealed class PgCronOptions
 
     /// <summary>
     /// The CronWatch name for a job. Default <see cref="PgCronSource.DefaultJobName"/>: its jobname
-    /// with anything other than letters, digits, <c>.</c>, <c>_</c>, <c>:</c> and <c>-</c> turned
+    /// with anything other than letters, digits, <c>.</c>, <c>_</c>, <c>:</c>, and <c>-</c> turned
     /// into <c>-</c>, or <c>pg_cron:&lt;jobid&gt;</c> when it has none. The prefix goes in front
     /// either way. One that throws or answers null, like a <see cref="Pick"/> or
     /// <see cref="OptionsFor"/> that throws, is reported once and fails only that job, which keeps
@@ -50,7 +50,7 @@ public sealed class PgCronOptions
     public Func<PgCronJob, string?>? JobName { get; init; }
 
     /// <summary>
-    /// Grace, timeout, maxDuration, expect and the rest, for every job. The schedule and timezone
+    /// Grace, timeout, maxDuration, expect, and the rest, for every job. The schedule and timezone
     /// always come from pg_cron, so options that set either are refused.
     /// </summary>
     public JobOptions? Options { get; init; }

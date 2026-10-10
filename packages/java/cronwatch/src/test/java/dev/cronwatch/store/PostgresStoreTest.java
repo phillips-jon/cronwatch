@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The store on Postgres, when {@code CRONWATCH_TEST_PG} is set: the shared server tests and the
- * SDK's {@code stores.test.ts} own, as the Go, Rust and Elixir ports have them.
+ * SDK's {@code stores.test.ts} own, as the Go, Rust, and Elixir ports have them.
  */
 class PostgresStoreTest extends ServerStoreTests {
   @Override
@@ -198,7 +198,7 @@ class PostgresStoreTest extends ServerStoreTests {
       JobState st = store.getState("nul");
       assertNotNull(st);
       assertEquals(1, st.consecutiveFailures(), "the state, with its alert, was written too");
-      // So are a trigger, metric names and a definition's text.
+      // So are a trigger, metric names, and a definition's text.
       cw.job(
               "nul2",
               dev.cronwatch.JobOptions.builder()

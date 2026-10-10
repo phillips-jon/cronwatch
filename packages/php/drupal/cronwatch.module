@@ -2,7 +2,7 @@
 
 /**
  * @file
- * CronWatch: every cron run, each hook_cron and chosen queue workers watched.
+ * CronWatch: every cron run, each hook_cron, and chosen queue workers watched.
  *
  * The cron runs are recorded by the cron service itself (WatchedCron, set by
  * CronwatchServiceProvider, or WatchedUltimateCron under Ultimate Cron, set
@@ -70,6 +70,6 @@ function cronwatch_help(string $route_name, RouteMatchInterface $route_match): ?
   if ($route_name !== 'help.page.cronwatch') {
     return NULL;
   }
-  return '<p>' . t('CronWatch records every cron run as a run of the job <em>drupal:cron</em>, and each module\'s hook_cron in it as a run of <em>drupal:&lt;module&gt;</em>, in the site\'s own database. It alerts you when cron is missed, when a hook_cron fails, gets stuck or runs much slower than usual, and again when it recovers. Queue workers you choose are watched too, each item a run. Under Ultimate Cron, each run of its jobs is recorded, each job expected on its own rules.') . '</p>'
+  return '<p>' . t('CronWatch records every cron run as a run of the job <em>drupal:cron</em>, and each module\'s hook_cron in it as a run of <em>drupal:&lt;module&gt;</em>, in the site\'s own database. It alerts you when cron is missed, when a hook_cron fails, gets stuck, or runs much slower than usual, and again when it recovers. Queue workers you choose are watched too, each item a run. Under Ultimate Cron, each run of its jobs is recorded, each job expected on its own rules.') . '</p>'
     . '<p>' . t('A check every few minutes finds missed and stuck runs. It runs at the end of each cron run, and from <code>drush cronwatch:check</code>; a check that runs with cron cannot notice cron not running, so run it from the server\'s crontab as well.') . '</p>';
 }

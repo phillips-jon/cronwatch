@@ -2,7 +2,7 @@ defmodule Cronwatch.Web.Routes do
   @moduledoc false
   # The dashboard and its small JSON API (routes/index.ts), carried over from
   # the Go port's routes.go through the Rust port's web/routes.rs: the same
-  # URLs, JSON, status codes, headers, cookie, redirects, cross-site rule and
+  # URLs, JSON, status codes, headers, cookie, redirects, cross-site rule, and
   # token rules as the SDK's routes, so @cronwatch/mcp works against an
   # Elixir app as it does against a Node one. Framework-free: `handle/2`
   # takes a Cronwatch.Web.Request and answers {status, headers, body};
@@ -51,8 +51,8 @@ defmodule Cronwatch.Web.Routes do
   def max_body, do: @max_body
 
   # 'self' only for what the app shell needs: app.js (which registers the
-  # service worker and the theme toggle), the manifest, the worker and the icons.
-  # No inline script, and the pages work without any.
+  # service worker and the theme toggle), the manifest, the worker, and the
+  # icons. No inline script, and the pages work without any.
   @page_csp "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
   @asset_csp "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"
 
@@ -382,7 +382,7 @@ defmodule Cronwatch.Web.Routes do
     asset = if get and path != "/offline", do: PWA.static_asset(path, base)
 
     cond do
-      # The app shell: the manifest, icons, service worker, app.js and the
+      # The app shell: the manifest, icons, service worker, app.js, and the
       # offline page. Served to anyone, since a browser fetches some of it
       # without cookies and none of it says anything about the jobs.
       get and path == "/offline" ->

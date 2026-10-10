@@ -9,11 +9,11 @@ namespace Cronwatch;
  * single convention, so the first of CRONWATCH_ENV, APP_ENV (Laravel,
  * Symfony, Craft) and WP_ENVIRONMENT_TYPE (WordPress) whose value, trimmed,
  * is not empty is used, lowercased (a value of only spaces counts as
- * unset), from getenv(), $_ENV or $_SERVER, since frameworks that read a
+ * unset), from getenv(), $_ENV, or $_SERVER, since frameworks that read a
  * .env file put its values in one of those; failing those, what a framework
  * integration names with setFallback() (the WordPress plugin gives
  * wp_get_environment_type(), which also reads the constant of that name).
- * "development", "dev", "local", "test" and "testing" are development (the
+ * "development", "dev", "local", "test", and "testing" are development (the
  * SDK's NODE_ENV "development" and "test", and Laravel's and Symfony's own
  * names); "production" and "prod" are production.
  *
@@ -45,7 +45,7 @@ final class Env
     /**
      * The words Laravel's env() reads as something other than text (null,
      * true, false, empty, with or without parentheses, in any case). Laravel
-     * hands the config null, a bool or "" for them while the variable still
+     * hands the config null, a bool, or "" for them while the variable still
      * holds the word, so a secret holding one counts as not set rather than
      * as the password "null".
      */
@@ -53,9 +53,9 @@ final class Env
 
     /**
      * A secret from the environment (CRONWATCH_TOKEN, CRON_SECRET), from the
-     * first of getenv(), $_ENV and $_SERVER that holds one, or null. A value
+     * first of getenv(), $_ENV, and $_SERVER that holds one, or null. A value
      * that is empty or only whitespace (as JavaScript's trim() sees it), or
-     * one of the words Laravel's env() reads as null, true, false or empty,
+     * one of the words Laravel's env() reads as null, true, false, or empty,
      * counts as unset, so the dashboard and handlers fail closed. Any other
      * value is used as it is, untrimmed.
      */
@@ -76,7 +76,7 @@ final class Env
     /**
      * A secret's text as given, or null when it counts as unset: empty, only
      * whitespace, or one of the words Laravel's env() reads as null, true,
-     * false or empty (see secret()). For a framework integration reading its
+     * false, or empty (see secret()). For a framework integration reading its
      * own config before it falls back to the environment.
      */
     public static function secretText(?string $value): ?string

@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Cronwatch.Hosting;
 
-/// <summary>One job <c>AddCronwatchJob</c> registered: its name, options and how its class is resolved.</summary>
+/// <summary>One job <c>AddCronwatchJob</c> registered: its name, options, and how its class is resolved.</summary>
 internal sealed class HostedJob(string name, JobOptions options, Type type, Func<IServiceProvider, ICronwatchJob> resolve)
 {
     public string Name { get; } = name;
@@ -32,7 +32,7 @@ internal sealed partial class HostedJobs : IHostedService, IDisposable
 {
     /// <summary>
     /// The trigger each fire's run records: the integration's name, as every integration's is.
-    /// Runs recorded before 1.0 carry <c>schedule</c>; nothing reads it back.
+    /// Runs recorded before 0.11 carry <c>schedule</c>; nothing reads it back.
     /// </summary>
     internal const string Trigger = "hosting";
 

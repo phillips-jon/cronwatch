@@ -4,7 +4,7 @@ defmodule Cronwatch.Error do
   raises from its `!` variant.
 
   `kind` is `:invalid` for what the SDK refuses (a bad job name, option,
-  schedule or duration), with the SDK's message; `:store` for the store
+  schedule, or duration), with the SDK's message; `:store` for the store
   failing, with the store's own error as `reason`; `:other` for anything
   else.
   """

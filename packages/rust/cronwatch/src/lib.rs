@@ -1,11 +1,11 @@
-//! CronWatch for Rust: know when your cron jobs fail, run late or never run.
+//! CronWatch for Rust: know when your cron jobs fail, run late, or never run.
 //!
 //! The same library as `@cronwatch/sdk`, the library behind
 //! [cronwatch.dev](https://cronwatch.dev): it
 //! records each run of a job in a store the app already has, judges it
 //! (failed, stuck, slow, over budget, under floor, missed its schedule), and
 //! sends one alert when a condition opens and one recovery when it closes. A
-//! Rust process shares a store with Node, Ruby, Python, PHP and Go processes
+//! Rust process shares a store with Node, Ruby, Python, PHP, and Go processes
 //! byte for byte.
 //!
 //! ```no_run
@@ -111,21 +111,21 @@ pub mod __private {
 /// The stored definition `options` give a job named `name`, without a
 /// client.
 #[doc(hidden)]
-#[deprecated(note = "no longer part of the API; documented before 1.0, so it still works through 1.x and goes in 2.0")]
+#[deprecated(note = "no longer part of the API; documented before 0.11, so it still works through 1.x and goes in 2.0")]
 pub fn describe_job(name: &str, options: &JobOptions) -> Definition {
     client::describe_job(name, options)
 }
 
 /// How long a run took, held from 0 to [`MAX_DURATION_MS`].
 #[doc(hidden)]
-#[deprecated(note = "internal, outside the 1.x promise; no longer public from 1.0")]
+#[deprecated(note = "internal, outside the 1.x promise; no longer public from 0.11")]
 pub fn run_duration(started_at: i64, finished_at: i64) -> i64 {
     types::run_duration(started_at, finished_at)
 }
 
 /// The version a stored state's `version` value counts as.
 #[doc(hidden)]
-#[deprecated(note = "internal, outside the 1.x promise; no longer public from 1.0")]
+#[deprecated(note = "internal, outside the 1.x promise; no longer public from 0.11")]
 pub fn state_version(version: Option<&js::Value>) -> i64 {
     types::state_version(version)
 }

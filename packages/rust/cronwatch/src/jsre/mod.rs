@@ -21,7 +21,7 @@
 //! the Kelvin sign never matches "k"), which for patterns whose letters are
 //! all ASCII is exactly ASCII folding. What it does not implement it
 //! refuses rather than read as something else: lazy quantifiers, named
-//! groups, backreferences, `\c`, `\p{...}` and `\u{...}`.
+//! groups, backreferences, `\c`, `\p{...}`, and `\u{...}`.
 
 mod parse;
 

@@ -34,9 +34,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * The replay of {@code packages/ruby/test/web/golden.json}, the SDK routes' answers to a fixed seed
  * (written by {@code golden.mjs}), shared by every adapter's test: the seed step for step, the
- * captures, and the comparison of status, headers and body byte for byte. Run ids are random on
+ * captures, and the comparison of status, headers, and body byte for byte. Run ids are random on
  * both sides, so each becomes {@code <id:N>} in order of first appearance. The gem and the Python,
- * PHP, Go, Rust and Elixir ports replay the same file.
+ * PHP, Go, Rust, and Elixir ports replay the same file.
  */
 public final class Golden {
   private Golden() {}
@@ -66,7 +66,7 @@ public final class Golden {
     }
   }
 
-  /** A seeded client, its clock and what it reported. */
+  /** A seeded client, its clock, and what it reported. */
   public record Seeded(Cronwatch cw, AtomicLong clock, List<String> errors) {}
 
   private static List<Map.Entry<String, String>> pairs(@Nullable Object v) {
@@ -114,7 +114,7 @@ public final class Golden {
 
   /**
    * A captured body with the fixture's placeholders for what {@code GET <base>/api} names filled in
-   * with this port's: its library, its language and its version.
+   * with this port's: its library, its language, and its version.
    */
   static String ours(String body) {
     return body.replace("<library>", "dev.cronwatch:cronwatch")

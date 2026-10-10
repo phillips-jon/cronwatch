@@ -51,7 +51,7 @@ pub(crate) fn take_frames() -> Vec<String> {
 }
 
 /// The frames of a backtrace's text that are the app's: the panic machinery
-/// (`std`, `core`, `alloc`, the hook and this crate's own) left out, at most
+/// (`std`, `core`, `alloc`, the hook, and this crate's own) left out, at most
 /// five, each `function (file:line)`.
 fn frames_of(text: &str) -> Vec<String> {
     let mut out = Vec::new();

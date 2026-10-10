@@ -10,11 +10,11 @@ namespace Cronwatch.Quartz.Tests;
 
 /// <summary>
 /// A report, not a gate: generated cron expressions read by Cronos (the reader Hangfire carries),
-/// Quartz.NET's <c>CronExpression</c> and NCrontab, each checked against CronWatch's reading (the
+/// Quartz.NET's <c>CronExpression</c>, and NCrontab, each checked against CronWatch's reading (the
 /// croner port) as the integrations check a schedule (<see cref="SchedulerBridge.CheckFires"/>),
 /// and how many each reads alike printed, with why the rest differ. It keeps measured why the port
 /// carries croner rather than depending on a .NET cron library (see DESIGN.md, Keeping in step),
-/// as the Java port's <c>ReadingsReportTest</c> does, whose generator, seed and zones these are,
+/// as the Java port's <c>ReadingsReportTest</c> does, whose generator, seed, and zones these are,
 /// so the numbers can be set side by side. It takes some seconds, so it runs only when asked:
 /// <c>CRONWATCH_READINGS=1</c>.
 /// </summary>
@@ -49,7 +49,7 @@ public class ReadingsReportTests
 
     private long Between(long lo, long hi) => lo + (long)(Next() % (ulong)(hi - lo + 1));
 
-    /// <summary>A field in the grammar every library here shares: *, a value, a range, a step or a list.</summary>
+    /// <summary>A field in the grammar every library here shares: *, a value, a range, a step, or a list.</summary>
     private string Field(long low, long high)
     {
         double kind = Chance();

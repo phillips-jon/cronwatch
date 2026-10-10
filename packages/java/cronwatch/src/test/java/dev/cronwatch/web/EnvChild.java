@@ -250,7 +250,7 @@ public final class EnvChild {
 
   /**
    * Tokens and secrets of only whitespace, as JavaScript's trim sees it (the no-break space, an em
-   * space and the byte order mark included), which count as unset.
+   * space, and the byte order mark included), which count as unset.
    */
   static final List<String> BLANKS =
       List.of("", " ", "  ", "\t", " \n  \ufeff ", "\u00a0", "\u2003", "\ufeff");

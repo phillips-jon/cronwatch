@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
- * Replays {@code conformance/pgcron.json}: the SDK's {@code pgCronSchedule}, {@code pgCronJobName}
+ * Replays {@code conformance/pgcron.json}: the SDK's {@code pgCronSchedule}, {@code pgCronJobName},
  * and {@code pgCronRun} over every case, and its hold.
  */
 class PgCronConformanceTest {
@@ -55,6 +55,6 @@ class PgCronConformanceTest {
     failures.same("holdMs", (double) PgCron.HOLD_MS, f.get("holdMs"));
     count++;
     failures.check("pgcron");
-    assertEquals(30, count, "every case: schedules 14, names 6, runs 9 and the hold");
+    assertEquals(30, count, "every case: schedules 14, names 6, runs 9, and the hold");
   }
 }

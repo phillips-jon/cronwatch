@@ -1,7 +1,7 @@
 //! `Serialize` and `Deserialize` for the public types (the `serde` feature),
 //! for an app's own use: returning a `JobSummary` from its own handler,
 //! say. Each type goes through the same JSON value its `to_json` writes, so
-//! the fields, their names and their order are the SDK's; numbers that are
+//! the fields, their names, and their order are the SDK's; numbers that are
 //! whole are written as integers, as JavaScript prints them. The stores and
 //! channels never use this.
 

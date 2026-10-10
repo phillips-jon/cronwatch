@@ -12,7 +12,7 @@ namespace Cronwatch.Tests.Web;
 
 /// <summary>
 /// <c>job.Handler()</c>: the SDK's handler tests (<c>client.test.ts</c> and
-/// <c>client-hardening.test.ts</c>), as the Go, Rust, Elixir and Java ports have them, and the
+/// <c>client-hardening.test.ts</c>), as the Go, Rust, Elixir, and Java ports have them, and the
 /// .NET answers: a <see cref="CronwatchResponse"/> the function returns, a throw answered 500, and the
 /// request's token linked into the run's. Without a secret, and in development, it is tested in
 /// <see cref="RoutesEnvTests"/>.

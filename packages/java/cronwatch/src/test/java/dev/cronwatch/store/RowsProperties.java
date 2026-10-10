@@ -206,7 +206,7 @@ class RowsProperties {
     return o;
   }
 
-  /** A column value of any SQLite type: an integer, a real, text or (where allowed) NULL. */
+  /** A column value of any SQLite type: an integer, a real, text, or (where allowed) NULL. */
   private static @Nullable Object column(Gen g, boolean nullable) {
     return switch ((int) g.between(0, 6)) {
       case 0 -> nullable ? null : g.anyLong();
@@ -299,7 +299,7 @@ class RowsProperties {
    * Whether a reported error is a slip of the port's rather than the SDK's own answer to a row of
    * another shape: a definition whose schedule is not text fails its job's check in the SDK too
    * ({@code schedule.trim is not a function}), and that is reported, as it should be; a null, a
-   * cast, arithmetic or an index out of range is not.
+   * cast, arithmetic, or an index out of range is not.
    */
   private static boolean slip(@Nullable Throwable e) {
     for (Throwable t = e; t != null; t = t.getCause()) {
@@ -357,7 +357,7 @@ class RowsProperties {
   }
 
   /**
-   * Reads back what was written, but for NULs: every store writes a run's trigger, output, error
+   * Reads back what was written, but for NULs: every store writes a run's trigger, output, error,
    * and metric names, and every key and string of a definition and a state, without them. A key
    * that differed from another only by a NUL then collides with it, and reads back as JSON reads a
    * repeated key: in the first one's place, with the last one's value.

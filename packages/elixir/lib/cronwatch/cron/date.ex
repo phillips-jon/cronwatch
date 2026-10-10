@@ -5,7 +5,7 @@ defmodule Cronwatch.Cron.Date do
   # Croner's CronDate: a wall-clock time whose fields are moved forward to the
   # next match, a field at a time, spilling into the next month or year as
   # croner does. The fields are year, month (0 based), day, hour, minute,
-  # second and milliseconds, held in a tuple in that order.
+  # second, and milliseconds, held in a tuple in that order.
 
   import Bitwise
 
@@ -20,7 +20,7 @@ defmodule Cronwatch.Cron.Date do
   @second 5
   @millis 6
 
-  # Croner's fieldOrder: the field, the field above it, the pattern's table
+  # Croner's fieldOrder: the field, the field above it, the pattern's table,
   # and the offset from a field value to its table index.
   @order {{1, 0, :month, 0}, {2, 1, :day, -1}, {3, 2, :hour, 0}, {4, 3, :minute, 0}, {5, 4, :second, 0}}
   @n_order 5
@@ -198,7 +198,7 @@ defmodule Cronwatch.Cron.Date do
 
   # Croner's recurse(), walked in a loop: each field in turn from the month
   # down is moved to its next match, a field that runs out carries into the
-  # one above and the walk starts again from the month. Croner recurses a
+  # one above, and the walk starts again from the month. Croner recurses a
   # year at a time, so for a date no month has it runs out of stack; the
   # loop answers false (never) at the year croner gives up at.
   defp recurse(f, p, level) do

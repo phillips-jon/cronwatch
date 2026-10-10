@@ -406,7 +406,7 @@ defmodule Cronwatch.Web.Request do
 end
 
 defimpl Inspect, for: Cronwatch.Web.Request do
-  # A request carries the token as a bearer, a cookie or `?token=`, so its
+  # A request carries the token as a bearer, a cookie, or `?token=`, so its
   # inspect names the headers without their values and leaves out the query
   # and the body.
   import Inspect.Algebra

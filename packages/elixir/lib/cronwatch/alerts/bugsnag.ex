@@ -10,7 +10,7 @@ defmodule Cronwatch.Alerts.Bugsnag do
   `:release_stage` (default `"production"`), `:endpoint` (the notify
   endpoint, for on-premise Bugsnag), `:recovered` (default false: an event
   is for what broke), `:now` (the clock `bugsnag-sent-at` is read from, in
-  epoch milliseconds, for tests), `:link` (sent as metadata) and
+  epoch milliseconds, for tests), `:link` (sent as metadata), and
   `:transport`.
   """
   @behaviour Cronwatch.Channel

@@ -5,7 +5,7 @@ defmodule Cronwatch.CronerParityTest do
   # saving, from times around the clock changes) answered by the SDK in Node
   # (test/testdata/schedule_fuzz.mjs, which imports packages/sdk/dist) and by
   # this port, which must agree on every error message and every fire time.
-  # Seeded, so a failure repeats; the generator is the Go, Python, PHP and
+  # Seeded, so a failure repeats; the generator is the Go, Python, PHP, and
   # Rust ports', over the same SplitMix64, so all of them see the same cases.
   use ExUnit.Case, async: true
 
@@ -27,7 +27,7 @@ defmodule Cronwatch.CronerParityTest do
   @helper Path.expand("../testdata/schedule_fuzz.mjs", __DIR__)
   @dist Path.expand("../../../sdk/dist/index.js", __DIR__)
 
-  # SplitMix64: small, seeded and the same on every platform. The state is
+  # SplitMix64: small, seeded, and the same on every platform. The state is
   # kept in the process dictionary, as the generator is a sequence of draws.
   defp next do
     s = Process.get(:fuzz) + 0x9E3779B97F4A7C15 &&& @mask

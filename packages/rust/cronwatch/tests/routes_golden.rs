@@ -1,11 +1,11 @@
 //! Replays packages/ruby/test/web/golden.json, the SDK routes' answers to a
 //! fixed seed (written by golden.mjs), against `Client::routes` seeded the
-//! same way, and compares status, headers and body byte for byte, three
+//! same way, and compares status, headers, and body byte for byte, three
 //! ways: straight into `Routes::handle`, through the tower service, and
 //! through a real hyper server with the dashboard nested in an axum
 //! `Router`, its base path found from the mount. Run ids are random on
 //! both sides, so each becomes `<id:N>` in order of first appearance. The
-//! gem and the Python, PHP and Go ports replay the same file.
+//! gem and the Python, PHP, and Go ports replay the same file.
 
 mod common;
 
@@ -60,7 +60,7 @@ fn read_golden() -> Vec<Capture> {
                 body: c.get("body").and_then(Value::as_str).map(str::to_string),
                 status: c.get("status").and_then(Value::as_f64).unwrap() as u16,
                 response_headers: pairs(c.get("responseHeaders")),
-                // GET /api names the library, its language and its version,
+                // GET /api names the library, its language, and its version,
                 // which differ from port to port: the fixture holds
                 // placeholders, and this port puts in its own.
                 response_body: text(c.get("responseBody").unwrap())

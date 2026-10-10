@@ -60,7 +60,7 @@ import org.quartz.listeners.SchedulerListenerSupport;
 /**
  * CronWatch for a Quartz 2.5 {@link Scheduler}: every job the scheduler holds with a trigger is
  * declared as a CronWatch job with its schedule, and every firing is recorded as a run, so a job
- * that fails, runs late, never runs, gets stuck or runs slow is reported.
+ * that fails, runs late, never runs, gets stuck, or runs slow is reported.
  *
  * <pre>{@code
  * Scheduler scheduler = StdSchedulerFactory.getDefaultScheduler();
@@ -163,10 +163,10 @@ public final class CronwatchQuartz implements AutoCloseable {
   private record Checked(@Nullable String schedule, @Nullable String problem) {}
 
   /**
-   * Each cron trigger's check against Quartz's own fire times, by the job, the expression, the zone
-   * and the year, so the read every minute walks only what changed: a cron that fires each second
-   * in a zone with daylight saving takes most of a second to walk. Only what the last read saw is
-   * kept.
+   * Each cron trigger's check against Quartz's own fire times, by the job, the expression, the
+   * zone, and the year, so the read every minute walks only what changed: a cron that fires each
+   * second in a zone with daylight saving takes most of a second to walk. Only what the last read
+   * saw is kept.
    */
   private final Map<String, Checked> checked = new ConcurrentHashMap<>();
 
@@ -431,7 +431,7 @@ public final class CronwatchQuartz implements AutoCloseable {
           watch.reportOnce(
               "cronwatch: "
                   + label(name)
-                  + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\""
+                  + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\","
                   + " or \"-\"), so it is not watched; rename it",
               "declaring " + label(name));
           continue;
@@ -627,7 +627,7 @@ public final class CronwatchQuartz implements AutoCloseable {
   // ---- runs
 
   /**
-   * The run's id: the app, the scheduler instance and the firing, since a fire instance id is
+   * The run's id: the app, the scheduler instance, and the firing, since a fire instance id is
    * unique only within one scheduler instance and a refire reuses it. One longer than a store holds
    * keeps its prefix and instance and a hash of the rest.
    */

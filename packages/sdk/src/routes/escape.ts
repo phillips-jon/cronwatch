@@ -10,8 +10,8 @@ export function escapeHtml(value: unknown): string {
 
 /**
  * Escapes a job name shown as text, with a line break allowed after each run
- * of `_`, `:`, `.`, `/` or `-`, so a long hook or class name wraps at its
- * separators rather than mid-word. Only for text: never an attribute, a URL
+ * of `_`, `:`, `.`, `/`, or `-`, so a long hook or class name wraps at its
+ * separators rather than mid-word. Only for text: never an attribute, a URL,
  * or a title.
  */
 export function escapeName(value: unknown): string {

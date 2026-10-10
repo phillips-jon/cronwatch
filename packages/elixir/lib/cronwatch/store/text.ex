@@ -2,7 +2,7 @@ defmodule Cronwatch.Store.Text do
   @moduledoc false
   # Postgres refuses U+0000 in TEXT and JSONB, and a refused write loses the
   # whole row, so every store writes text without it (the SDK's params in
-  # stores/sql.ts, and its memory store): a run's trigger, output, error and
+  # stores/sql.ts, and its memory store): a run's trigger, output, error, and
   # metric names, and every key and string of a definition and a state.
   # Identifiers (a job's name, a run's id) are written as given; the client
   # refuses one with a NUL before it gets here.

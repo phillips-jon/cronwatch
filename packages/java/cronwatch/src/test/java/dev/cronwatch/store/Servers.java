@@ -20,13 +20,13 @@ import org.jspecify.annotations.Nullable;
 /**
  * The database servers the tests run against when their variables are set: {@code
  * CRONWATCH_TEST_PG} (Postgres), {@code CRONWATCH_TEST_MYSQL} (MySQL), {@code
- * CRONWATCH_TEST_MARIADB} (MariaDB) and {@code CRONWATCH_TEST_PGCRON} (a Postgres with pg_cron),
+ * CRONWATCH_TEST_MARIADB} (MariaDB), and {@code CRONWATCH_TEST_PGCRON} (a Postgres with pg_cron),
  * each a URL such as {@code postgres://postgres:pw@127.0.0.1:5432/cw} or {@code
- * mysql://root:pw@127.0.0.1:3306/cw}, as the Go, Rust and Elixir ports read them. A test on a
+ * mysql://root:pw@127.0.0.1:3306/cw}, as the Go, Rust, and Elixir ports read them. A test on a
  * server whose variable is unset is skipped, saying so. Each test uses tables of a prefix of its
  * own, dropped when it ends, so the tests share a server.
  *
- * <p>The drivers are pgjdbc for Postgres, Connector/J for MySQL and MariaDB Connector/J for
+ * <p>The drivers are pgjdbc for Postgres, Connector/J for MySQL, and MariaDB Connector/J for
  * MariaDB, each through {@link DriverManager}, so no driver class is named here.
  */
 public final class Servers {

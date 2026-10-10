@@ -1,6 +1,6 @@
 ---
 title: Next.js and Vercel
-description: Vercel cron, route handlers, the Postgres store, the check cron and the Node runtime.
+description: Vercel cron, route handlers, the Postgres store, the check cron, and the Node runtime.
 order: 2
 ---
 

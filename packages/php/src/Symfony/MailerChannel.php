@@ -14,7 +14,7 @@ use Symfony\Component\Mime\Email;
 
 /**
  * Sends each alert through the app's mailer (symfony/mailer), composed as
- * every email channel composes it: the same subject, plain text and HTML.
+ * every email channel composes it: the same subject, plain text, and HTML.
  */
 final class MailerChannel implements AlertChannel
 {

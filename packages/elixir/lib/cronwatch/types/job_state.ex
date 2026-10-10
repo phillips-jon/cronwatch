@@ -104,7 +104,7 @@ defmodule Cronwatch.JobState do
   # The failures in a row a stored `consecutiveFailures` value counts as, as
   # the SDK's failureCount() reads it: a whole number (2.0 is 2) held at
   # 2^53 - 1, else 0, so a foreign row's count at a 64-bit limit stays at the
-  # top and a 1.5, "3" or -1 counts as none.
+  # top, and a 1.5, "3", or -1 counts as none.
   def failure_count(v) when is_integer(v) and v > 0, do: min(v, @max_version)
   def failure_count(v) when is_float(v) and v > 0 and v == trunc(v), do: min(trunc(v), @max_version)
   def failure_count(_), do: 0

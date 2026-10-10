@@ -223,7 +223,7 @@ internal static class Html
         return output;
     }
 
-    /// <summary>The board: every job's health, its last day and its recent runs.</summary>
+    /// <summary>The board: every job's health, its last day, and its recent runs.</summary>
     public static string DashboardPage(
         IReadOnlyList<JobSummary> jobs,
         IReadOnlyDictionary<string, IReadOnlyList<Run>> runsByJob,

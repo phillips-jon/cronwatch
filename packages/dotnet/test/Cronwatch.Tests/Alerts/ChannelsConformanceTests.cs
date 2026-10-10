@@ -14,7 +14,7 @@ namespace Cronwatch.Tests.Alerts;
 /// <summary>
 /// Replays <c>conformance/channels.json</c>, the requests the SDK's channels make
 /// (<c>scripts/conformance.mjs</c> drives them with a stub fetch): every request's URL, headers
-/// (name, value and position) and body, byte for byte, for the fixture's sample alerts and each
+/// (name, value, and position), and body, byte for byte, for the fixture's sample alerts and each
 /// channel's option sets; the error each gives for a refused request; Twilio's partial delivery;
 /// and the text cuts.
 /// </summary>

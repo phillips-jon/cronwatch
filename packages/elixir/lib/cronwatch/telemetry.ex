@@ -3,7 +3,7 @@ defmodule Cronwatch.Telemetry do
   The `:telemetry` events CronWatch emits, named in one place.
 
     * `[:cronwatch, :run, :start | :stop | :exception]`: a span around a
-      job's function, with `:instance`, `:job`, `:run` (the run's id) and
+      job's function, with `:instance`, `:job`, `:run` (the run's id), and
       `:trigger` in the metadata and, on `:stop`, the run's `:status`.
     * `[:cronwatch, :check, :start | :stop | :exception]`: a span around a
       check, with the counts of its result (`:jobs`, `:alerts`, `:pruned`)
@@ -12,9 +12,9 @@ defmodule Cronwatch.Telemetry do
       channel and alert (`:sent` and `:failed`) or per alert (`:queued` for
       one kept for the next check, `:dropped` for one no longer worth
       sending), with `:instance`, `:job`, `:type`, `:condition` (nil for a
-      recovery) and `:channel` in the metadata.
+      recovery), and `:channel` in the metadata.
     * `[:cronwatch, :error]`: whatever the error handler hears, with
-      `:instance`, `:where` (`recording nightly-report`, the SDK's text) and
+      `:instance`, `:where` (`recording nightly-report`, the SDK's text), and
       `:error` in the metadata.
   """
 

@@ -1,5 +1,5 @@
 //! Stored rows as another process (or another port) may have written them:
-//! a run, a definition, a state, an alert and metrics, each read, written
+//! a run, a definition, a state, an alert, and metrics, each read, written,
 //! and read again to the same text; a definition is also declared, as the
 //! scheduler integrations declare one the store holds.
 #![no_main]

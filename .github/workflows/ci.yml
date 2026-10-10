@@ -5,18 +5,18 @@
 # supported Rails series. The Python package's tests run on the oldest and
 # newest Python it supports, against each supported Django series, and the
 # PHP package's on the oldest and newest PHP, against MySQL, MariaDB,
-# Postgres and WordPress, against each supported Laravel and Symfony
+# Postgres, and WordPress, against each supported Laravel and Symfony
 # series, and in a real Drupal and a real Craft. The Go module's tests run
 # on the two Go releases Go supports, with the race detector, against
-# SQLite, Postgres, MySQL and MariaDB. The Rust workspace's tests run on
+# SQLite, Postgres, MySQL, and MariaDB. The Rust workspace's tests run on
 # its rust-version (1.85, the core), on 1.94 (cronwatch-sqlx and
-# cronwatch-apalis, whose floor sqlx 0.9 sets) and on stable (everything), with
+# cronwatch-apalis, whose floor sqlx 0.9 sets), and on stable (everything), with
 # rustfmt and clippy, and on macOS and Windows; each feature alone, the
-# docs, the packages and the lowest versions the manifests allow are
+# docs, the packages, and the lowest versions the manifests allow are
 # checked, and the fuzz targets built. The Java build's tests run on JDK 21, its
 # floor, and the newest JDK, with Error Prone, and Spotless and the core's jar
 # checked on the newest. The MCP server is driven against each port's
-# dashboard. One Node, one Ruby, one Python, one PHP and one Go entry also
+# dashboard. One Node, one Ruby, one Python, one PHP, and one Go entry also
 # run the pg_cron tests against a Postgres with the extension, and the built
 # site's links are checked. Each package's public API is checked against a
 # committed report (TypeScript, Python, Elixir, .NET) or the last release
@@ -110,7 +110,7 @@ jobs:
       - run: npm run build
       # Pack both packages, install the tarballs into a scratch project, then
       # import and require every entry, typecheck them (node16 ESM and CJS,
-      # bundler) and run Are the Types Wrong.
+      # bundler), and run Are the Types Wrong.
       - run: npm run check:packages
       # Every internal link and #fragment in the built site resolves.
       - run: npm run build:site
@@ -183,10 +183,10 @@ jobs:
         working-directory: packages/ruby
         env:
           CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
-      # Build the gem, install it into an empty GEM_HOME and use it from a
+      # Build the gem, install it into an empty GEM_HOME, and use it from a
       # fresh process outside the bundle, as an app would (check:packages
       # does the same for the npm packages).
-      - name: Build, install and require the gem
+      - name: Build, install, and require the gem
         working-directory: packages/ruby
         run: |
           dir="$(mktemp -d)"
@@ -217,10 +217,10 @@ jobs:
           CRONWATCH_RUBY: bundle exec ruby
 
   # The Python package's tests replay conformance/ and the dashboard fixture,
-  # share a SQLite file with the built SDK and check the croner port against
+  # share a SQLite file with the built SDK, and check the croner port against
   # croner, so the SDK is built (and the fixtures checked) first. Postgres
   # store tests run against the service. Each supported Django series (5.2
-  # LTS, 6.0 and 6.1; 6.x needs Python 3.12 or newer) runs over the dev
+  # LTS, 6.0, and 6.1; 6.x needs Python 3.12 or newer) runs over the dev
   # group's Django with `uv run --with`.
   python:
     name: python (Python ${{ matrix.python }}, Django ${{ matrix.django }})
@@ -257,7 +257,7 @@ jobs:
       # better-sqlite3 now and then dies mid-stream on the runners.
       - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       # Builds the SDK, then fails if conformance/, the dashboard fixture
-      # (packages/ruby/test/web/golden.json) or the icons are stale.
+      # (packages/ruby/test/web/golden.json), or the icons are stale.
       - run: npm run check:conformance
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
@@ -290,9 +290,9 @@ jobs:
         env:
           CRONWATCH_TEST_PYTHON: "1"
           UV_PYTHON: ${{ matrix.python }}
-      # Build the wheel, install it into an empty virtualenv and use it from a
+      # Build the wheel, install it into an empty virtualenv, and use it from a
       # directory outside the project, as an app would.
-      - name: Build, install and import the package
+      - name: Build, install, and import the package
         working-directory: packages/python
         run: |
           dir="$(mktemp -d)"
@@ -334,11 +334,11 @@ jobs:
           '
 
   # The PHP package's tests replay conformance/ and the dashboard fixture,
-  # share a SQLite file with the built SDK and check the croner port against
-  # croner, so the SDK is built (and the fixtures checked) first. The MySQL, MariaDB and Postgres store
+  # share a SQLite file with the built SDK, and check the croner port against
+  # croner, so the SDK is built (and the fixtures checked) first. The MySQL, MariaDB, and Postgres store
   # tests, and the finish-once tests with several processes, run against the
   # services; the pg_cron tests against a Postgres with the extension, as the
-  # Node, Ruby and Python jobs start it. The Laravel and Symfony tests run on
+  # Node, Ruby, and Python jobs start it. The Laravel and Symfony tests run on
   # the newest of each that the PHP allows (php-frameworks pins each series).
   php:
     name: php (PHP ${{ matrix.php }})
@@ -381,7 +381,7 @@ jobs:
       # better-sqlite3 now and then dies mid-stream on the runners.
       - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       # Builds the SDK, then fails if conformance/, the dashboard fixture
-      # (packages/ruby/test/web/golden.json) or the icons are stale.
+      # (packages/ruby/test/web/golden.json), or the icons are stale.
       - run: npm run check:conformance
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
         with:
@@ -394,7 +394,7 @@ jobs:
       - run: composer install --no-interaction --no-progress
         working-directory: packages/php
       # A second Postgres with pg_cron, for the pg_cron source's tests against
-      # the real extension, as the Node, Ruby and Python jobs start it.
+      # the real extension, as the Node, Ruby, and Python jobs start it.
       - name: Start Postgres with pg_cron
         if: matrix.php == '8.5'
         run: |
@@ -597,7 +597,7 @@ jobs:
   # this checkout), runs `craft install`, installs the plugin, and drives it
   # with console commands (the watched commands, queue/run, cronwatch/check,
   # uninstalling) and PHP's built-in server (the Control Panel's dashboard
-  # behind its sign-in, CSRF and permissions, the JSON API). Craft 5.3, the
+  # behind its sign-in, CSRF, and permissions, the JSON API). Craft 5.3, the
   # plugin's floor, and the newest 5.x, on PHP 8.2 and 8.5, on each database
   # Craft runs on.
   php-craft:
@@ -655,7 +655,7 @@ jobs:
   # conformance/ and checks its croner port against croner through the built
   # SDK; packages/go/sqltest, a module of its own and the only place database
   # drivers appear, runs the SQL store's contract, conformance and
-  # finish-once tests on SQLite, Postgres, MySQL and MariaDB, shares a
+  # finish-once tests on SQLite, Postgres, MySQL, and MariaDB, shares a
   # SQLite file with the SDK, and (on the newest Go) runs the pg_cron
   # source against a Postgres with the extension.
   go:
@@ -742,7 +742,7 @@ jobs:
             (cd "packages/go/$module" && "$(go env GOPATH)/bin/staticcheck" ./...) || exit 1
           done
       # A second Postgres with pg_cron, for the pg_cron source's tests against
-      # the real extension, as the Node, Ruby, Python and PHP jobs start it.
+      # the real extension, as the Node, Ruby, Python, and PHP jobs start it.
       - name: Start Postgres with pg_cron
         if: matrix.go == '1.26'
         run: |
@@ -802,7 +802,7 @@ jobs:
     strategy:
       matrix:
         # The workspace's rust-version, 1.85 (the core's and the two
-        # integrations'), 1.94 and the current stable.
+        # integrations'), 1.94, and the current stable.
         # cronwatch-tokio-cron-scheduler is tested on 1.85 too, and
         # cronwatch-apalis's library is linted there without its `cron`
         # feature (the cron crate needs 1.87) or its tests (apalis's
@@ -910,8 +910,8 @@ jobs:
 
   # The Rust workspace on macOS and Windows, on stable: the zones from the
   # system's database (macOS) and from jiff's bundle (Windows has none),
-  # paths and line endings. There are no database services there, so the
-  # Postgres, MySQL, MariaDB and pg_cron tests skip, as they say, and so do
+  # paths, and line endings. There are no database services there, so the
+  # Postgres, MySQL, MariaDB, and pg_cron tests skip, as they say, and so do
   # the croner parity check and the SQLite file shared with Node, which need
   # the built SDK; everything else runs.
   rust-platforms:
@@ -978,7 +978,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - name: Install Rust stable and nightly, cargo-hack and cargo-fuzz
+      - name: Install Rust stable and nightly, cargo-hack, and cargo-fuzz
         run: |
           rustup toolchain install stable --profile minimal --component rustfmt
           rustup toolchain install nightly --profile minimal
@@ -1002,7 +1002,7 @@ jobs:
   # release, or the commit in scripts/api-baseline while that is newer:
   # apidiff fails on an incompatible change to a Go module, and
   # cargo-semver-checks on a change the crate's version does not allow.
-  # The TypeScript, Python and Elixir packages compare a committed report
+  # The TypeScript, Python, and Elixir packages compare a committed report
   # of their API in their own jobs, and .NET holds its surface in
   # PublicAPI.Unshipped.txt, checked by every build.
   api:
@@ -1039,7 +1039,7 @@ jobs:
   # through CRONWATCH_TEST_PG; Quantum needs no service.
   # The conformance step builds the SDK for the croner parity check and the
   # SQLite file shared with Node. The newest entry also runs the formatter,
-  # Credo and Dialyzer (its PLTs cached with the build, by the Elixir and
+  # Credo, and Dialyzer (its PLTs cached with the build, by the Elixir and
   # OTP versions), and the crontab example's release; the floor also
   # compiles without the optional dependencies, as an app with none of them
   # builds the package.
@@ -1111,7 +1111,7 @@ jobs:
         with:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
-      # deps, the build and the PLTs (under _build/plts).
+      # deps, the build, and the PLTs (under _build/plts).
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
@@ -1159,8 +1159,8 @@ jobs:
         working-directory: packages/elixir
         run: mix dialyzer --format github
       # The docs HexDocs will build, with warnings as errors, and the Hex
-      # tarball's file list: lib, the project files, the README and the
-      # licence, and nothing from test, webserver, examples or conformance.
+      # tarball's file list: lib, the project files, the README, and the
+      # licence, and nothing from test, webserver, examples, or conformance.
       - name: mix docs and the package's files
         if: matrix.newest
         working-directory: packages/elixir
@@ -1229,9 +1229,9 @@ jobs:
 
   # The Elixir package on macOS and Windows, on the newest Elixir and OTP:
   # the suite without database services or the built SDK, so the server
-  # tests, the croner parity check and the SQLite file shared with Node skip
+  # tests, the croner parity check, and the SQLite file shared with Node skip
   # as they say. It covers tz's bundled zones where there is no system
-  # database, paths, line endings and SQLite's NIF on each system.
+  # database, paths, line endings, and SQLite's NIF on each system.
   # setup-beam has no macOS builds, so macOS takes Homebrew's Elixir.
   elixir-platforms:
     name: elixir (${{ matrix.os }})
@@ -1298,7 +1298,7 @@ jobs:
           # The current long-term release, for the tests alone.
           - { java: "25", newest: false }
           - { java: "27", newest: true }
-    # The databases for SqlStore's server tests, as the elixir, go and rust
+    # The databases for SqlStore's server tests, as the elixir, go, and rust
     # jobs have them.
     services:
       postgres:
@@ -1426,8 +1426,8 @@ jobs:
           fi
 
   # The suite on macOS and Windows, with no database and without the built
-  # SDK, so the server tests, the croner parity check and the SQLite file
-  # shared with Node skip, as they say: the JDK's zones, paths and line
+  # SDK, so the server tests, the croner parity check, and the SQLite file
+  # shared with Node skip, as they say: the JDK's zones, paths, and line
   # endings.
   java-platforms:
     name: java (${{ matrix.os }})
@@ -1461,7 +1461,7 @@ jobs:
 
   # The scheduler integrations' tests and the starter's dashboard tests (the
   # starter's dev.cronwatch.spring and dev.cronwatch.spring.web, the Quartz
-  # module's and the JobRunr module's) against the oldest and the newest
+  # module's, and the JobRunr module's) against the oldest and the newest
   # release each supports: Maven resolves exactly the version a POM names, and
   # an app's own build decides which one it runs. The Quartz module's recovery
   # test runs on the JDBC job store over Postgres.
@@ -1614,14 +1614,14 @@ jobs:
         run: npm test --workspace packages/mcp
       # The five packages as nuget.yml packs them, and its check of them by
       # the same script: each its assembly, XML documentation, README,
-      # license and icon and nothing from the tests, and no dependency in
+      # license, and icon, and nothing from the tests, and no dependency in
       # the core's .nuspec, since the core depends on no other package.
       - name: dotnet pack, and the packages' files
         working-directory: packages/dotnet
         run: |
           dotnet pack -c Release --no-build -o artifacts/packages
           bash scripts/check-packages.sh artifacts/packages
-      # A job, a hosted job, a check and the dashboard on SQLite, published
+      # A job, a hosted job, a check, and the dashboard on SQLite, published
       # with Native AOT (every trimming and AOT warning an error), then run.
       - name: dotnet publish examples/aot, and run it
         working-directory: packages/dotnet
@@ -1671,9 +1671,9 @@ jobs:
           done
 
   # The suite on macOS and Windows, with no database services and without the
-  # built SDK, so the server tests, the croner parity check and the SQLite file
+  # built SDK, so the server tests, the croner parity check, and the SQLite file
   # shared with Node skip as they say: TimeZoneInfo on each system's zone
-  # database (Windows' through ICU), paths and line endings.
+  # database (Windows' through ICU), paths, and line endings.
   dotnet-platforms:
     name: dotnet (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

@@ -6,7 +6,9 @@ import dev.cronwatch.storetest.StoreContract;
 import org.junit.jupiter.api.Test;
 import org.sqlite.SQLiteDataSource;
 
-/** The SQL store under its name before 1.0 still works, as the store it now hands every call to. */
+/**
+ * The SQL store under its name before 0.11 still works, as the store it now hands every call to.
+ */
 @SuppressWarnings("removal") // the deprecated alias is what this tests
 class DeprecatedSqlStoreTest {
   private static SQLiteDataSource memory() {

@@ -24,7 +24,7 @@ use yii\web\Response;
  * Craft's sign-in standing for its token. A change (silence, forget, "Run
  * check now", all POSTs) also needs the cronwatch-manage permission and
  * Craft's CSRF token, which every form carries as a hidden field, besides
- * the dashboard's own same-origin check. Links, forms and redirects are
+ * the dashboard's own same-origin check. Links, forms, and redirects are
  * rewritten to that route (see EmbeddedDashboard), and the app shell is
  * left out.
  */

@@ -1,7 +1,7 @@
 """The environment, read in one place, as every CronWatch library reads it:
-the first of CRONWATCH_ENV, APP_ENV and ENVIRONMENT that holds more than
+the first of CRONWATCH_ENV, APP_ENV, and ENVIRONMENT that holds more than
 spaces, trimmed and lowercased, with "prod" read as "production" and "dev",
-"local", "test" and "testing" as "development". Failing those, a framework
+"local", "test", and "testing" as "development". Failing those, a framework
 integration may name one (cronwatch.django reads DEBUG: development when it
 is on, production when off). None when nothing names one, which is neither.
 It decides whether the in-memory store warns that it forgets on restart, and
@@ -55,7 +55,7 @@ def _blank(value: str) -> bool:
 
 def read_secret_env(name: str) -> str | None:
     """A secret from the environment (CRONWATCH_TOKEN, CRON_SECRET): None when
-    the variable is unset, empty or only whitespace, so a blank value counts as
+    the variable is unset, empty, or only whitespace, so a blank value counts as
     not set and the routes and handlers fail closed. Any other value is used
     as it is, untrimmed."""
     value = os.environ.get(name)
@@ -63,7 +63,7 @@ def read_secret_env(name: str) -> str | None:
 
 
 def secret_option(value: object, what: str, unset: object) -> object:
-    """A token or secret passed in code: a str, None (the opt-out) or `unset`
+    """A token or secret passed in code: a str, None (the opt-out), or `unset`
     (not given). A str that is empty or only whitespace counts as not given
     (`unset` comes back). Anything else (False, a number, bytes) raises a
     TypeError naming the option, so it never becomes a password."""

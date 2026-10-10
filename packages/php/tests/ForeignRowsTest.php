@@ -87,7 +87,7 @@ final class ForeignRowsTest extends TestCase
         }
     }
 
-    /** A check, a silence and every page over the foreign rows of store.json (stores.test.ts). */
+    /** A check, a silence, and every page over the foreign rows of store.json (stores.test.ts). */
     public function testACheckASilenceAndEveryPageOverForeignRows(): void
     {
         $fixture = self::foreignRows();
@@ -347,7 +347,7 @@ final class ForeignRowsTest extends TestCase
     }
 
     /**
-     * A state whose times, conditions and queued alerts hold values of the
+     * A state whose times, conditions, and queued alerts hold values of the
      * wrong kind: each reads as absent, so the job is still checked, its
      * failures still alert, and silence and unsilence still work.
      */

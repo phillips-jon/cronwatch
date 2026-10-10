@@ -50,7 +50,7 @@ def parse(value: object) -> str | None:
 def bare(value: str) -> str | None:
     """scheme://host[:port] for text that is a scheme and a bare host (what
     trust_proxy builds from the forwarded headers), or None when it carries a
-    path, credentials, a query or a fragment, or is not an http or https URL."""
+    path, credentials, a query, or a fragment, or is not an http or https URL."""
     try:
         origin, extra = read(value)
     except (InvalidOrigin, _NotHttp):
@@ -71,7 +71,7 @@ def _shown(value: object) -> str:
 
 def read(value: str) -> tuple[str, bool]:
     """(origin, whether anything past the host would show in the URL: a path
-    other than "/", credentials, a query or a fragment). Raises InvalidOrigin
+    other than "/", credentials, a query, or a fragment). Raises InvalidOrigin
     for anything that is not one, never another error."""
     try:
         return _read(value)

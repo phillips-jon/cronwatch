@@ -135,8 +135,8 @@ public final class Job {
    * The job as an HTTP handler, the SDK's {@code job.handler()}, for a platform cron that calls a
    * URL: each request that carries the secret ({@code Authorization: Bearer <secret>}) runs {@code
    * fn} in its thread as a recorded run with the trigger {@code handler}, answered with how it went
-   * (see {@link Handler}). Serve it with {@code WebServer.mount}, the servlet adapter or the Spring
-   * Boot starter.
+   * (see {@link Handler}). Serve it with {@code WebServer.mount}, the servlet adapter, or the
+   * Spring Boot starter.
    */
   public Handler handler(HandlerFunction fn, HandlerOptions options) {
     return Handler.of(this, fn, options);

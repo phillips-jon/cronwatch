@@ -15,7 +15,7 @@ namespace Cronwatch.Hangfire;
 
 /// <summary>
 /// CronWatch for Hangfire 1.8: every attempt of a watched job is recorded as a run, so a job that
-/// fails, runs late, never runs, gets stuck or runs slow is reported, and every recurring job is
+/// fails, runs late, never runs, gets stuck, or runs slow is reported, and every recurring job is
 /// declared as a CronWatch job on its cron.
 /// <code>
 /// GlobalConfiguration.Configuration.UseInMemoryStorage().UseCronwatch(cw);
@@ -168,7 +168,7 @@ public sealed class CronwatchHangfire : IDisposable
                 if (!SchedulerBridge.ValidName(dto.Id))
                 {
                     Watch.ReportOnce(
-                        "cronwatch: " + label + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\" or \"-\"), so it is not watched; rename it",
+                        "cronwatch: " + label + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\", or \"-\"), so it is not watched; rename it",
                         "declaring " + label);
                     continue;
                 }
@@ -310,7 +310,7 @@ public sealed class CronwatchHangfire : IDisposable
         if (!SchedulerBridge.ValidName(name))
         {
             Watch.ReportOnce(
-                "cronwatch: the Hangfire job " + Json.Stringify(name) + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\" or \"-\"), so it is not watched; rename it",
+                "cronwatch: the Hangfire job " + Json.Stringify(name) + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\", or \"-\"), so it is not watched; rename it",
                 "hangfire");
             return null;
         }

@@ -9,8 +9,8 @@ end
 
 module Cronwatch
   module Stores
-    # Keeps jobs, runs and state in the app's database through ActiveRecord.
-    # The same three tables, columns, indexes and JSON as the SDK's SQLite and
+    # Keeps jobs, runs, and state in the app's database through ActiveRecord.
+    # The same three tables, columns, indexes, and JSON as the SDK's SQLite and
     # Postgres stores (packages/sdk/src/stores/sql.ts), so a Node process and a
     # Ruby process can share one database. Postgres and SQLite are supported
     # and tested; any other adapter (MySQL among them) is refused.
@@ -67,7 +67,7 @@ module Cronwatch
       def self.table_prefix(prefix = DEFAULT_PREFIX)
         unless prefix.is_a?(String) && /\A[a-z_][a-z0-9_]*\z/.match?(prefix) && prefix.length <= MAX_PREFIX
           raise ArgumentError,
-                "cronwatch: invalid table prefix #{JS.json(prefix.to_s)}. Use lowercase letters, digits and underscores, " \
+                "cronwatch: invalid table prefix #{JS.json(prefix.to_s)}. Use lowercase letters, digits, and underscores, " \
                 "not starting with a digit, at most #{MAX_PREFIX} characters."
         end
 
@@ -400,7 +400,7 @@ module Cronwatch
       # parsed or as text, and BIGINT as a string.
       # Postgres refuses U+0000 in TEXT and JSONB, and a refused write loses
       # the whole row, so every dialect writes text without it: a run's
-      # trigger, output, error and metric names, and every key and string of
+      # trigger, output, error, and metric names, and every key and string of
       # a definition and a state. Identifiers (a job's name, a run's id) are
       # written as given; the client refuses one with a NUL before it gets here.
       def text(value)
@@ -428,7 +428,7 @@ module Cronwatch
         end
       end
 
-      # Rows are read leniently: a foreign, hand-edited or damaged row (SQLite
+      # Rows are read leniently: a foreign, hand-edited, or damaged row (SQLite
       # keeps whatever type it is given, in any column) must affect only its
       # own job, never every read. JSON text that does not parse (or nests
       # past JSON.parse's limit) reads as nil, which the client takes as no

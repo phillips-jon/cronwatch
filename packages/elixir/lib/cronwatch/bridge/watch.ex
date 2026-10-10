@@ -3,9 +3,9 @@ defmodule Cronwatch.Bridge.Entry do
   One job a scheduler runs, as an integration reads it: its `name`, a
   `label` naming it in messages (`Oban crontab entry for
   MyApp.Workers.Nightly`), its `schedule` as CronWatch reads it (`""` for
-  none) and the `timezone` it is read in (`""` for the process's own), a
+  none), the `timezone` it is read in (`""` for the process's own), a
   `problem` (why an entry with a schedule of its own has none here, reported
-  once), the integration's `defaults` for every job (before the schedule)
+  once), the integration's `defaults` for every job (before the schedule),
   and the entry's own `options` (after it, so a schedule among them
   replaces the scheduler's).
 
@@ -35,11 +35,11 @@ defmodule Cronwatch.Bridge.Watch do
   it, and the jobs a worker runs that another process declared: the Go
   port's `bridge/watch.go` and the Rust port's `Watch`, with both audits'
   fixes. A process of its own, which is the declaring lock: `declare/2`,
-  the end of `fallback/3` and `unschedule/1`'s declarations run in it one at
+  the end of `fallback/3`, and `unschedule/1`'s declarations run in it one at
   a time, so one never takes another's entries for gone or leaves the
   instance holding a job without its schedule.
 
-  Start it with `start_link/1` (`instance:`, `tag:`, `app:` and
+  Start it with `start_link/1` (`instance:`, `tag:`, `app:`, and
   `scheduler:`, how messages name the scheduler), under the integration.
   """
 

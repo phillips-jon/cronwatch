@@ -6,7 +6,7 @@ import { MIN, HOUR } from "./helpers.js";
 
 const DAY = 86_400_000;
 
-test("parseSchedule accepts cron, nicknames and intervals; rejects junk", () => {
+test("parseSchedule accepts cron, nicknames, and intervals; rejects junk", () => {
   assert.equal(parseSchedule("0 2 * * *").kind, "cron");
   assert.equal(parseSchedule("@hourly").kind, "cron");
   assert.equal(parseSchedule("*/5 * * * *").kind, "cron");

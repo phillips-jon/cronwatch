@@ -9,7 +9,7 @@ namespace Cronwatch.StoreTesting;
 /// <summary>
 /// Replays the store cases of the repository's <c>conformance/store.json</c>, which the SDK's
 /// memory store answered, against a store: prune scripts, compare-and-set steps, conditional run
-/// updates and text written without NUL (<see cref="RunAsync"/>), and states another process wrote
+/// updates, and text written without NUL (<see cref="RunAsync"/>), and states another process wrote
 /// with a version that is not a whole number (<see cref="ForeignVersionsAsync"/>). The caller reads
 /// the fixture and passes its text, since a published package cannot reach the repository:
 /// <code>
@@ -17,8 +17,10 @@ namespace Cronwatch.StoreTesting;
 /// int cases = await StoreReplay.RunAsync(fixture, () => new MyStore(EmptyDatabase()));
 /// </code>
 /// Each method throws a <see cref="StoreContractException"/> at the first case the store answers
-/// differently.
+/// differently. Not part of the 1.x promise, which covers <see cref="StoreContract.RunAsync"/>
+/// alone: the port's own tests replay the fixture with it.
 /// </summary>
+[Obsolete("Public by accident: the store kit promises StoreContract.RunAsync. It still works, and is removed in 1.0.")]
 public static class StoreReplay
 {
     private static List<JsObject> Objects(object? v)
@@ -68,7 +70,7 @@ public static class StoreReplay
     }
 
     /// <summary>
-    /// Replays the prune, compare-and-set, conditional update and NUL cases against stores from
+    /// Replays the prune, compare-and-set, conditional update, and NUL cases against stores from
     /// <paramref name="fresh"/>, each of which must be empty; each is disposed when its cases are
     /// done.
     /// </summary>
@@ -196,7 +198,7 @@ public static class StoreReplay
     }
 
     // The nul steps: text is written without U+0000, which Postgres refuses (a run's trigger,
-    // output, error and metric names, and every key and string of a definition and a state).
+    // output, error, and metric names, and every key and string of a definition and a state).
     private static async Task<int> NulAsync(JsObject fix, Func<IStore> fresh)
     {
         IStore store = fresh();
@@ -272,7 +274,7 @@ public static class StoreReplay
     /// <summary>
     /// Replays the <c>foreignVersion</c> cases against <paramref name="store"/>, which holds its
     /// states as JSON text: for each, job <c>v</c> is deleted, <paramref name="writeRaw"/> puts the
-    /// case's state text in the state table as it is (its version <c>1.5</c>, <c>"x"</c> or
+    /// case's state text in the state table as it is (its version <c>1.5</c>, <c>"x"</c>, or
     /// <c>2.0</c>), and each compare-and-set step must be refused or written as the SDK's was. The
     /// store is not disposed.
     /// </summary>

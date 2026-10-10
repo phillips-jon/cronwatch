@@ -132,7 +132,7 @@ public final class TwilioOptions {
     /**
      * The options.
      *
-     * @throws dev.cronwatch.CronwatchException without an account SID, credentials, a sender or a
+     * @throws dev.cronwatch.CronwatchException without an account SID, credentials, a sender, or a
      *     number
      */
     public TwilioOptions build() {

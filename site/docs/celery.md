@@ -35,7 +35,7 @@ app.conf.beat_schedule = {
 cronwatch.celery.install(app, client=cw, grace="15m")
 ```
 
-That is all. Each beat entry's task is a job named after the task, with beat's schedule: a `crontab` becomes the same cron expression in the app's zone (checked against Celery's own idea of when it is due, around clock changes too), and an interval becomes `every 15m`. Options given to `install` (`grace`, `timeout`, `failures_before_alert` and the rest) apply to every job it declares. The `cronwatch-check` entry runs the check every five minutes; schedule it once for the whole deployment, not once per worker.
+That is all. Each beat entry's task is a job named after the task, with beat's schedule: a `crontab` becomes the same cron expression in the app's zone (checked against Celery's own idea of when it is due, around clock changes too), and an interval becomes `every 15m`. Options given to `install` (`grace`, `timeout`, `failures_before_alert`, and the rest) apply to every job it declares. The `cronwatch-check` entry runs the check every five minutes; schedule it once for the whole deployment, not once per worker.
 
 Inside a watched task, `cronwatch.current()` is the run's context, so a task can log and report metrics:
 
@@ -63,13 +63,13 @@ from cronwatch.celery import cronwatch_task
 def import_orders(batch_id): ...
 ```
 
-`@cronwatch_task(**options)` goes below `@app.task` on the function or above it on the task, and takes a job's options and `name=`; its own options win over `install`'s, and its `schedule` replaces beat's. A job is named after its task unless `name=` gives it another name, such as a shorter one for the dashboard: `@cronwatch_task(name="import-orders")`. A job name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit. `install(app, tasks={"orders.import": {"timeout": "30m"}})` does the same without touching the task, and `exclude=` leaves out beat entries by key or tasks by name. `celery.backend_cleanup` is never a job.
+`@cronwatch_task(**options)` goes below `@app.task` on the function or above it on the task, and takes a job's options and `name=`; its own options win over `install`'s, and its `schedule` replaces beat's. A job is named after its task unless `name=` gives it another name, such as a shorter one for the dashboard: `@cronwatch_task(name="import-orders")`. A job name is 1 to 120 letters, digits, `.`, `_`, `:`, or `-`, starting with a letter or digit. `install(app, tasks={"orders.import": {"timeout": "30m"}})` does the same without touching the task, and `exclude=` leaves out beat entries by key or tasks by name. `celery.backend_cleanup` is never a job.
 
-## Retries, failures and lost workers
+## Retries, failures, and lost workers
 
-Every run a worker records has the trigger `celery` (see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)), and its id starts with the task's id. A task that raises still raises on to Celery, so its retries, error handlers and result backend see it unchanged.
+Every run a worker records has the trigger `celery` (see [Triggers, tags, and job names](/docs/dashboard/#triggers-tags-and-job-names)), and its id starts with the task's id. A task that raises still raises on to Celery, so its retries, error handlers, and result backend see it unchanged.
 
-Each attempt is a run of its own: an attempt that ends in `self.retry()` is a failed run with the error that caused it, and the attempt that finally succeeds closes the alert with a recovery. So a task that fails, retries and then succeeds sends one failed alert and one recovery, not one per attempt. To ride through a few retries without any alert, set `failures_before_alert` to the number of attempts you are willing to lose.
+Each attempt is a run of its own: an attempt that ends in `self.retry()` is a failed run with the error that caused it, and the attempt that finally succeeds closes the alert with a recovery. So a task that fails, retries, and then succeeds sends one failed alert and one recovery, not one per attempt. To ride through a few retries without any alert, set `failures_before_alert` to the number of attempts you are willing to lose.
 
 A run whose worker process is lost is failed by the worker's main process, which Celery tells: a hard time limit, `WorkerLostError`, a revoke with `terminate=True`, a task cancelled when the broker connection dropped. Celery's `Ignore` is an ok run and `Reject` a failed one. A run Celery never reports (a task requeued after the whole worker died) is marked stuck by a check once the job's `timeout` has passed.
 

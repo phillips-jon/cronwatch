@@ -7,7 +7,7 @@ defmodule Cronwatch.JSRE.Match do
   #
   # The rest of this module is the matcher: it runs a compiled pattern as a
   # chain of nodes over UTF-16 code units, backtracking by returning up the
-  # call stack. The captures, the loops' counts and where the match ended are
+  # call stack. The captures, the loops' counts, and where the match ended are
   # a state each step hands on only when it matches, so a failed branch leaves
   # nothing behind; the steps left are handed back either way, since the
   # budget counts the work of every branch.

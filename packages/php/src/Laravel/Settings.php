@@ -10,11 +10,11 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\Env as LaravelEnv;
 
 /**
- * The settings whose keys 1.0 renamed to match the Symfony bundle's:
+ * The settings whose keys 0.11 renamed to match the Symfony bundle's:
  * `table_prefix` (was `store.prefix`), `create_tables` (was
  * `store.create_tables`), `check.schedule` (was `schedule.check`) and
  * `check.frequency` (was `schedule.check_cron`). A config file published
- * before 1.0 still has the old keys; while it does, each is read in place
+ * before 0.11 still has the old keys; while it does, each is read in place
  * of its new key, with a deprecation notice once per process, through 1.x.
  * The package's own config file has only the new keys, so an old key that
  * is there came from the app.
@@ -63,7 +63,7 @@ final class Settings
      * gives (an empty or blank string, true, false) means none, with no
      * fallback. Only a config value of null (the key unset, or `env()` of a
      * variable that is unset) reads the variable, and then as Laravel's own
-     * `env()` reads it, so `X=null`, `X=(null)`, `X=empty`, `X=true` and
+     * `env()` reads it, so `X=null`, `X=(null)`, `X=empty`, `X=true`, and
      * `X=false` in .env are not a password (the raw environment holds them
      * as written). A cached config (`config:cache`) with
      * no value still reads a variable the process is given at run time.

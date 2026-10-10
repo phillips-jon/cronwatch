@@ -131,8 +131,7 @@ internal static class ForeignRowChecks
 
 /// <summary>
 /// The foreign-row checks <c>ServerStoreTests</c> run over a server's raw rows: fixture helpers,
-/// not part of the 1.x promise, which covers <see cref="StoreContract.RunAsync"/>,
-/// <see cref="StoreReplay"/> and <see cref="FinishOnce"/>.
+/// not part of the 1.x promise, which covers <see cref="StoreContract.RunAsync"/> alone.
 /// </summary>
 [Obsolete("A fixture helper of the port's own tests, public by accident. It still works, and is removed in 1.0.")]
 public static class ForeignRows

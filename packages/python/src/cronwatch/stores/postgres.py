@@ -1,8 +1,8 @@
 """Keeps everything in Postgres through psycopg 3 (stores/postgres.ts): the
 same tables, statements (``$n`` placeholders, sent as written through
-psycopg's RawCursor) and JSON as the SDK's store, so a Node, a Ruby and a
+psycopg's RawCursor) and JSON as the SDK's store, so a Node, a Ruby, and a
 Python process can share the database. For apps on Heroku, Fly, Render, Neon,
-Supabase and the like, where there is no disk to keep a SQLite file on.
+Supabase, and the like, where there is no disk to keep a SQLite file on.
 Times are stored as BIGINT epoch milliseconds.
 
     pip install "cronwatch-sdk[postgres]"
@@ -45,7 +45,7 @@ class PostgresStore:
     ``DATABASE_URL``. Pass ``pool=`` to bring your own psycopg_pool
     ``ConnectionPool`` (anything whose ``connection()`` is a context manager
     giving a psycopg connection) instead; it is not closed by ``close()``.
-    ``prefix`` names the tables: lowercase letters, digits and underscores,
+    ``prefix`` names the tables: lowercase letters, digits, and underscores,
     default "cronwatch_"."""
 
     def __init__(self, conninfo: str | None = None, *, pool: Any = None, prefix: str = _sql.DEFAULT_PREFIX) -> None:

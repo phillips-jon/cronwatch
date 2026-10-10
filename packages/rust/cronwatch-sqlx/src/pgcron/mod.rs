@@ -3,7 +3,7 @@
 //! source, on every check it reads `cron.job` and declares each job with its
 //! schedule, then copies new rows of `cron.job_run_details` in as runs (ids
 //! `pgcron:<prefix><runid>`), so the usual evaluation raises missed, failed,
-//! stuck and slow alerts.
+//! stuck, and slow alerts.
 //!
 //! ```no_run
 //! # async fn example(pool: sqlx::PgPool) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -17,7 +17,7 @@
 //! # }
 //! ```
 //!
-//! A job that is renamed, unscheduled or no longer picked keeps its old
+//! A job that is renamed, unscheduled, or no longer picked keeps its old
 //! name's runs and history, and that name is declared again without a
 //! schedule, so it is never reported missed. Its description says why.
 //!
@@ -44,7 +44,7 @@ use crate::rows::{Param, Row};
 #[cfg(test)]
 mod tests;
 
-/// A row of `cron.job`, as `pick`, `job_name` and `options_for` are given
+/// A row of `cron.job`, as `pick`, `job_name`, and `options_for` are given
 /// it. `#[non_exhaustive]`: the source reads these.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
@@ -99,13 +99,13 @@ pub struct PgCronOptions {
     /// (`"db:"`). It also keeps run ids apart.
     pub prefix: String,
     /// The CronWatch name for a job. By default its jobname with
-    /// anything other than letters, digits, `.`, `_`, `:` and `-` turned into
+    /// anything other than letters, digits, `.`, `_`, `:`, and `-` turned into
     /// `-`, or `pg_cron:<jobid>` when it has none. The prefix goes in front
     /// either way. One that panics, like a `pick` or `options_for` that
     /// panics, is reported once and fails only that job, which keeps its
     /// last declaration until the callback works again.
     pub job_name: Option<NameFn>,
-    /// Job options (grace, timeout, max duration, expect and the rest) for
+    /// Job options (grace, timeout, max duration, expect, and the rest) for
     /// every job; `options_for` gives them per job instead. The schedule and
     /// timezone always come from pg_cron.
     pub options: JobOptions,
@@ -202,9 +202,9 @@ const MAX_PAGES: usize = 10;
 /// seen, so a run that never starts is marked stuck like any other.
 pub(crate) const HOLD_FOR: Duration = Duration::from_secs(10 * 60);
 
-/// `HOLD_FOR`'s public name before 1.0.
+/// `HOLD_FOR`'s public name before 0.11.
 #[doc(hidden)]
-#[deprecated(note = "internal to the pg_cron source, outside the 1.x promise; no longer public from 1.0")]
+#[deprecated(note = "internal to the pg_cron source, outside the 1.x promise; no longer public from 0.11")]
 pub const HOLD: Duration = HOLD_FOR;
 
 const JOBS_SQL: &str = "SELECT jobid, jobname, schedule, database, username, active FROM cron.job ORDER BY jobid";
@@ -271,9 +271,9 @@ pub(crate) fn cron_schedule(schedule: &str) -> Option<String> {
     Some(fields.join(" "))
 }
 
-/// `cron_schedule`'s public name before 1.0.
+/// `cron_schedule`'s public name before 0.11.
 #[doc(hidden)]
-#[deprecated(note = "internal to the pg_cron source, outside the 1.x promise; no longer public from 1.0")]
+#[deprecated(note = "internal to the pg_cron source, outside the 1.x promise; no longer public from 0.11")]
 pub fn schedule(schedule: &str) -> Option<String> {
     cron_schedule(schedule)
 }
@@ -325,16 +325,16 @@ pub(crate) fn run_from(row: &PgCronRow, job: &str, id_prefix: &str, fallback_at:
     Some(run)
 }
 
-/// `default_name`'s public name before 1.0.
+/// `default_name`'s public name before 0.11.
 #[doc(hidden)]
-#[deprecated(note = "internal to the pg_cron source, outside the 1.x promise; no longer public from 1.0")]
+#[deprecated(note = "internal to the pg_cron source, outside the 1.x promise; no longer public from 0.11")]
 pub fn job_name(job: &PgCronJob) -> String {
     default_name(job)
 }
 
-/// `run_from`'s public name before 1.0.
+/// `run_from`'s public name before 0.11.
 #[doc(hidden)]
-#[deprecated(note = "internal to the pg_cron source, outside the 1.x promise; no longer public from 1.0")]
+#[deprecated(note = "internal to the pg_cron source, outside the 1.x promise; no longer public from 0.11")]
 pub fn run_of(row: &PgCronRow, job: &str, id_prefix: &str, fallback_at: i64) -> Option<Run> {
     run_from(row, job, id_prefix, fallback_at)
 }
@@ -770,7 +770,7 @@ impl PgCron {
         }
 
         // A name this source used for a job that has since been renamed,
-        // unscheduled or dropped from the jobs picked.
+        // unscheduled, or dropped from the jobs picked.
         let in_use: HashSet<String> = names.values().cloned().collect();
         for name in &in_use {
             st.retired.remove(name);

@@ -1,7 +1,7 @@
 package cronwatch
 
 // What makes the dashboard an installable web app (routes/pwa.ts): a
-// manifest, icons, a service worker, the script that registers it and a
+// manifest, icons, a service worker, the script that registers it, and a
 // page to show offline. None of it says anything about the jobs, so it is
 // served without the token (a browser fetches the manifest and icons
 // without cookies in some flows).
@@ -31,7 +31,7 @@ func manifest(base string) string {
 		"id", base+"/",
 		"name", "CronWatch",
 		"short_name", "CronWatch",
-		"description", "The scheduled jobs of this app: their health, their last day and their runs.",
+		"description", "The scheduled jobs of this app: their health, their last day, and their runs.",
 		"start_url", base+"/",
 		"scope", base+"/",
 		"display", "standalone",

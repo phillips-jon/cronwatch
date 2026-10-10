@@ -1,4 +1,4 @@
-//! The SQL store on Postgres, MySQL and MariaDB, each when its variable is
+//! The SQL store on Postgres, MySQL, and MariaDB, each when its variable is
 //! set (see `common/server.rs`): the store contract, the store.json replay,
 //! the finish-once scenarios over several stores (each on a pool of its own)
 //! on one database, a client end to end, and each dialect's own tests
@@ -118,7 +118,7 @@ async fn a_run_is_finished_once_across_stores_on_each_server() {
 }
 
 /// A client from end to end: jobs declared, runs that succeed and fail, a
-/// check that finds a stuck run and a missed one, the alerts sent and the
+/// check that finds a stuck run and a missed one, the alerts sent, and the
 /// state's version moving on every write.
 #[tokio::test]
 async fn a_client_records_and_checks_on_each_server() {
@@ -380,7 +380,7 @@ async fn nul_characters_are_still_recorded_on_postgres() {
     assert!(runs[0].error.as_deref().unwrap().starts_with("Error: badbyte"), "{:?}", runs[0].error);
     let st = store.get_state("nul").await.unwrap().unwrap();
     assert_eq!(st.consecutive_failures, 1, "the state, with its alert, was written too");
-    // So are a trigger, metric names and a definition's text.
+    // So are a trigger, metric names, and a definition's text.
     let nul2 = p.client.job("nul2", JobOptions::new().description("a\0b").tags(["t\0"]).budget("c\0", 5.0)).unwrap();
     nul2.run_with(cronwatch::RunOptions::new().trigger("cr\0on"), |j| async move {
         j.metric("ro\0ws", 2.0)?;
@@ -584,7 +584,7 @@ async fn mysql_keeps_a_run_with_a_long_trigger() {
 
 /// State rows a damaged or hand-edited row could hold in MySQL's LONGTEXT:
 /// text that is not JSON, JSON that is not an object, and objects whose
-/// version is not a number. A check, a silence and a second check answer
+/// version is not a number. A check, a silence, and a second check answer
 /// with no error, and the silence replaces each row (it counts as version
 /// 0, as on SQLite).
 #[tokio::test]

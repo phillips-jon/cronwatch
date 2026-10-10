@@ -1,5 +1,5 @@
 """Shared by every test: the process timezone is UTC, as the conformance
-fixtures were generated in, and helpers for clocks, captured alerts and a
+fixtures were generated in, and helpers for clocks, captured alerts, and a
 store that fails on demand."""
 
 from __future__ import annotations

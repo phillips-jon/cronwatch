@@ -8,7 +8,7 @@ using System.Text;
 namespace Cronwatch.Internal;
 
 /// <summary>
-/// The SDK's <c>output.ts</c>: the output cap, error text and secret redaction. Lengths and cuts
+/// The SDK's <c>output.ts</c>: the output cap, error text, and secret redaction. Lengths and cuts
 /// are in UTF-16 code units, as JavaScript counts them (a .NET string is one), so the same output
 /// is capped at the same character here and in every other port.
 /// </summary>
@@ -162,7 +162,7 @@ internal static class OutputText
     /// <summary>
     /// Up to five of the exception's frames, innermost first, as a JavaScript stack writes them:
     /// the method, then the file and line in parentheses when there is a file. The runtime's own
-    /// plumbing (the async method builders, awaiters and <c>ExceptionDispatchInfo</c>) is left
+    /// plumbing (the async method builders, awaiters, and <c>ExceptionDispatchInfo</c>) is left
     /// out, as <c>Exception.ToString()</c> leaves it out, and an async method's state machine is
     /// written as the method a person wrote.
     /// </summary>
@@ -321,7 +321,7 @@ internal static class OutputText
         // Incoming webhook URLs carry their secret in the path.
         SecretPattern.Template(@"(\bhooks\.slack\.com\/(?:services|workflows|triggers)\/)[A-Za-z0-9/_-]{1,255}", "gi", "$1" + Redacted),
         SecretPattern.Template(@"(\bdiscord(?:app)?\.com\/api\/(?:v\d{1,2}\/)?webhooks\/)[A-Za-z0-9/_-]{1,255}", "gi", "$1" + Redacted),
-        // Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI and Google
+        // Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI, and Google
         // style keys.
         SecretPattern.Template(@"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b", "g", Redacted),
         SecretPattern.Template(@"\b(?:gh[pousr]_[A-Za-z0-9]{30,255}|github_pat_[A-Za-z0-9_]{20,255})\b", "g", Redacted),
@@ -335,7 +335,7 @@ internal static class OutputText
     /// <summary>
     /// The default redact: blanks values that look like secrets (key=value pairs with secret-ish
     /// names, Authorization headers, URL credentials, bearer tokens, JWTs, PEM private keys,
-    /// webhook URLs and well-known token formats) before output or an error is stored, shown or
+    /// webhook URLs, and well-known token formats) before output or an error is stored, shown, or
     /// sent anywhere.
     /// </summary>
     public static string RedactSecrets(string text)

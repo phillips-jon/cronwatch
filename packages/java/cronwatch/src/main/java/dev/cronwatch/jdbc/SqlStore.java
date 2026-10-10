@@ -12,13 +12,13 @@ import javax.sql.DataSource;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The SQL store under the package it had before 1.0: every call goes to a {@link
+ * The SQL store under the package it had before 0.11: every call goes to a {@link
  * dev.cronwatch.store.SqlStore}, which is now beside {@code MemoryStore} in {@code
  * dev.cronwatch.store}.
  *
  * @deprecated use {@link dev.cronwatch.store.SqlStore}, the same store; removed in 2.0
  */
-@Deprecated(since = "1.0", forRemoval = true)
+@Deprecated(since = "0.11", forRemoval = true)
 public final class SqlStore implements Store {
   private final dev.cronwatch.store.SqlStore store;
 
@@ -31,7 +31,7 @@ public final class SqlStore implements Store {
    *
    * @deprecated use {@link dev.cronwatch.store.SqlStore#sqlite}; removed in 2.0
    */
-  @Deprecated(since = "1.0", forRemoval = true)
+  @Deprecated(since = "0.11", forRemoval = true)
   public static SqlStore sqlite(DataSource dataSource) {
     return new SqlStore(dev.cronwatch.store.SqlStore.sqlite(dataSource));
   }
@@ -41,7 +41,7 @@ public final class SqlStore implements Store {
    *
    * @deprecated use {@link dev.cronwatch.store.SqlStore#postgres}; removed in 2.0
    */
-  @Deprecated(since = "1.0", forRemoval = true)
+  @Deprecated(since = "0.11", forRemoval = true)
   public static SqlStore postgres(DataSource dataSource) {
     return new SqlStore(dev.cronwatch.store.SqlStore.postgres(dataSource));
   }
@@ -51,7 +51,7 @@ public final class SqlStore implements Store {
    *
    * @deprecated use {@link dev.cronwatch.store.SqlStore#mysql}; removed in 2.0
    */
-  @Deprecated(since = "1.0", forRemoval = true)
+  @Deprecated(since = "0.11", forRemoval = true)
   public static SqlStore mysql(DataSource dataSource) {
     return new SqlStore(dev.cronwatch.store.SqlStore.mysql(dataSource));
   }
@@ -62,7 +62,7 @@ public final class SqlStore implements Store {
    * @throws dev.cronwatch.CronwatchException as that does
    * @deprecated use {@link dev.cronwatch.store.SqlStore#of}; removed in 2.0
    */
-  @Deprecated(since = "1.0", forRemoval = true)
+  @Deprecated(since = "0.11", forRemoval = true)
   public static SqlStore of(DataSource dataSource) {
     return new SqlStore(dev.cronwatch.store.SqlStore.of(dataSource));
   }
@@ -81,7 +81,7 @@ public final class SqlStore implements Store {
     return store.tablePrefix();
   }
 
-  /** The store's database: {@code sqlite}, {@code postgres} or {@code mysql}. */
+  /** The store's database: {@code sqlite}, {@code postgres}, or {@code mysql}. */
   public String dialect() {
     return store.dialect();
   }

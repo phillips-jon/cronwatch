@@ -55,7 +55,7 @@ public final class PostmarkOptions {
     /**
      * The options.
      *
-     * @throws dev.cronwatch.CronwatchException without a server token, a from address or a to
+     * @throws dev.cronwatch.CronwatchException without a server token, a from address, or a to
      *     address
      */
     public PostmarkOptions build() {

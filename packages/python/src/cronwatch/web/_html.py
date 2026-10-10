@@ -6,7 +6,7 @@ Set like cronwatch.dev: a printed sheet on grey paper, a serif for what a
 person reads, a mono for what a machine printed, neutral greys, and colour
 only for the states CronWatch reports. The page loads nothing but its own app
 shell (its CSP is default-src 'none' plus 'self' for the script, the
-manifest, the worker and images), so the fonts are system stacks that echo
+manifest, the worker, and images), so the fonts are system stacks that echo
 the site's Newsreader and IBM Plex Mono, and use them when they are installed.
 
 Installed as an app (display-mode: standalone) the header stays at the top as
@@ -213,7 +213,7 @@ DECLARE_ONE = 'cw.job("name", schedule="0 2 * * *")'
 
 def layout(title: str, body: str, base: str, refresh: int | None = None) -> str:
     """A page. `base` is where the dashboard is mounted ("" at the root): the
-    head links the web app manifest, the icons and app.js, the one script,
+    head links the web app manifest, the icons, and app.js, the one script,
     which registers the service worker and toggles the theme (_pwa.py). Everything works
     without it."""
     b = h(base)

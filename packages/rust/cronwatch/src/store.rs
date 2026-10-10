@@ -1,4 +1,4 @@
-//! Where jobs, runs and state live.
+//! Where jobs, runs, and state live.
 
 use std::fmt;
 use std::future::Future;
@@ -10,7 +10,7 @@ use crate::types::{Definition, JobState, Run, RunStatus, StoredJob};
 /// of the crate returns so the traits can be used as `Arc<dyn Trait>`.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
-/// Any error a store, a channel or a source returns.
+/// Any error a store, a channel, or a source returns.
 pub type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 /// What an optional store method answers when the store does not have it;
@@ -31,7 +31,7 @@ pub fn is_unsupported(err: &BoxError) -> bool {
     err.is::<Unsupported>()
 }
 
-/// Where jobs, runs and state live. [`MemoryStore`](crate::MemoryStore) is
+/// Where jobs, runs, and state live. [`MemoryStore`](crate::MemoryStore) is
 /// one; `cronwatch-sqlx` keeps them in the app's own database. A store of
 /// your own should pass the `storetest` feature's contract test.
 ///
@@ -46,11 +46,11 @@ pub trait Store: Send + Sync + 'static {
     fn get_job<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<Option<StoredJob>, BoxError>>;
     /// Every job, by name in byte order.
     fn list_jobs(&self) -> BoxFuture<'_, Result<Vec<StoredJob>, BoxError>>;
-    /// Removes a job, its runs and its state.
+    /// Removes a job, its runs, and its state.
     fn delete_job<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<(), BoxError>>;
     /// Refuses an id already stored.
     fn insert_run<'a>(&'a self, run: &'a Run) -> BoxFuture<'a, Result<(), BoxError>>;
-    /// Writes a run's status, finish, duration, error, output and metrics.
+    /// Writes a run's status, finish, duration, error, output, and metrics.
     /// A run that is gone stays gone.
     fn update_run<'a>(&'a self, run: &'a Run) -> BoxFuture<'a, Result<(), BoxError>>;
     /// `None` when there is no such run.

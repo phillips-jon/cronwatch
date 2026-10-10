@@ -1,6 +1,6 @@
 """The environment, as the SDK's env.test.ts reads it, with ENVIRONMENT in
 NODE_ENV's place: CRONWATCH_ENV, then APP_ENV, then ENVIRONMENT, the first
-that holds more than spaces, trimmed, lowercased and its alias resolved."""
+that holds more than spaces, trimmed, lowercased, and its alias resolved."""
 
 from __future__ import annotations
 

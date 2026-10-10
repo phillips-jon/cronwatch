@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 /**
- * MySQL's and MariaDB's own tests (the PHP port's {@code MysqlStoreTest}, as the Go, Rust and
+ * MySQL's and MariaDB's own tests (the PHP port's {@code MysqlStoreTest}, as the Go, Rust, and
  * Elixir ports have them), run once per server by a subclass.
  */
 abstract class MysqlDialectTests extends ServerStoreTests {
@@ -208,7 +208,7 @@ abstract class MysqlDialectTests extends ServerStoreTests {
   /**
    * State rows a damaged or hand-edited row could hold in the {@code LONGTEXT} column: text that is
    * not JSON, JSON that is not an object, and objects whose version is not a number. A check, a
-   * silence and a second check answer with no error, and the silence replaces each row (it counts
+   * silence, and a second check answer with no error, and the silence replaces each row (it counts
    * as version 0, as on SQLite).
    */
   @Test

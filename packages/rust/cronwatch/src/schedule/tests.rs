@@ -302,11 +302,11 @@ fn parse_duration_text_and_numbers() {
     );
     assert_eq!(
         parse_duration(&Value::Bool(true), "grace").unwrap_err(),
-        r#"grace "true" is not a duration like "15m", "1h30m" or "90s""#
+        r#"grace "true" is not a duration like "15m", "1h30m", or "90s""#
     );
     assert_eq!(
         parse_duration(&Value::Object(Object::new()), "grace").unwrap_err(),
-        r#"grace "[object Object]" is not a duration like "15m", "1h30m" or "90s""#
+        r#"grace "[object Object]" is not a duration like "15m", "1h30m", or "90s""#
     );
 }
 
@@ -323,7 +323,7 @@ fn a_duration_over_64_characters_is_refused_quoting_its_first_32() {
     let forty = "\u{1f600}".repeat(40);
     assert_eq!(
         text(&forty, "").unwrap_err(),
-        format!(r#"duration "{forty}" is not a duration like "15m", "1h30m" or "90s""#)
+        format!(r#"duration "{forty}" is not a duration like "15m", "1h30m", or "90s""#)
     );
     assert_eq!(
         text(&"\u{1f600}".repeat(65), "").unwrap_err(),

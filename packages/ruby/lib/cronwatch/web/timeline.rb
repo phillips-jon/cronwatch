@@ -239,11 +239,11 @@ module Cronwatch
 
         if open?(job, :over_budget) && last
           over = over_ceilings(job)
-          return "went over budget#{over.empty? ? "" : " on #{over.join(" and ")}"} at #{when_at(last.started_at, now)}"
+          return "went over budget#{over.empty? ? "" : " on #{Format.and_list(over)}"} at #{when_at(last.started_at, now)}"
         end
         if open?(job, :under_floor) && last
           under = under_floors(job)
-          return "fell short#{under.empty? ? "" : " on #{under.join(" and ")}"} at #{when_at(last.started_at, now)}"
+          return "fell short#{under.empty? ? "" : " on #{Format.and_list(under)}"} at #{when_at(last.started_at, now)}"
         end
         return "slow: took #{Duration.format(last.duration_ms)}" if open?(job, :slow) && !last&.duration_ms.nil?
         return "failing" if open?(job, :failed)
@@ -405,7 +405,7 @@ module Cronwatch
           [box.call("run ok"), "ran"],
           [box.call("run bad"), "failed"],
           [box.call("run timeout"), "timed out"],
-          [box.call("run warn"), "over budget, under floor or slow"],
+          [box.call("run warn"), "over budget, under floor, or slow"],
           [box.call("run running"), "running"],
           [box.call("missed"), "missed"],
         ]

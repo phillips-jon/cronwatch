@@ -1,6 +1,6 @@
 <?php
 /**
- * Deleting the plugin removes what it made: its three tables, its options
+ * Deleting the plugin removes what it made: its three tables, its options,
  * and its scheduled check, on every site of a network.
  *
  * @package Cronwatch
@@ -10,7 +10,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
-/** Removes the plugin's tables, options, transients and events from the current site. */
+/** Removes the plugin's tables, options, transients, and events from the current site. */
 function cronwatch_uninstall_site(): void {
 	global $wpdb;
 	$prefix = $wpdb->prefix . 'cronwatch_';

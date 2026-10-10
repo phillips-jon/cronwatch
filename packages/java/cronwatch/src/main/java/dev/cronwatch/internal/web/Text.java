@@ -14,7 +14,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * What the dashboard's pages need to write values the way the SDK's templates do ({@code
  * routes/escape.ts} and JavaScript itself): {@code escapeHtml}, {@code escapeName}, {@code
- * String(value)}, {@code toFixed} and {@code encodeURIComponent}, how text read from the wire is
+ * String(value)}, {@code toFixed}, and {@code encodeURIComponent}, how text read from the wire is
  * decoded, and how a secret is compared. Carried over from the Rust port's {@code web/text.rs}.
  */
 public final class Text {
@@ -63,7 +63,7 @@ public final class Text {
   /**
    * {@code escapeName}: a job name shown as text, with {@code <wbr>} after each run of {@code _ : .
    * / -} that something else follows, so a long name wraps at its separators. Only for text, never
-   * an attribute, a URL or a title.
+   * an attribute, a URL, or a title.
    */
   public static String escapeName(String s) {
     String text = escapeHtml(s);

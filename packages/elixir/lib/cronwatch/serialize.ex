@@ -54,12 +54,12 @@ defmodule Cronwatch.Serialize do
 
   def rule(other) do
     {:error,
-     "expect must be a string, {:matches, \"source\", \"flags\"} or a one-argument function, not #{inspect(other)}"}
+     "expect must be a string, {:matches, \"source\", \"flags\"}, or a one-argument function, not #{inspect(other)}"}
   end
 
   @doc """
   nil when the output passes the rule, or why it does not. A function that
-  raises, throws or exits fails the run with `Output check threw: ...`; a
+  raises, throws, or exits fails the run with `Output check threw: ...`; a
   stored pattern that gives up (past its step budget or 512 frames) fails
   with the ordinary `Output did not match /source/flags`.
   """
@@ -85,7 +85,7 @@ defmodule Cronwatch.Serialize do
   defp thrown(:throw, value, _), do: if(is_binary(value), do: value, else: inspect(value))
   defp thrown(:exit, reason, _), do: if(is_binary(reason), do: reason, else: inspect(reason))
 
-  @doc "The stored definition's `expect`: `contains \"...\"`, `matches /.../` or `custom function`."
+  @doc "The stored definition's `expect`: `contains \"...\"`, `matches /.../`, or `custom function`."
   @spec describe(rule()) :: String.t()
   def describe({:contains, text}), do: "contains " <> JS.quote(text)
   def describe({:matches, re}), do: "matches " <> JSRE.source(re)
@@ -111,7 +111,7 @@ defmodule Cronwatch.Serialize do
 
   @doc """
   A stored job as the client reads it (the SDK's readStoredJob), so a
-  foreign, hand-edited or damaged row affects only its own job: answers
+  foreign, hand-edited, or damaged row affects only its own job: answers
   `{job, readable}`. A definition that is not a JSON object (a SQL store
   reads text that does not parse as nil) becomes `{name}` and `readable` is
   false: the client reports the job and shows it as failing, without

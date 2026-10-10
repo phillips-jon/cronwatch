@@ -9,8 +9,8 @@ namespace Cronwatch.Internal;
 /// next matching time (<see cref="CronDate"/>), habits included: a day the month does not have
 /// rolls over, a wall-clock time in a spring-forward gap moves forward by the gap, and a time that
 /// happens twice is the earlier one. The names and the order of every step follow croner's
-/// source, as the Go, Python, PHP, Rust, Elixir and Java ports do, so they agree on every
-/// expression they read, every one they refuse and every fire time.
+/// source, as the Go, Python, PHP, Rust, Elixir, and Java ports do, so they agree on every
+/// expression they read, every one they refuse, and every fire time.
 /// </summary>
 /// <remarks>
 /// As the SDK settles the two schedules croner itself does not: a date no month has

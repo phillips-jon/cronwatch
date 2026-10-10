@@ -24,7 +24,7 @@ module Cronwatch
         end
       end
 
-      # The scheme, host and port only. A URL's path or query can hold a credential.
+      # The scheme, host, and port only. A URL's path or query can hold a credential.
       def origin(url)
         Webhook.origin(url)
       end
@@ -78,7 +78,7 @@ module Cronwatch
         Digest::SHA256.hexdigest(text.to_s)
       end
 
-      # A stable 32 hex character id for one alert: the same job, type and
+      # A stable 32 hex character id for one alert: the same job, type, and
       # time always give the same id, so a provider that deduplicates on it
       # drops a resend of an alert it already took.
       def alert_id(alert)
@@ -107,7 +107,7 @@ module Cronwatch
         }
       end
 
-      # Title, message, triage and link as one plain text block, the way every channel reads.
+      # Title, message, triage, and link as one plain text block, the way every channel reads.
       def plain_text(alert, link)
         lines = [alert.title, "", alert.message]
         lines.push("", "Triage: #{alert.triage}") if present?(alert.triage)

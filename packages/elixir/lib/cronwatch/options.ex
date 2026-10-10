@@ -32,7 +32,7 @@ defmodule Cronwatch.Options do
   @doc "The option names a job takes."
   def keys, do: Map.keys(@keys)
 
-  @doc "Whether a job name is 1 to 120 characters of letters, digits, ., _, : or -, starting with a letter or digit."
+  @doc "Whether a job name is 1 to 120 characters of letters, digits, ., _, :, or -, starting with a letter or digit."
   def valid_name?(name) when is_binary(name), do: Regex.match?(~r/\A[A-Za-z0-9][A-Za-z0-9._:-]{0,119}\z/, name)
   def valid_name?(_), do: false
 
@@ -68,7 +68,7 @@ defmodule Cronwatch.Options do
 
       {:error,
        Error.invalid(
-         ~s(job name #{JS.quote(text)} must be 1 to 120 characters of letters, digits, ".", "_", ":" or "-")
+         ~s(job name #{JS.quote(text)} must be 1 to 120 characters of letters, digits, ".", "_", ":", or "-")
        )}
     end
   end

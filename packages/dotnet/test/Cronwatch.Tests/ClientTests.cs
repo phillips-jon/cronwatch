@@ -11,7 +11,7 @@ namespace Cronwatch.Tests;
 
 /// <summary>
 /// The SDK's <c>client.test.ts</c>, ported: runs, failures, expect, the checks for missed and
-/// stuck runs, baselines and budgets, silence, triage, forget and a failing channel.
+/// stuck runs, baselines and budgets, silence, triage, forget, and a failing channel.
 /// </summary>
 public class ClientTests
 {
@@ -121,7 +121,7 @@ public class ClientTests
             "job \"x\": timeout must be longer than zero",
             Assert.Throws<CronwatchException>(() => m.Cw.Job("x", new JobOptions { Timeout = 0 })).Message);
         Assert.Equal(
-            "defaults takes grace, timeout, timezone and failuresBeforeAlert, not schedule",
+            "defaults takes grace, timeout, timezone, and failuresBeforeAlert, not schedule",
             Assert.Throws<CronwatchException>(() => Make(defaults: new JobOptions { Schedule = "@daily" })).Message);
     }
 

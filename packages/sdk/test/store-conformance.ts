@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import type { Alert, JobState, Run, Store, StoredJobDefinition } from "../src/types.js";
 
 /**
- * The test every store passes: memory, SQLite and Postgres in stores.test.ts,
+ * The test every store passes: memory, SQLite, and Postgres in stores.test.ts,
  * D1 in workers.test.ts. Copy it to check a store of your own.
  */
 export function run(id: string, job: string, status: Run["status"], startedAt: number): Run {
@@ -84,7 +84,7 @@ export async function conformance(name: string, make: () => Store, skip: string 
     const undelivered = { type: "failed", job: "a", title: "a failed", message: "boom", at: 7, details: { consecutiveFailures: 1 } } as unknown as Alert;
     const full = { job: "a", open: { stuck: 7 }, consecutiveFailures: 1, silencedUntil: null, lastAlertAt: 6, pendingRecovery: ["missed"], undelivered: [undelivered], sending: [{ until: 8, alert: undelivered }] } as JobState;
     await store.setState(full);
-    assert.deepEqual(await store.getState("a"), full, "pendingRecovery, undelivered and sending round-trip");
+    assert.deepEqual(await store.getState("a"), full, "pendingRecovery, undelivered, and sending round-trip");
     await store.setState({ job: "a", open: {}, consecutiveFailures: 0, silencedUntil: 99, lastAlertAt: 6 });
 
     // compareAndSetState: writes only over the version it was told to expect.

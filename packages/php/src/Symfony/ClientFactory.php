@@ -23,7 +23,7 @@ use Psr\Log\LoggerInterface;
 /**
  * The client, from config/packages/cronwatch.yaml: the store (a URL, or
  * the app's DATABASE_URL, or a SQLite file in var/), the alert channels,
- * triage and the client's options. The bundle makes the Cronwatch\Cronwatch
+ * triage, and the client's options. The bundle makes the Cronwatch\Cronwatch
  * service with it; an app that wants to build its own defines that service
  * itself.
  *

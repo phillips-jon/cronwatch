@@ -4,7 +4,7 @@ namespace Cronwatch.Tests;
 
 /// <summary>
 /// The cross-port check: the SDK keeps queued alerts as plain JSON, so a field a newer release
-/// added to an alert, its run, its details or a sending entry is written back as it was read, and
+/// added to an alert, its run, its details, or a sending entry is written back as it was read, and
 /// an alert of a type this release does not know keeps its details.
 /// </summary>
 public class QueuedAlertTests

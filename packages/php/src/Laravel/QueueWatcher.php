@@ -13,7 +13,7 @@ use Illuminate\Contracts\Container\Container;
 /**
  * Queued jobs that opt in (#[Cronwatch\Watch] on the class, or
  * ShouldBeWatched), watched through the queue's events, so each attempt
- * is a run with the trigger "laravel-queue" ("queue" before 1.0), recorded
+ * is a run with the trigger "laravel-queue" ("queue" before 0.11), recorded
  * in the worker that ran it:
  *
  * - JobProcessing starts the run; Cronwatch::current() is its context
@@ -38,7 +38,7 @@ use Illuminate\Contracts\Container\Container;
  * that succeeds closes it, and failuresBeforeAlert rides through retries.
  * A worker killed outright records nothing, and its run is marked stuck
  * after the job's timeout; one that exits or dies of a fatal error records
- * the run as interrupted. A queued listener, mailable or notification is
+ * the run as interrupted. A queued listener, mailable, or notification is
  * watched by its own class, as the worker names it.
  *
  * @internal

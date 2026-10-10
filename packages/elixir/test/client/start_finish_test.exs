@@ -1,5 +1,5 @@
 defmodule Cronwatch.StartFinishTest do
-  @moduledoc "The SDK's start-finish.test.ts, ported: runs that span calls, through start, resume, flush and finish."
+  @moduledoc "The SDK's start-finish.test.ts, ported: runs that span calls, through start, resume, flush, and finish."
   use ExUnit.Case, async: true
 
   import Cronwatch.Test.Client

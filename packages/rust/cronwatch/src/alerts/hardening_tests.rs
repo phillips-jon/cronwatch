@@ -2,7 +2,7 @@
 //! other ports' tests have it, against real local servers where it matters:
 //! redirects refused, one deadline, bodies capped, only the origin in an
 //! error, URLs and headers checked, credentials trimmed and cut out of quoted
-//! answers, TLS verified, Twilio's partial delivery and lone surrogates.
+//! answers, TLS verified, Twilio's partial delivery, and lone surrogates.
 
 use std::io::Write as _;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -841,7 +841,7 @@ fn the_webhook_signature_is_hmac_sha256() {
     );
 }
 
-/// The names deprecated before 1.0 still work until then.
+/// The names deprecated in 0.11 still work until 1.0.
 #[tokio::test]
 #[allow(deprecated)]
 async fn the_deprecated_transport_names_still_work() {

@@ -21,7 +21,7 @@ an IntervalTrigger becomes "every <interval>"; a DateTrigger runs once, so the
 job has no schedule. A trigger that cannot be read (a combined trigger, a
 calendar interval, a week or year field, a fire time daylight saving skips)
 is reported to the client's on_error as "declaring <job>" and the job is
-watched without a schedule. A job added, rescheduled or removed later is
+watched without a schedule. A job added, rescheduled, or removed later is
 declared again (a removed job keeps its runs and loses its schedule, so it is
 not reported missed).
 
@@ -399,7 +399,7 @@ class SchedulerWatch:
             self.client._report(
                 ValueError(
                     f"cronwatch: {where} ({job.name}) has no id or name CronWatch can use as a job name; give it an id= of "
-                    'letters, digits, ".", "_", ":" or "-", or pass jobs={id: {"name": ...}} to watch()'
+                    'letters, digits, ".", "_", ":", or "-", or pass jobs={id: {"name": ...}} to watch()'
                 ),
                 f"declaring {where}",
             )

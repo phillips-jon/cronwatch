@@ -180,7 +180,7 @@ final class CharSet implements CharTest {
   /** {@code \d}. */
   static final int[] DIGIT = {'0', '9'};
 
-  /** {@code \w}: ASCII letters, digits and underscore, whatever the flags. */
+  /** {@code \w}: ASCII letters, digits, and underscore, whatever the flags. */
   static final int[] WORD = {'0', '9', 'A', 'Z', '_', '_', 'a', 'z'};
 
   /** JavaScript's {@code \s}: WhiteSpace and LineTerminator. */

@@ -33,7 +33,7 @@ def _kept(value: Any, kind: type[_T]) -> _T:
 
 def _kept_run(run: Run) -> Run:
     """A run as the SQL stores write it: no U+0000 in its trigger, output,
-    error or metric names. Its id and job are identifiers, kept as given."""
+    error, or metric names. Its id and job are identifiers, kept as given."""
     copy = _clone(run, Run)
     copy.trigger = strip_nul(copy.trigger)
     copy.output = None if copy.output is None else strip_nul(copy.output)

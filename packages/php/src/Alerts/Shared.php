@@ -36,7 +36,7 @@ final class Shared
     /**
      * The parts of a URL as the WHATWG parser gives them, for the URLs the
      * channels take: protocol ("https:"), username, host (with the port
-     * when it is not the scheme's default), pathname and search. Null for
+     * when it is not the scheme's default), pathname, and search. Null for
      * text that is not an absolute URL with a host.
      *
      * @return array{protocol: string, scheme: string, username: string, host: string, pathname: string, search: string}|null
@@ -83,7 +83,7 @@ final class Shared
 
     /**
      * A URL as the URL parser (and so fetch) reads it: characters U+0000 to
-     * U+0020 around it dropped, and every tab, CR and LF inside it removed (a
+     * U+0020 around it dropped, and every tab, CR, and LF inside it removed (a
      * pasted webhook URL often ends in a newline).
      */
     public static function cleanUrl(#[\SensitiveParameter] string $url): string
@@ -112,9 +112,9 @@ final class Shared
     }
 
     /**
-     * An error message about a request to `url` with the URL's path, query
+     * An error message about a request to `url` with the URL's path, query,
      * and credentials taken out, so only its origin can show: what curl,
-     * PHP's streams or WordPress say can quote the URL.
+     * PHP's streams, or WordPress say can quote the URL.
      */
     public static function scrub(#[\SensitiveParameter] string $message, #[\SensitiveParameter] string $url): string
     {
@@ -137,7 +137,7 @@ final class Shared
         return $message;
     }
 
-    /** new URL(url).origin: the scheme, host and port only. A URL's path or query can hold a credential. */
+    /** new URL(url).origin: the scheme, host, and port only. A URL's path or query can hold a credential. */
     public static function origin(#[\SensitiveParameter] string $url): string
     {
         $parts = self::url($url);
@@ -189,8 +189,8 @@ final class Shared
 
     /**
      * Headers as an Http sends them: each name an HTTP token (RFC 9110:
-     * letters, digits and !#$%&'*+.^_`|~-), each value trimmed of the spaces,
-     * tabs and line breaks around it, as fetch sends it. A name that is not a
+     * letters, digits, and !#$%&'*+.^_`|~-), each value trimmed of the spaces,
+     * tabs, and line breaks around it, as fetch sends it. A name that is not a
      * token, or a value with a line break or NUL inside, is refused, as fetch
      * refuses them, so no header can add another.
      *
@@ -203,14 +203,14 @@ final class Shared
         foreach ($headers as $name => $value) {
             $name = (string) $name;
             if (preg_match('/^[!#$%&\'*+.^_`|~0-9A-Za-z-]+$/D', $name) !== 1) {
-                throw new \InvalidArgumentException('a header name must be a token (letters, digits and !#$%&\'*+.^_`|~-)');
+                throw new \InvalidArgumentException('a header name must be a token (letters, digits, and !#$%&\'*+.^_`|~-)');
             }
             $out[$name] = self::headerValue(is_scalar($value) ? (string) $value : '');
         }
         return $out;
     }
 
-    /** A header value without the spaces, tabs and line breaks around it, as fetch sends it; one with a line break or NUL inside is refused, as fetch refuses it. */
+    /** A header value without the spaces, tabs, and line breaks around it, as fetch sends it; one with a line break or NUL inside is refused, as fetch refuses it. */
     public static function headerValue(#[\SensitiveParameter] string $value): string
     {
         $value = trim($value, " \t\r\n");
@@ -236,7 +236,7 @@ final class Shared
         return $credential;
     }
 
-    /** JavaScript's truthiness for an optional string: null, false and "" are absent. */
+    /** JavaScript's truthiness for an optional string: null, false, and "" are absent. */
     public static function present(mixed $value): bool
     {
         return $value !== null && $value !== '' && $value !== false;
@@ -263,7 +263,7 @@ final class Shared
     }
 
     /**
-     * A stable 32 hex character id for one alert: the same job, type and time
+     * A stable 32 hex character id for one alert: the same job, type, and time
      * always give the same id, so a provider that deduplicates on it drops a
      * resend of an alert it already took.
      */
@@ -300,7 +300,7 @@ final class Shared
         return ['id' => $run->id, 'status' => $run->status, 'startedAt' => Js::isoTime($run->startedAt), 'durationMs' => $run->durationMs, 'trigger' => $run->trigger];
     }
 
-    /** Title, message, triage and link as one plain text block, the way every channel reads. */
+    /** Title, message, triage, and link as one plain text block, the way every channel reads. */
     public static function plainText(Alert $alert, ?string $link): string
     {
         $lines = [$alert->title, '', $alert->message];

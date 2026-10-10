@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Tells search engines which pages of cronwatch.dev changed, through
- * IndexNow (Bing, Yandex, Seznam, Naver and others share submissions).
+ * IndexNow (Bing, Yandex, Seznam, Naver, and others share submissions).
  *
  *   node site/scripts/indexnow.mjs <new dist> [<old dist>] [--dry-run]
  *

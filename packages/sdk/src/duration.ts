@@ -39,7 +39,7 @@ export function parseDuration(value: Duration, label = "duration"): number {
     consumed += match[0];
   }
   if (consumed.replace(/\s+/g, "") !== text.replace(/\s+/g, "")) {
-    throw new Error(`${label} "${value}" is not a duration like "15m", "1h30m" or "90s"`);
+    throw new Error(`${label} "${value}" is not a duration like "15m", "1h30m", or "90s"`);
   }
   return Math.round(total);
 }

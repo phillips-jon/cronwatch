@@ -49,7 +49,7 @@ const (
 )
 
 // Stderr is where the default error handler, the in-memory store's
-// warning and the console channel's failures go.
+// warning, and the console channel's failures go.
 //
 // Deprecated: Stderr is a hook for this module's own tests. Give the client
 // WithErrorHandler, and a channel of your own in place of Console, to send
@@ -115,7 +115,7 @@ type Client struct {
 	triageBusy  int
 }
 
-// String names the client, how many jobs it declares and its store's type,
+// String names the client, how many jobs it declares, and its store's type,
 // and says whether a cron secret is set, never the secret: fmt and loggers
 // print a value's fields otherwise.
 func (c *Client) String() string {
@@ -193,7 +193,7 @@ func MustNew(options ...Option) *Client {
 	return c
 }
 
-// Store is where this client keeps jobs, runs and state.
+// Store is where this client keeps jobs, runs, and state.
 func (c *Client) Store() Store { return c.store }
 
 // Now is the client's clock, in epoch milliseconds.
@@ -240,7 +240,7 @@ func (c *Client) redact(text string) string {
 // keep the handle. Declaring a name again replaces its definition.
 func (c *Client) Job(name string, options ...JobOption) (*Job, error) {
 	if !nameRE.MatchString(name) {
-		return nil, fmt.Errorf("job name %s must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\" or \"-\"", js.Quote(name))
+		return nil, fmt.Errorf("job name %s must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\", or \"-\"", js.Quote(name))
 	}
 	var cfg jobConfig
 	for _, o := range options {

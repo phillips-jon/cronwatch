@@ -1,7 +1,7 @@
 defmodule Cronwatch.RuntimeTest do
   @moduledoc """
   What the BEAM adds to the SDK's client (DESIGN.md's Processes, Runs,
-  Timeouts, Telemetry and Delivery): runs whose process dies, isolated runs,
+  Timeouts, Telemetry, and Delivery): runs whose process dies, isolated runs,
   the timeout flag, current/0 through $callers, Logger metadata, the
   telemetry events, the shared check, and the locks.
   """

@@ -1,7 +1,7 @@
-//! Everything public about a job, a run and an alert. Each type writes the
+//! Everything public about a job, a run, and an alert. Each type writes the
 //! SDK's JSON (`to_json`): the same field names, in the same order, with
 //! numbers as JavaScript prints them, so a Rust process and a Node, Ruby,
-//! Python, PHP or Go process can share one store and `@cronwatch/mcp` reads
+//! Python, PHP, or Go process can share one store and `@cronwatch/mcp` reads
 //! any of them.
 
 use std::fmt;
@@ -276,7 +276,7 @@ pub fn run_duration(started_at: i64, finished_at: i64) -> i64 {
 /// The version a stored state's `version` value counts as for
 /// [`Store::compare_and_set_state`](crate::Store::compare_and_set_state):
 /// a JSON number that is a whole number from 0 to 2^53 - 1, else 0 (absent,
-/// or a foreign row's `1.5`, `"x"` or `-1`). The SQL stores read it the same
+/// or a foreign row's `1.5`, `"x"`, or `-1`). The SQL stores read it the same
 /// way, so such a row is written over by the next update instead of refusing
 /// every compare-and-set of its job for good.
 pub fn state_version(version: Option<&Value>) -> i64 {
@@ -320,13 +320,13 @@ pub struct Run {
     /// Lines logged, or the string the job returned. Capped at 16 KB.
     pub output: Option<String>,
     pub metrics: Metrics,
-    /// What started the run: `run`, `handler`, `start` or a value of yours.
+    /// What started the run: `run`, `handler`, `start`, or a value of yours.
     pub trigger: String,
 }
 
 impl Run {
-    /// A run of `job` with this id, status and start, and nothing else: not
-    /// finished, no error, output or metrics, trigger `run`. Set the other
+    /// A run of `job` with this id, status, and start, and nothing else: not
+    /// finished, no error, output, or metrics, trigger `run`. Set the other
     /// fields on what it returns.
     pub fn new(id: impl Into<String>, job: impl Into<String>, status: RunStatus, started_at: i64) -> Run {
         Run {
@@ -365,7 +365,7 @@ impl Run {
         self.to_value().to_json()
     }
 
-    /// The run as a store writes it: its trigger, output, error and metric
+    /// The run as a store writes it: its trigger, output, error, and metric
     /// names without U+0000, which Postgres refuses (a refused write would
     /// lose the whole run). Its id and job are identifiers, kept as given;
     /// the client never makes one with a NUL.
@@ -520,7 +520,7 @@ impl StoredJob {
     }
 
     /// The job named `name` as a store read its row, with its definition as
-    /// the JSON text the row holds, leniently, so a foreign, hand-edited or
+    /// the JSON text the row holds, leniently, so a foreign, hand-edited, or
     /// damaged row affects only its own job. A definition that does not
     /// parse, or is not a JSON object, becomes `{"name": <name>}` and the job
     /// is not readable ([`is_readable`](Self::is_readable)): the client
@@ -797,7 +797,7 @@ impl JobState {
     }
 
     /// Reads the SDK's JSON value, leniently, as the SDK's `normalizeState`
-    /// reads a stored state, so a foreign, hand-edited or damaged one affects
+    /// reads a stored state, so a foreign, hand-edited, or damaged one affects
     /// only its own job: an `open` entry whose time is not a number is not
     /// open, a `silencedUntil` or `lastAlertAt` that is not a number is
     /// none, and `pendingRecovery` and `undelivered` keep only their entries
@@ -1101,7 +1101,7 @@ fn detail_keys(t: &AlertType) -> Option<&'static [&'static str]> {
 
 impl Alert {
     /// An alert of `alert_type` for `job` at `at`, with these details and
-    /// nothing else: no run, an empty definition, title and message, no
+    /// nothing else: no run, an empty definition, title, and message, no
     /// triage. Set the other fields on what it returns.
     pub fn new(alert_type: AlertType, job: impl Into<String>, details: AlertDetails, at: i64) -> Alert {
         Alert {

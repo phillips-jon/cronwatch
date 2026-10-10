@@ -54,7 +54,7 @@ var (
 // clockUTC is "22:42", in UTC.
 func clockUTC(t int64) string { return js.ISOString(t)[11:16] }
 
-// civil is the UTC date of t: its year, month (1 to 12), day and weekday
+// civil is the UTC date of t: its year, month (1 to 12), day, and weekday
 // (0 for Sunday).
 func civil(t int64) (month, day, weekday int) {
 	days := js.FloorDiv(t, dayMs)
@@ -324,14 +324,14 @@ func laneNote(job JobSummary, missed *int64, now int64) string {
 	if hasCondition(job.Open, ConditionOverBudget) && last != nil {
 		text := "went over budget"
 		if over := overCeilings(job); len(over) > 0 {
-			text += " on " + strings.Join(over, " and ")
+			text += " on " + andList(over)
 		}
 		return text + " at " + whenUTC(last.StartedAt, now)
 	}
 	if hasCondition(job.Open, ConditionUnderFloor) && last != nil {
 		text := "fell short"
 		if under := underFloors(job); len(under) > 0 {
-			text += " on " + strings.Join(under, " and ")
+			text += " on " + andList(under)
 		}
 		return text + " at " + whenUTC(last.StartedAt, now)
 	}
@@ -642,7 +642,7 @@ var timelineLegend = func() string {
 		{box("run ok"), "ran"},
 		{box("run bad"), "failed"},
 		{box("run timeout"), "timed out"},
-		{box("run warn"), "over budget, under floor or slow"},
+		{box("run warn"), "over budget, under floor, or slow"},
 		{box("run running"), "running"},
 		{box("missed"), "missed"},
 	}

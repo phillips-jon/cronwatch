@@ -7,7 +7,7 @@ group: Python
 
 # Django
 
-`cronwatch.django` wires [cronwatch-sdk](/docs/python/) into a Django app: one settings dict, the dashboard and JSON API under a URL you choose, and a management command that looks for missed and stuck runs. It needs Django 5.2 or newer and is tested on 5.2 LTS, 6.0 and 6.1. Django 5.2 runs on Python 3.11 or newer; Django 6.0 and 6.1 need Python 3.12 or newer.
+`cronwatch.django` wires [cronwatch-sdk](/docs/python/) into a Django app: one settings dict, the dashboard and JSON API under a URL you choose, and a management command that looks for missed and stuck runs. It needs Django 5.2 or newer and is tested on 5.2 LTS, 6.0, and 6.1. Django 5.2 runs on Python 3.11 or newer; Django 6.0 and 6.1 need Python 3.12 or newer.
 
 ```bash
 pip install "cronwatch-sdk[django]"
@@ -43,13 +43,13 @@ The keys of `CRONWATCH`:
 | `ORIGIN` | the public origin, pinned whatever a request says |
 | `TRUST_PROXY` | take the origin from `X-Forwarded-Proto` and `X-Forwarded-Host` |
 
-A store, channel or source may be a dotted path, to the thing itself or to a class or function that makes it (called once, with no arguments), so settings need not import your code. An unknown key raises `ImproperlyConfigured`, so a typo is found at once.
+A store, channel, or source may be a dotted path, to the thing itself or to a class or function that makes it (called once, with no arguments), so settings need not import your code. An unknown key raises `ImproperlyConfigured`, so a typo is found at once.
 
 The client is made from these settings the first time something asks for it, through `cronwatch.configure`, so `cronwatch.django.client()` and `cronwatch.client()` are the same client everywhere in the process. A change to `CRONWATCH` or `DEBUG`, as `override_settings` makes in a test, drops it and makes it again.
 
 A job handle keeps the client it was declared on, and the new client does not rebind it: a handle made at import, such as `nightly_report` below, still records to the old client's store under `override_settings`. In a test that swaps the store, declare the job again on the current client (`client().job("nightly-report", ...)`) and run it through that handle.
 
-`DEBUG` stands in for the environment when none of `CRONWATCH_ENV`, `APP_ENV` and `ENVIRONMENT` is set: on is development, off is production. In development the dashboard makes a token of its own when there is none and prints its sign-in link to the console. In production, without a token, it answers 503 rather than serve your jobs to anyone.
+`DEBUG` stands in for the environment when none of `CRONWATCH_ENV`, `APP_ENV`, and `ENVIRONMENT` is set: on is development, off is production. In development the dashboard makes a token of its own when there is none and prints its sign-in link to the console. In production, without a token, it answers 503 rather than serve your jobs to anyone.
 
 The link names the host only when `ORIGIN` is set or the request's host is loopback, such as `localhost` or `127.0.0.1` (a Host header such as `localhost:1@evil.example` does not count); otherwise it is a path to open on this server.
 

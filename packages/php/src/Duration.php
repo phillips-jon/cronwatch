@@ -99,7 +99,7 @@ final class Duration
 
     private static function notADuration(string $label, string $value): \InvalidArgumentException
     {
-        return new \InvalidArgumentException("{$label} \"{$value}\" is not a duration like \"15m\", \"1h30m\" or \"90s\"");
+        return new \InvalidArgumentException("{$label} \"{$value}\" is not a duration like \"15m\", \"1h30m\", or \"90s\"");
     }
 
     /**

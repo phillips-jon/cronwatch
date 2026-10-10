@@ -1,9 +1,9 @@
-//! The schema, statements and parameters. SQLite's and Postgres's are
-//! stores/sql.ts's text for text, so a Node, Ruby, Python, PHP, Go and Rust
+//! The schema, statements, and parameters. SQLite's and Postgres's are
+//! stores/sql.ts's text for text, so a Node, Ruby, Python, PHP, Go, and Rust
 //! process can share one database and `sqlite_master` reads the same whoever
 //! made the tables. MySQL (and MariaDB) has a dialect of its own, the PHP and
 //! Go ports' (`packages/go/sqlstore/sql.go`), since it has no `ON CONFLICT`,
-//! no partial index and no `TEXT` primary key: the same tables, columns and
+//! no partial index and no `TEXT` primary key: the same tables, columns, and
 //! values, with the JSON columns as text holding the SDK's JSON byte for
 //! byte, never MySQL's `JSON` type, which would rewrite it.
 
@@ -43,7 +43,7 @@ pub(crate) fn table_prefix(prefix: &str) -> Result<String, String> {
         && b.len() <= MAX_PREFIX;
     if !ok {
         return Err(format!(
-            "cronwatch: invalid table prefix {}. Use lowercase letters, digits and underscores, not starting with a digit, at most {MAX_PREFIX} characters.",
+            "cronwatch: invalid table prefix {}. Use lowercase letters, digits, and underscores, not starting with a digit, at most {MAX_PREFIX} characters.",
             quote(prefix)
         ));
     }
@@ -344,7 +344,7 @@ mod tests {
         assert_eq!(table_prefix("_x9"), Ok("_x9".into()));
         assert_eq!(
             table_prefix("Monitoring_").unwrap_err(),
-            "cronwatch: invalid table prefix \"Monitoring_\". Use lowercase letters, digits and underscores, not starting with a digit, at most 47 characters."
+            "cronwatch: invalid table prefix \"Monitoring_\". Use lowercase letters, digits, and underscores, not starting with a digit, at most 47 characters."
         );
         assert!(table_prefix("9x").is_err());
         assert!(table_prefix("").is_err());

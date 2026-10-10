@@ -62,8 +62,8 @@ export interface HandlerOptions {
    * Vercel sends its cron requests with). An empty string, or one of only
    * whitespace, counts as unset; any other type (false, a number) throws.
    * With no secret at all the handler answers 503 unless the app is in
-   * development (the first of CRONWATCH_ENV, APP_ENV and NODE_ENV that is
-   * set names "development", "dev", "local", "test" or "testing"). Pass
+   * development (the first of CRONWATCH_ENV, APP_ENV, and NODE_ENV that is
+   * set names "development", "dev", "local", "test", or "testing"). Pass
    * null to allow anyone.
    */
   secret?: string | null;
@@ -124,7 +124,7 @@ export interface RunHandle {
   metrics(values: Record<string, number>): void;
   /**
    * Append the lines and metrics added so far to the stored run, which must
-   * still be running and belong to this job. A read, change and write of the
+   * still be running and belong to this job. A read, change, and write of the
    * run's row, written only while it is still running: two processes
    * appending to one run at the same moment can lose one's lines, but a flush
    * never undoes a finish. The first 16 KB of everything flushed stay in the
@@ -132,7 +132,7 @@ export interface RunHandle {
    */
   flush(): Promise<void>;
   /**
-   * Finish the run, judge it like any other and send what that produces.
+   * Finish the run, judge it like any other, and send what that produces.
    * Resolves to the run as recorded, or null when nothing was recorded: the
    * run was already finished (here or elsewhere), was not found, or belongs
    * to another job, which is reported to onError. When several processes
@@ -183,7 +183,7 @@ export interface RecordRunOptions {
 }
 
 export interface CronwatchOptions {
-  /** Where jobs, runs and state live. Defaults to an in-memory store that forgets on restart. */
+  /** Where jobs, runs, and state live. Defaults to an in-memory store that forgets on restart. */
   store?: Store;
   /**
    * Where runs this process does not wrap come from, such as pg_cron jobs.
@@ -208,11 +208,11 @@ export interface CronwatchOptions {
   /** Applied to every job unless the job sets its own. */
   defaults?: Pick<JobOptions, "grace" | "timeout" | "timezone" | "failuresBeforeAlert">;
   /**
-   * Applied to every run's output and error before it is stored, shown or
+   * Applied to every run's output and error before it is stored, shown, or
    * sent to an alert channel or triage. The default blanks values that look
    * like secrets (password=..., Authorization headers, URL credentials, bearer
    * tokens, JWTs, PEM private keys, webhook URLs, AWS, GitHub, Slack, Stripe,
-   * Google and API key formats). Pass your own function, or false to keep
+   * Google, and API key formats). Pass your own function, or false to keep
    * output exactly as logged. A function that throws or returns something
    * other than a string is reported to onError and the default is used.
    */
@@ -297,7 +297,7 @@ function validateDefinition(def: JobDefinition): void {
     }
   }
   if (def.expect !== undefined && typeof def.expect !== "string" && !(def.expect instanceof RegExp) && typeof def.expect !== "function") {
-    throw new Error(`job "${name}": expect must be a string, a RegExp or a function`);
+    throw new Error(`job "${name}": expect must be a string, a RegExp, or a function`);
   }
 }
 
@@ -383,7 +383,7 @@ export class Cronwatch {
   /** Declare a job. Call it once, at module level, and keep the handle. */
   job(name: string, options: JobOptions = {}): JobHandle {
     if (!NAME_RE.test(name)) {
-      throw new Error(`job name "${name}" must be 1 to 120 characters of letters, digits, ".", "_", ":" or "-"`);
+      throw new Error(`job name "${name}" must be 1 to 120 characters of letters, digits, ".", "_", ":", or "-"`);
     }
     const definition: JobDefinition = { ...this.defaults, ...options, name };
     validateDefinition(definition);
@@ -1184,7 +1184,7 @@ export class Cronwatch {
     }
 
     // Each job on its own: one that cannot be evaluated is reported, shown
-    // as failing (see unevaluableSummary) and does not stop the others.
+    // as failing (see unevaluableSummary), and does not stop the others.
     const jobs: JobSummary[] = [];
     const retries = { spentMs: 0 };
     for (const stored of await this.storedJobs()) {
@@ -1295,7 +1295,7 @@ export class Cronwatch {
     return this.patchState(name, (state) => { state.silencedUntil = null; });
   }
 
-  /** Read, change and write one job's state, in turn with every other update to it. */
+  /** Read, change, and write one job's state, in turn with every other update to it. */
   private async patchState(name: string, change: (state: JobState) => void): Promise<JobState> {
     await this.ensureReady();
     const { state } = await this.updateState(name, (current) => {
@@ -1371,7 +1371,7 @@ export class Cronwatch {
 
   /**
    * Stop the interval, wait for a check already under way (bounded by its
-   * own channel, triage and retry timeouts; what it throws was reported to
+   * own channel, triage, and retry timeouts; what it throws was reported to
    * whoever started it), then close the store, so that check neither writes
    * after the store is closed nor loses the alerts it would queue.
    */
@@ -1486,7 +1486,7 @@ export const RESERVED_RUN_ID_PREFIX = "pgcron:";
 
 /**
  * The longest run id, in UTF-16 code units (JavaScript's string length): what
- * start(), resume() and recordRun() take, and every store holds.
+ * start(), resume(), and recordRun() take, and every store holds.
  */
 const MAX_RUN_ID = 200;
 

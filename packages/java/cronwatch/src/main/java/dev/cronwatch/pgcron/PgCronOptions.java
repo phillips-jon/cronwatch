@@ -12,8 +12,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * How {@link PgCron#source(javax.sql.DataSource, PgCronOptions)} watches pg_cron: the SDK's {@code
- * PgCronOptions}, with its {@code jobs} as {@code jobs}, {@code jobIds} and {@code pick}, as the
- * Go, Rust and Elixir ports have them.
+ * PgCronOptions}, with its {@code jobs} as {@code jobs}, {@code jobIds}, and {@code pick}, as the
+ * Go, Rust, and Elixir ports have them.
  *
  * <pre>{@code
  * PgCronOptions.builder()
@@ -140,8 +140,8 @@ public final class PgCronOptions {
 
     /**
      * The CronWatch name for a job. Default {@link PgCron#jobName}: its jobname with anything other
-     * than letters, digits, {@code .}, {@code _}, {@code :} and {@code -} turned into {@code -}, or
-     * {@code pg_cron:<jobid>} when it has none. The prefix goes in front either way. One that
+     * than letters, digits, {@code .}, {@code _}, {@code :}, and {@code -} turned into {@code -},
+     * or {@code pg_cron:<jobid>} when it has none. The prefix goes in front either way. One that
      * throws or returns null, like a {@code pick} or {@code options} function that throws, is
      * reported once and fails only that job, which keeps its last declaration until the function
      * works again.
@@ -152,7 +152,7 @@ public final class PgCronOptions {
     }
 
     /**
-     * Grace, timeout, maxDuration, expect and the rest, for every job. The schedule and timezone
+     * Grace, timeout, maxDuration, expect, and the rest, for every job. The schedule and timezone
      * always come from pg_cron, so options that set either are refused by {@link #build}.
      */
     public Builder options(JobOptions options) {

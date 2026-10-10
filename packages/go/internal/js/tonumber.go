@@ -14,7 +14,7 @@ var (
 )
 
 // Number is Number(text): trimmed as String.prototype.trim trims, then
-// decimal, 0x, 0o or 0b, Infinity, or NaN; "" (or only whitespace) is 0.
+// decimal, 0x, 0o, or 0b, Infinity, or NaN; "" (or only whitespace) is 0.
 func Number(text string) float64 {
 	text = Trim(text)
 	switch {

@@ -9,7 +9,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * {@code conformance/output.json}: the output cap, every redaction case and every error message,
+ * {@code conformance/output.json}: the output cap, every redaction case, and every error message,
  * byte for byte. The recorder's {@code expectText} cases are replayed beside the recorder.
  */
 class OutputConformanceTest {

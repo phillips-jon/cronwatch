@@ -144,7 +144,7 @@ module SqlStoreConformance
 end
 
 # A database to test against. The including class defines `database`
-# (:sqlite_memory, :sqlite_file or :postgres); tables made through make_store
+# (:sqlite_memory, :sqlite_file, or :postgres); tables made through make_store
 # are dropped after each test.
 module ActiveRecordStoreHarness
   include TestHelpers
@@ -197,7 +197,7 @@ module ActiveRecordStoreTests
   end
 
   # conformance/client.json unknownFields: what a newer release wrote
-  # survives a check, a silence, an unsilence and a run on this store too.
+  # survives a check, a silence, an unsilence, and a run on this store too.
   def test_unknown_stored_fields_survive
     ClientFixture.replay_unknown_fields(make_store) { |op, expected, got| assert_equal expected, got, op }
   end
@@ -465,7 +465,7 @@ module ActiveRecordStoreTests
     assert_equal "beforeafter", run.output
     assert_match(/\ARuntimeError: badbyte/, run.error)
     assert_equal 1, store.get_state("nul").consecutive_failures, "the state, with its alert, was written too"
-    # So are a trigger, metric names and a definition's text.
+    # So are a trigger, metric names, and a definition's text.
     nul2 = cw.job("nul2", description: "a\0b", tags: ["t\0"], budget: { "c\0" => 5 })
     nul2.run(trigger: "cr\0on") { |job| job.metric("ro\0ws", 2) }
     second = cw.runs("nul2").first

@@ -20,7 +20,7 @@ by a worker is recorded with the trigger "celery", and a check reports one
 that never ran. No task needs changing. ``cronwatch.current()`` is the run's
 context inside the task, for log() and metric(). A task that raises is
 recorded as failed and raises on to Celery as before, so its retries, error
-handlers and result backend see it unchanged.
+handlers, and result backend see it unchanged.
 
 Schedules come from ``app.conf.beat_schedule`` (crontab and interval entries)
 and, when django-celery-beat is installed, its PeriodicTask table (enabled
@@ -224,7 +224,7 @@ def _crontab_zone(sched: Any, app: Any) -> str:
 
 def _cron_text(sched: Any) -> str:
     """The five fields croner reads for a Celery crontab. Celery fires on a day
-    that matches the day of the month, the month and the day of the week
+    that matches the day of the month, the month, and the day of the week
     together, which croner reads with "+" before the day of the week when both
     days are restricted."""
     minute = field_text(sched.minute, 0, 59)
@@ -733,7 +733,7 @@ def _on_postrun(sender: Any = None, task: Any = None, retval: Any = None, state:
     task = task if task is not None else sender
     if task is None or _run_of(task) is None:
         return
-    # Reached without success, failure or retry: Ignore, Reject, or an exception
+    # Reached without success, failure, or retry: Ignore, Reject, or an exception
     # that went past Celery's handling (an interrupt, or an eager task with
     # task_eager_propagates), which is still in flight here.
     if state == celery.states.IGNORED:
@@ -760,7 +760,7 @@ def _on_worker_init(sender: Any = None, **_: Any) -> None:
 @shared_task(name=CHECK_TASK, bind=True, ignore_result=True)
 def check(self: Any) -> str:
     """Looks for missed and stuck runs across every job, sends alerts, retries
-    undelivered ones and prunes old runs (cw.check()), after declaring every
+    undelivered ones, and prunes old runs (cw.check()), after declaring every
     watched job. Schedule it with beat every few minutes, once for the whole
     deployment; nothing else notices a job that never ran."""
     watch = watch_for(self._get_app())

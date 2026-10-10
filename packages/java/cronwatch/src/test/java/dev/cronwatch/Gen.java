@@ -75,7 +75,7 @@ public final class Gen {
 
   /**
    * Any text up to {@code max} UTF-16 units: ASCII, control characters, JSON's and JavaScript's
-   * punctuation, letters outside ASCII, whole pairs and lone halves of surrogates.
+   * punctuation, letters outside ASCII, whole pairs, and lone halves of surrogates.
    */
   public String anyString(int max) {
     int n = random.nextInt(max + 1);

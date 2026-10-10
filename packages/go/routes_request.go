@@ -72,7 +72,7 @@ func requestTarget(r *http.Request) (path, query string) {
 }
 
 // pathSafe is whether the URL parser leaves c in a path as it is: the
-// path percent-encode set is C0 controls, space, " # < > ? ` { } and
+// path percent-encode set is C0 controls, space, " # < > ? ` { }, and
 // everything past ~.
 func pathSafe(c byte) bool {
 	return c > 0x20 && c < 0x7f && strings.IndexByte("\"#<>?`{}", c) < 0

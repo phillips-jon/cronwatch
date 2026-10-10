@@ -7,7 +7,7 @@ import java.time.zone.ZoneRules;
 /**
  * Croner's CronDate: a wall-clock time whose fields are moved forward to the next match, a field at
  * a time, spilling into the next month or year as croner does. The fields are year, month (0
- * based), day, hour, minute, second and milliseconds.
+ * based), day, hour, minute, second, and milliseconds.
  */
 final class CronDate {
   private static final long[] DAYS_IN_MONTH = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};

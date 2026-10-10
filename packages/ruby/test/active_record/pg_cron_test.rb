@@ -48,7 +48,7 @@ class ActiveRecordPgCronTest < Minitest::Test
     store = Cronwatch::Stores::ActiveRecord.new(prefix: @prefix, connection_class: @klass)
     errors = []
     picks = ->(job) { job.jobname.to_s.start_with?(@tag) }
-    # A class, its pool and a checked out connection all work.
+    # A class, its pool, and a checked out connection all work.
     [@klass, @klass.connection_pool].each_with_index do |db, i|
       client = Cronwatch.new(store: store, alerts: [], cron_secret: nil, on_error: ->(e, where) { errors << "#{where}: #{e.message}" },
                              sources: [Cronwatch::Sources::PgCron.new(db, jobs: picks, prefix: "p#{i}:")])

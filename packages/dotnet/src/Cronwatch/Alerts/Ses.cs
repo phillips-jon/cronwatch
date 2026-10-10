@@ -69,7 +69,7 @@ public sealed class SesChannel : IChannel
     private readonly ITransport? _transport;
 
     /// <summary>The channel.</summary>
-    /// <exception cref="CronwatchException">Without a region, the credentials, a sender or a recipient.</exception>
+    /// <exception cref="CronwatchException">Without a region, the credentials, a sender, or a recipient.</exception>
     public SesChannel(SesOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);

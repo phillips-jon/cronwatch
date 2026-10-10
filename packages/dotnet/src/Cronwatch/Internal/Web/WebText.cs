@@ -9,7 +9,7 @@ namespace Cronwatch.Internal;
 /// <summary>
 /// What the dashboard's pages need to write values the way the SDK's templates do
 /// (<c>routes/escape.ts</c> and JavaScript itself): <c>escapeHtml</c>, <c>escapeName</c>,
-/// <c>String(value)</c>, <c>toFixed</c> and <c>encodeURIComponent</c>, how text read from the wire
+/// <c>String(value)</c>, <c>toFixed</c>, and <c>encodeURIComponent</c>, how text read from the wire
 /// is decoded, and how a secret is compared. Carried over from the Java port's
 /// <c>internal/web/Text</c>.
 /// </summary>
@@ -58,7 +58,7 @@ internal static class WebText
     /// <summary>
     /// <c>escapeName</c>: a job name shown as text, with <c>&lt;wbr&gt;</c> after each run of
     /// <c>_ : . / -</c> that something else follows, so a long name wraps at its separators. Only
-    /// for text, never an attribute, a URL or a title.
+    /// for text, never an attribute, a URL, or a title.
     /// </summary>
     public static string EscapeName(string s)
     {

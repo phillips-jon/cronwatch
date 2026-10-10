@@ -26,7 +26,7 @@ use Cronwatch\Output;
  * What the callbacks echo is passed on as it is written (an output buffer
  * with a callback, flushed every 8 KB), and its end is kept as the run's
  * output: never all of it, so a callback that streams a large export uses
- * no more memory than it did without the plugin. A callback that throws, a fatal error or an exit() ends the
+ * no more memory than it did without the plugin. A callback that throws, a fatal error, or an exit() ends the
  * request: the run is recorded as failed from inside WordPress's fatal
  * error handler (which may end the process with wp_die() before a plugin's
  * shutdown function is called) or from a shutdown function of its own,

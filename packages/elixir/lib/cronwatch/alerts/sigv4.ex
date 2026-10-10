@@ -15,8 +15,8 @@ defmodule Cronwatch.Alerts.SigV4 do
   but not returned, because the HTTP client sets it.
 
   `request` has `:method`, `:url`, `:headers` (a list of pairs), `:body`,
-  `:region`, `:service` and `:now` (epoch milliseconds); `credentials` has
-  `:access_key_id`, `:secret_access_key` and `:session_token` (`""` for
+  `:region`, `:service`, and `:now` (epoch milliseconds); `credentials` has
+  `:access_key_id`, `:secret_access_key`, and `:session_token` (`""` for
   none).
   """
   @spec sign(map(), map()) :: {:ok, [{String.t(), String.t()}]} | {:error, String.t()}

@@ -376,7 +376,7 @@ pub(crate) fn js_number(v: &Value) -> f64 {
 }
 
 /// `Number(text)` for trimmed, non-empty text: decimal, `Infinity`, and the
-/// `0x`, `0o` and `0b` integer forms; anything else is NaN.
+/// `0x`, `0o`, and `0b` integer forms; anything else is NaN.
 fn string_to_number(text: &str) -> f64 {
     let (sign, body) = match text.as_bytes()[0] {
         b'-' => (-1.0, &text[1..]),
@@ -433,7 +433,7 @@ fn failures_before_alert(def: &Definition) -> f64 {
     }
 }
 
-/// Called when a run finishes with status ok, failed or timeout. `history`
+/// Called when a run finishes with status ok, failed, or timeout. `history`
 /// is the job's earlier runs, newest first, not including this one.
 pub(crate) fn on_run_finish(
     def: &Definition,
@@ -697,7 +697,7 @@ pub(crate) fn stale_alert(alert: &Alert, state: &JobState) -> bool {
     state.open_at(&Condition::parse(alert.alert_type.as_str())) != Some(alert.at)
 }
 
-/// How a job looks at a glance. Silence wins, then stuck, failing and late.
+/// How a job looks at a glance. Silence wins, then stuck, failing, and late.
 pub(crate) fn job_health(
     def: &Definition,
     last_run: Option<&Run>,

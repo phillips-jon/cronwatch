@@ -1,9 +1,9 @@
 package sqltest
 
 // conformance/store.json's foreignRows on SQLite, which keeps whatever type
-// it is given in any column: each foreign, hand-edited or damaged row reads
+// it is given in any column: each foreign, hand-edited, or damaged row reads
 // leniently, and one affects only its own job (stores.test.ts, "each
-// foreign row reads leniently" and "a check, a silence and every page over
+// foreign row reads leniently" and "a check, a silence, and every page over
 // foreign rows").
 
 import (

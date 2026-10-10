@@ -101,7 +101,7 @@ public final class SesOptions {
      * The options.
      *
      * @throws dev.cronwatch.CronwatchException without a region like {@code us-east-1}, the
-     *     credentials, a from address or a to address
+     *     credentials, a from address, or a to address
      */
     public SesOptions build() {
       if (region.isEmpty()) {

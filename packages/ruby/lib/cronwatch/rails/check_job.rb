@@ -4,7 +4,7 @@ require "active_job"
 
 module Cronwatch
   # Looks for missed and stuck runs across every job, sends alerts, retries
-  # undelivered ones and prunes old runs: Cronwatch.client.check, as a job.
+  # undelivered ones, and prunes old runs: Cronwatch.client.check, as a job.
   # Schedule it every few minutes; nothing else notices a job that never ran.
   #
   #   # config/recurring.yml (Solid Queue)

@@ -31,7 +31,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * for its token. A change (silence, forget, "Run check now", all POSTs)
  * also needs "administer cronwatch" and Drupal's CSRF token, which every
  * form's action carries, besides the dashboard's own same-origin check.
- * Links, forms and redirects are rewritten to that route (see
+ * Links, forms, and redirects are rewritten to that route (see
  * EmbeddedDashboard), and the app shell is left out.
  *
  * /cronwatch/api/... is the JSON API for @cronwatch/mcp, with the
@@ -111,7 +111,7 @@ final class DashboardController extends ControllerBase {
         throw new AccessDeniedHttpException('Changing CronWatch needs the "administer cronwatch" permission.');
       }
       if (!$this->csrf->validate((string) $request->query->get('token', ''), self::CSRF)) {
-        throw new AccessDeniedHttpException('The form has expired. Go back, reload the page and try again.');
+        throw new AccessDeniedHttpException('The form has expired. Go back, reload the page, and try again.');
       }
       if (self::isCheck(substr($inner->path, strlen(EmbeddedDashboard::MARKER)))) {
         // The module's check: every job declared first.

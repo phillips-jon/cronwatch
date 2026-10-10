@@ -45,8 +45,8 @@ public sealed class JobOptions
 
     /// <summary>
     /// When the job is supposed to run: a five or six field cron expression (<c>"0 2 * * *"</c>), a
-    /// nickname (<c>"@hourly"</c>) or an interval (<c>"every 5m"</c>). Without one, nothing is ever
-    /// reported as missed.
+    /// nickname (<c>"@hourly"</c>), or an interval (<c>"every 5m"</c>). Without one, nothing is
+    /// ever reported as missed.
     /// </summary>
     public string? Schedule { get => Read<string>("schedule"); init => Put("schedule", value); }
 
@@ -124,7 +124,8 @@ public sealed class JobOptions
 
     /// <summary>
     /// Sets a field of the definition this port has no property for (a field a newer SDK knows),
-    /// in its place, as JSON: null, a bool, a number, a string, a list or a <see cref="JsObject"/>.
+    /// in its place, as JSON: null, a bool, a number, a string, a list, or a
+    /// <see cref="JsObject"/>.
     /// </summary>
     /// <returns>These options, for setting several in a line.</returns>
     public JobOptions Field(string key, object? value)
@@ -160,7 +161,7 @@ public sealed class JobOptions
 
     /// <summary>
     /// A copy of these options, for an integration that adds to options the app gave. The budget,
-    /// the floor and every value are copied; the expect rule is shared, as it is immutable.
+    /// the floor, and every value are copied; the expect rule is shared, as it is immutable.
     /// </summary>
     internal JobOptions Copy()
     {

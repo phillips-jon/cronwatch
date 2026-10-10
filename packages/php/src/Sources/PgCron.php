@@ -20,9 +20,9 @@ use Cronwatch\Store\PostgresStore;
  * them (sources/pgcron.ts). As a source, on every check it reads cron.job
  * and declares each job with its schedule, then copies new rows of
  * cron.job_run_details in as runs (ids "pgcron:<runid>"), so the usual
- * evaluation raises missed, failed, stuck and slow alerts.
+ * evaluation raises missed, failed, stuck, and slow alerts.
  *
- * A job that is renamed, unscheduled or no longer picked keeps its old
+ * A job that is renamed, unscheduled, or no longer picked keeps its old
  * name's runs and history, and that name is declared again without a
  * schedule, so it is never reported missed. Its description says why.
  *
@@ -130,7 +130,7 @@ final class PgCron implements Source
      *        function that throws, is reported once and fails only that job, which keeps its last declaration until the
      *        callback works again.
      * @param array<string, mixed>|(callable(array<string, mixed>): array<string, mixed>)|null $options grace, timeout,
-     *        maxDuration, expect and the rest, for every job or per job. The schedule and timezone always come from pg_cron.
+     *        maxDuration, expect, and the rest, for every job or per job. The schedule and timezone always come from pg_cron.
      * @param string|null $timezone the timezone pg_cron reads its cron expressions in. Default the server's cron.timezone,
      *        read from pg_settings, which shows it only to roles with pg_read_all_settings; UTC (pg_cron's default) is
      *        assumed when it cannot be read.
@@ -567,7 +567,7 @@ final class PgCron implements Source
 
     /**
      * A name this source used for a job that has since been renamed,
-     * unscheduled or dropped from `jobs` is declared again without its
+     * unscheduled, or dropped from `jobs` is declared again without its
      * schedule. Once per process, the same for names left scheduled in the
      * store while no process was watching.
      *

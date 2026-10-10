@@ -10,7 +10,7 @@ function make(options: Parameters<typeof cronwatch>[0] = {}) {
   return { cw, c, alerts };
 }
 
-test("run records output, metrics and duration, and returns the result", async () => {
+test("run records output, metrics, and duration, and returns the result", async () => {
   const { cw, c } = make();
   const job = cw.job("report", { schedule: "0 2 * * *" });
   const result = await job.run(async (j) => {

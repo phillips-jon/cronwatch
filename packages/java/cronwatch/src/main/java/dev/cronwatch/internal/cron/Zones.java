@@ -45,7 +45,7 @@ public final class Zones {
     return id == null ? null : ZoneId.of(id);
   }
 
-  /** Reads "+HH", "+HHMM" or "+HH:MM" (or "-"), as {@code Intl} reads an offset time zone. */
+  /** Reads "+HH", "+HHMM", or "+HH:MM" (or "-"), as {@code Intl} reads an offset time zone. */
   private static @Nullable ZoneOffset fixedOffset(String name) {
     if (name.length() < 3 || (name.charAt(0) != '+' && name.charAt(0) != '-')) {
       return null;

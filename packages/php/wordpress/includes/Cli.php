@@ -7,7 +7,7 @@ namespace Cronwatch\WordPress;
 \defined('ABSPATH') || exit;
 
 /**
- * Checks WP-Cron events for missed, failed and stuck runs. Run it from the
+ * Checks WP-Cron events for missed, failed, and stuck runs. Run it from the
  * system crontab every five minutes, so the check happens whether or not
  * anyone visits the site.
  */
@@ -15,7 +15,7 @@ final class Cli
 {
     /**
      * Runs one check: looks for missed and stuck runs across every WP-Cron
-     * event, sends alerts, retries undelivered ones and prunes old runs.
+     * event, sends alerts, retries undelivered ones, and prunes old runs.
      * Prints one line; --quiet prints nothing.
      *
      * ## EXAMPLES

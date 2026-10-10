@@ -9,6 +9,17 @@ defmodule Cronwatch.Format do
   alias Cronwatch.JS.Object
 
   @doc """
+  format.ts `andList`: words joined as an English list, with a serial comma
+  from three on: `a`, `a and b`, `a, b, and c`.
+  """
+  def and_list(words) when length(words) <= 2, do: Enum.join(words, " and ")
+
+  def and_list(words) do
+    {init, [last]} = Enum.split(words, -1)
+    Enum.join(init, ", ") <> ", and " <> last
+  end
+
+  @doc """
   evaluate.ts `formatNumber`: a whole number grouped in thousands (`1,234`),
   anything else rounded to at most four decimals (`0.0123`), as
   `Intl.NumberFormat("en-US")` writes them. ICU starts from the shortest
@@ -233,7 +244,7 @@ defmodule Cronwatch.Format do
   end
 
   defp compose("recovered", run, d, _def, name, now) do
-    after_text = Enum.map_join(d.after, ", ", &String.replace(&1, "_", " ", global: false))
+    after_text = d.after |> Enum.map(&String.replace(&1, "_", " ", global: false)) |> and_list()
     at = if run, do: when_at(run.started_at, now), else: "just now"
     line = "A run #{at} succeeded" <> if(after_text != "", do: " after: #{after_text}", else: "") <> "."
     lines = if run && run.duration_ms != nil, do: [line, "Ran #{Duration.format(run.duration_ms)}."], else: [line]

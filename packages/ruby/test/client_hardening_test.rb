@@ -4,7 +4,7 @@ require_relative "test_helper"
 require "stringio"
 
 # The SDK's client-hardening.test.ts and concurrency.test.ts: triage tried
-# once per alert, the retry queue's order, budget and trimming, jobs that
+# once per alert, the retry queue's order, budget, and trimming, jobs that
 # cannot be evaluated, a broken redact, and two processes sharing one store.
 class ClientHardeningTest < Minitest::Test
   include TestHelpers
@@ -422,7 +422,7 @@ class ClientHardeningTest < Minitest::Test
     assert_equal "every 5m", store.get_job("nightly").definition.schedule
     assert_equal 1, web.runs("nightly").length
 
-    # So does a started run, a check, the board and the job's page in the process that declares it.
+    # So does a started run, a check, the board, and the job's page in the process that declares it.
     forgotten.call
     handle = nightly.start
     assert store.get_job("nightly")

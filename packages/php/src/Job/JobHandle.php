@@ -57,7 +57,7 @@ final class JobHandle
     /**
      * The same as monitor().
      *
-     * @deprecated since 1.0, removed in 2.0: use monitor(), which is the same.
+     * @deprecated since 0.11, removed in 2.0: use monitor(), which is the same.
      */
     public function wrap(callable $fn, string $trigger = 'run'): \Closure
     {
@@ -70,12 +70,12 @@ final class JobHandle
      * carrying `Authorization: Bearer <secret>`, as a recorded run with the
      * trigger "handler", and the request is answered with how it went. The
      * secret defaults to the client's cronSecret (CRON_SECRET); null lets
-     * anyone run the job (false does the same, deprecated since 1.0 and
-     * removed in 2.0; in 0.x null meant the client's secret). See Handler for its answers and its adapters
+     * anyone run the job (false does the same, deprecated since 0.11 and
+     * removed in 2.0; before 0.11 null meant the client's secret). See Handler for its answers and its adapters
      * (serve() for a bare script, laravel(), a Symfony controller, PSR-15).
      *
      * @param callable(JobContext, mixed): mixed $fn
-     * @param string|\Cronwatch\FromEnv|false|null $secret "", a string of only whitespace and FromEnv::Read mean the
+     * @param string|\Cronwatch\FromEnv|false|null $secret "", a string of only whitespace, and FromEnv::Read mean the
      *        client's secret; anything else (true, a number) throws a TypeError
      */
     public function handler(callable $fn, mixed $secret = ''): Handler

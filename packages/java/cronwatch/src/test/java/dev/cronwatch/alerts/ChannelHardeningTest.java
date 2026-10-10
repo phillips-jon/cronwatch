@@ -29,7 +29,7 @@ import org.junit.jupiter.api.io.TempDir;
  * The channels' hardening, as the SDK's {@code channels-hardening.test.ts} and the other ports'
  * tests have it, against real local servers where it matters: redirects refused, one deadline,
  * bodies capped as they arrive, only the origin in an error, URLs and headers checked, credentials
- * trimmed and cut out of quoted answers, TLS verified, Twilio's partial delivery and lone
+ * trimmed and cut out of quoted answers, TLS verified, Twilio's partial delivery, and lone
  * surrogates. Each confirms one of the design's answers about the JDK's {@code HttpClient}.
  */
 class ChannelHardeningTest {
@@ -485,9 +485,9 @@ class ChannelHardeningTest {
       for (Map.Entry<String, String> h : seen.headers()) {
         names.add(h.getKey());
       }
-      // What the JDK sends: its own content-length, host and user-agent first, then the
+      // What the JDK sends: its own content-length, host, and user-agent first, then the
       // request's sorted by name without regard to case (the JDK keeps them in a TreeMap), names
-      // in the case given; host, content-length and connection given by the request are dropped.
+      // in the case given; host, content-length, and connection given by the request are dropped.
       assertEquals(
           List.of(
               "Content-Length", "Host", "User-Agent", "authorization", "content-type", "X-Custom"),

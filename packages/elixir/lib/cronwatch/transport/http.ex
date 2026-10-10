@@ -33,10 +33,10 @@ defmodule Cronwatch.Transport.HTTP do
 
   Options: `cacerts:` (DER certificates to trust in place of the system's,
   for a private certificate authority), `ssl:` (further `:ssl` client
-  options, added after these) and `timeout:`.
+  options, added after these), and `timeout:`.
 
   The request carries `host`, then the headers given, in their order, then
-  `content-length` (unless given) and `connection: close`, and no
+  `content-length` (unless given), and `connection: close`, and no
   `user-agent` unless given one.
   """
 
@@ -95,7 +95,7 @@ defmodule Cronwatch.Transport.HTTP do
   @own ~w(host content-length transfer-encoding connection keep-alive te trailer upgrade expect)
 
   # The request's bytes: the request line, host, the headers as given,
-  # content-length and connection: close.
+  # content-length, and connection: close.
   defp request(%URL{} = u, %Request{headers: headers, body: body}) do
     target = if u.query, do: u.path <> "?" <> u.query, else: u.path
     host = u.host <> if(u.port, do: ":#{u.port}", else: "")

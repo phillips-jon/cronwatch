@@ -134,7 +134,7 @@ public sealed partial class CronwatchClient
 
     /// <summary>
     /// The longest run id, in UTF-16 code units (JavaScript's string length): what a run's start,
-    /// <c>ResumeAsync</c> and <c>RecordRunAsync</c> take, and every store holds.
+    /// <c>ResumeAsync</c>, and <c>RecordRunAsync</c> take, and every store holds.
     /// </summary>
     private const int MaxRunId = 200;
 

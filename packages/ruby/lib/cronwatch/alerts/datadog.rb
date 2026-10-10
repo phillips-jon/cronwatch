@@ -6,7 +6,7 @@ module Cronwatch
     # job and alert type. `site` is your Datadog site: "datadoghq.com" (the
     # default), "datadoghq.eu", "us3.datadoghq.com", "us5.datadoghq.com",
     # "ap1.datadoghq.com", "ddog-gov.com". Every event is tagged cronwatch,
-    # job:<name> and alert:<type>, then `tags`.
+    # job:<name>, and alert:<type>, then `tags`.
     class Datadog
       ALERT_TYPE = {
         missed: "error", failed: "error", stuck: "error", slow: "warning", over_budget: "warning", under_floor: "warning",

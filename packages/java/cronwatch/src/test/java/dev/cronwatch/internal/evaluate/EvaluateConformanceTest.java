@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
  * byte.
  */
 class EvaluateConformanceTest {
-  /** {@code scripts/conformance.mjs}'s {@code Sim}: one job, its runs and its state. */
+  /** {@code scripts/conformance.mjs}'s {@code Sim}: one job, its runs, and its state. */
   private static final class Sim {
     Definition def;
     StoredJob stored;

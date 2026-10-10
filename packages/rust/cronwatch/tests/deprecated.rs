@@ -1,7 +1,7 @@
-//! The names deprecated before 1.0 still work, each doing what its
-//! replacement does: internal helpers that were public until then, and the
-//! names 1.0 renamed. (`start`, `into_router`, `with_client` and the
-//! storetest helpers are tested beside what replaced them.)
+//! The names deprecated in 0.11 still work, each doing what its replacement
+//! does: internal helpers that were public before 0.11, and the names 0.11
+//! renamed. (`start`, `into_router`, `with_client`, and the storetest helpers
+//! are tested beside what replaced them.)
 #![allow(deprecated)]
 
 use cronwatch::JobOptions;

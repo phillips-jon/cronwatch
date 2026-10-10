@@ -29,7 +29,7 @@ const KNOWN: [&str; 11] = [
 
 /// The options that declare a job again without its schedule: its
 /// description followed by ` (no longer scheduled)` (`A scheduled task`
-/// when it had none), its tags, grace, timeout, maxDuration, budget, floor
+/// when it had none), its tags, grace, timeout, maxDuration, budget, floor,
 /// and failuresBeforeAlert.
 pub fn unscheduled(def: &Definition) -> JobOptions {
     let mut description = def.description().to_string();

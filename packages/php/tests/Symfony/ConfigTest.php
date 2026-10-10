@@ -46,7 +46,7 @@ final class ConfigTest extends TestCase
             Stores::fromUrl('sqlsrv://app@db/app');
             $this->fail('a sqlsrv URL is refused');
         } catch (\InvalidArgumentException $error) {
-            $this->assertSame('CronWatch stores in MySQL, MariaDB, Postgres or SQLite; a sqlsrv URL is not one of them', $error->getMessage());
+            $this->assertSame('CronWatch stores in MySQL, MariaDB, Postgres, or SQLite; a sqlsrv URL is not one of them', $error->getMessage());
         }
     }
 

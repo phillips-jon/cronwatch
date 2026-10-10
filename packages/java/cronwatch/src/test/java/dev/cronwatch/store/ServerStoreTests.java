@@ -207,7 +207,7 @@ abstract class ServerStoreTests {
 
   /**
    * A client from end to end: jobs declared, runs that succeed and fail, a check that finds a stuck
-   * run and a missed one, the alerts sent and the state's version moving on every write; then
+   * run and a missed one, the alerts sent, and the state's version moving on every write; then
    * another process reads it all back.
    */
   @Test

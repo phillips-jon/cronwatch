@@ -1,6 +1,6 @@
 name: CronWatch
 type: module
-description: 'Records every hook_cron and the queue workers you choose as jobs in your own database, and alerts you when a run is missed, fails, gets stuck or runs slow.'
+description: 'Records every hook_cron and the queue workers you choose as jobs in your own database, and alerts you when a run is missed, fails, gets stuck, or runs slow.'
 package: System
 core_version_requirement: ^10.3 || ^11
 php: 8.2

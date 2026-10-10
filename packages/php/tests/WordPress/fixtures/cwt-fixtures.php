@@ -3,7 +3,7 @@
  * Plugin Name: CronWatch test fixtures
  *
  * A must-use plugin the WordPress tests install beside CronWatch: event
- * callbacks that succeed, throw, hit a fatal error and exit, or stream a lot
+ * callbacks that succeed, throw, hit a fatal error, exit, or stream a lot
  * of output, a clock the tests move (the cwt_now option, epoch
  * milliseconds), an alert channel that keeps each alert in the cwt_alerts
  * option, and job options for some hooks from the cwt_job_options option

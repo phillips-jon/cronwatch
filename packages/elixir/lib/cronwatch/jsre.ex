@@ -23,7 +23,7 @@ defmodule Cronwatch.JSRE do
   # folds ASCII letters only, as JavaScript's `/i` without `u` does for
   # patterns whose letters are ASCII). What it does not implement it refuses
   # rather than read as something else: lazy quantifiers, named groups,
-  # backreferences, `\\c`, `\\p{...}` and `\\u{...}`.
+  # backreferences, `\\c`, `\\p{...}`, and `\\u{...}`.
   #
   # The bounds are the Rust port's: a pattern longer than 4096 characters, or
   # with groups nested more than 100 deep, is not read; and a match gives up

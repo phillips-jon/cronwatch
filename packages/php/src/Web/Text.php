@@ -9,7 +9,7 @@ use Cronwatch\Js;
 /**
  * What the pages need to write values the way the SDK's templates do:
  * escapeHtml, String(value), JavaScript truthiness, encodeURIComponent,
- * Number#toFixed and Object.entries.
+ * Number#toFixed, and Object.entries.
  *
  * @internal
  */

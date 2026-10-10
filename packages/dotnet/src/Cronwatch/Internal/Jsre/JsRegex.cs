@@ -8,7 +8,7 @@ namespace Cronwatch.Internal;
 /// <summary>
 /// A small backtracking regular expression engine with JavaScript's semantics, for the SDK's
 /// secret redaction patterns and for a job's stored <c>matches /.../</c> expect rule. It is the Go
-/// port's <c>internal/jsre</c>, carried over through the Rust, Elixir and Java ports with their
+/// port's <c>internal/jsre</c>, carried over through the Rust, Elixir, and Java ports with their
 /// audits' fixes.
 /// </summary>
 /// <remarks>
@@ -23,7 +23,7 @@ namespace Cronwatch.Internal;
 /// groups, lookahead, fixed-length lookbehind, alternation, greedy quantifiers, and the flags
 /// <c>g</c> and <c>i</c>. What it does not implement it refuses rather than read as something
 /// else: lazy quantifiers, named groups, backreferences, <c>\c</c>, <c>\p{...}</c>,
-/// <c>\u{...}</c> and legacy octal escapes.</para>
+/// <c>\u{...}</c>, and legacy octal escapes.</para>
 /// <para>A compiled pattern is read-only, so one may be shared by every thread; each match keeps
 /// its own state.</para>
 /// </remarks>

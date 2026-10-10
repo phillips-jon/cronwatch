@@ -1,7 +1,7 @@
 defmodule Cronwatch.QueuedAlertTest do
   # The SDK keeps the alerts it queues (undelivered, and the outbox's
   # entries) as the objects it read, so a field a newer release added to an
-  # alert, its details or an outbox entry is written back and sent on retry.
+  # alert, its details, or an outbox entry is written back and sent on retry.
   use ExUnit.Case, async: true
 
   alias Cronwatch.Alert

@@ -1,7 +1,7 @@
 defmodule Cronwatch.Check do
   @moduledoc false
   # The check (client.ts runCheck), the reads the dashboard makes, silence,
-  # forget and record_run. Functions ending in ! raise %Cronwatch.Error{}.
+  # forget, and record_run. Functions ending in ! raise %Cronwatch.Error{}.
 
   alias Cronwatch.CheckResult
   alias Cronwatch.Config
@@ -61,7 +61,7 @@ defmodule Cronwatch.Check do
     alerts = alerts ++ Enum.flat_map(Core.store!(c, :running_runs, []), &stuck(c, &1, now))
 
     # Each job on its own: one that cannot be evaluated is reported, shown as
-    # failing and does not stop the others.
+    # failing, and does not stop the others.
     {jobs, alerts, _spent} =
       Enum.reduce(stored_jobs!(c), {[], alerts, 0}, fn {stored, readable}, {jobs, alerts, spent} ->
         try do
@@ -300,7 +300,7 @@ defmodule Cronwatch.Check do
     n |> max(min) |> min(500)
   end
 
-  @doc "Reads, changes and writes one job's state, in turn with every other update to it."
+  @doc "Reads, changes, and writes one job's state, in turn with every other update to it."
   def patch_state!(c, name, change) do
     Core.ensure_ready!(c)
 

@@ -2,8 +2,8 @@ namespace Cronwatch.Internal;
 
 /// <summary>
 /// The JSON helpers beyond parse and stringify, for the port's own code: what <c>Json</c>'s
-/// <c>Quote</c>, <c>Kind</c>, <c>Copy</c>, <c>TryNumber</c> and <c>MaxDepth</c> were before 1.0
-/// made them internal.
+/// <c>Quote</c>, <c>Kind</c>, <c>Copy</c>, <c>TryNumber</c>, and <c>MaxDepth</c> were until 0.11
+/// deprecated them.
 /// </summary>
 internal static class JsonText
 {

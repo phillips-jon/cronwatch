@@ -7,7 +7,7 @@ group: Python
 
 # Python
 
-`cronwatch-sdk` is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow, over budget and under floor by the same rules, sends the same alert text, and writes the same rows, so a Python process can share one database with a Node, Ruby, PHP, Go, Rust, Elixir, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers plain Python and the API underneath.
+`cronwatch-sdk` is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow, over budget, and under floor by the same rules, sends the same alert text, and writes the same rows, so a Python process can share one database with a Node, Ruby, PHP, Go, Rust, Elixir, Java, or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers plain Python and the API underneath.
 
 ```bash
 pip install cronwatch-sdk        # or: uv add cronwatch-sdk
@@ -17,8 +17,8 @@ The import name is `cronwatch` (the name `cronwatch` on PyPI belongs to an older
 
 | Import | For | Install |
 |---|---|---|
-| `cronwatch` | the client, the memory and SQLite stores, `Console` and `Custom` | `cronwatch-sdk` |
-| `cronwatch.alerts` | Slack, Discord, webhook, email, SMS and error tracker channels | `cronwatch-sdk` |
+| `cronwatch` | the client, the memory and SQLite stores, `Console`, and `Custom` | `cronwatch-sdk` |
+| `cronwatch.alerts` | Slack, Discord, webhook, email, SMS, and error tracker channels | `cronwatch-sdk` |
 | `cronwatch.stores.postgres` | the Postgres store | `cronwatch-sdk[postgres]` (psycopg 3.2 or newer) |
 | `cronwatch.triage.anthropic` | Claude triage | `cronwatch-sdk[anthropic]` |
 | `cronwatch.sources.pgcron` | watching pg_cron's jobs | `cronwatch-sdk` (psycopg for a connection string) |
@@ -83,7 +83,7 @@ Without keeping a handle, `cw.run("nightly-report")` declares the job on first u
 
 Option names are snake_case (`max_duration`, `failures_before_alert`). Durations are strings such as `"15m"` or `"1h30m"`, milliseconds, or a `datetime.timedelta`. A duration string is at most 64 characters; a longer one raises `ValueError`. Anything that leaves the process (store rows, webhook bodies) uses the SDK's camelCase field names, so every language reads it.
 
-The context has `name`, `run_id`, `started_at`, `log(*parts)`, `metric(name, value)`, `metrics(dict)` and `signal`, which aborts once the job's `timeout` has passed. Nothing is interrupted: a loop that can stop early checks `ctx.aborted()`, or calls `ctx.signal.throw_if_aborted()` to raise.
+The context has `name`, `run_id`, `started_at`, `log(*parts)`, `metric(name, value)`, `metrics(dict)`, and `signal`, which aborts once the job's `timeout` has passed. Nothing is interrupted: a loop that can stop early checks `ctx.aborted()`, or calls `ctx.signal.throw_if_aborted()` to raise.
 
 ## Async jobs
 
@@ -110,7 +110,7 @@ async def main() -> None:
 
 `run(fn)` sees that `fn` is async and returns a coroutine to await. A plain function or `lambda` that only returns a coroutine (`lambda ctx: build_report_async()`) is refused with a `TypeError`, since that coroutine never ran; write it as an `async def`.
 
-`cronwatch.aio.AsyncCronwatch(client)` (or `AsyncCronwatch(store=..., alerts=...)`) has the client's methods as coroutines: `await acw.check()`, `await acw.runs("nightly-report")`, `await acw.silence("nightly-report", "2h")`, and start and resume handles whose `finish` is awaited. The store, the alert channels and triage run in a worker thread, so a slow database or a hung webhook never blocks the event loop. It needs asyncio (uvicorn, FastAPI, aiohttp); trio is not supported.
+`cronwatch.aio.AsyncCronwatch(client)` (or `AsyncCronwatch(store=..., alerts=...)`) has the client's methods as coroutines: `await acw.check()`, `await acw.runs("nightly-report")`, `await acw.silence("nightly-report", "2h")`, and start and resume handles whose `finish` is awaited. The store, the alert channels, and triage run in a worker thread, so a slow database or a hung webhook never blocks the event loop. It needs asyncio (uvicorn, FastAPI, aiohttp); trio is not supported.
 
 ## Run the check
 
@@ -140,11 +140,11 @@ cw.close()
 */5 * * * *  cd /srv/app && .venv/bin/python check.py
 ```
 
-`check()` returns a result with `checked_at`, `jobs`, `alerts` and `pruned`. Calls at the same time share one check.
+`check()` returns a result with `checked_at`, `jobs`, `alerts`, and `pruned`. Calls at the same time share one check.
 
 ## The dashboard
 
-`cw.routes()` is the dashboard and JSON API, the same pages and endpoints as the TypeScript routes: the board's counts by health, a timeline of the last day with a lane per job, the table of every job, and for each job its last seven days, runs and definition, all drawn on the server with no script. It is a WSGI app, and `.asgi` is the same routes as an ASGI app, so it mounts in any Python web server. For Django, see [Django](/docs/django/).
+`cw.routes()` is the dashboard and JSON API, the same pages and endpoints as the TypeScript routes: the board's counts by health, a timeline of the last day with a lane per job, the table of every job, and for each job its last seven days, runs, and definition, all drawn on the server with no script. It is a WSGI app, and `.asgi` is the same routes as an ASGI app, so it mounts in any Python web server. For Django, see [Django](/docs/django/).
 
 ```python
 # Flask
@@ -162,14 +162,14 @@ application = cw.routes()
 
 - `token`: leave it out to read `CRONWATCH_TOKEN`; an empty string or one of only whitespace, given here or in the variable, counts as unset, and anything but a string or `None` (`False`, a number) raises `TypeError`. `None` opts out and serves the routes open, for a mount behind your own auth.
 
-  Without a token, in development, the routes make a token of their own and print a sign-in link to standard output on the first request. Anywhere else they answer 503. The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `ENVIRONMENT` that holds more than spaces (where the SDK reads `NODE_ENV` third), trimmed and lowercased; `development`, `dev`, `local`, `test` and `testing` count as development, and `production` and `prod` as production, as in every CronWatch library.
+  Without a token, in development, the routes make a token of their own and print a sign-in link to standard output on the first request. Anywhere else they answer 503. The environment is the first of `CRONWATCH_ENV`, `APP_ENV`, and `ENVIRONMENT` that holds more than spaces (where the SDK reads `NODE_ENV` third), trimmed and lowercased; `development`, `dev`, `local`, `test`, and `testing` count as development, and `production` and `prod` as production, as in every CronWatch library.
 
-  The link names the host only when `origin` is set or the request's host is loopback: `localhost`, a name ending in `.localhost`, `127.0.0.0/8` or `::1`. Only a host that is one of those counts, so a Host header such as `localhost:1@evil.example` does not. Otherwise the link leaves the host out, since a client chooses it: `Sign in: /cronwatch/?token=... on this server (the first request's host is not local, so the link leaves it out)`.
+  The link names the host only when `origin` is set or the request's host is loopback: `localhost`, a name ending in `.localhost`, `127.0.0.0/8`, or `::1`. Only a host that is one of those counts, so a Host header such as `localhost:1@evil.example` does not. Otherwise the link leaves the host out, since a client chooses it: `Sign in: /cronwatch/?token=... on this server (the first request's host is not local, so the link leaves it out)`.
 - `base_path`: where it is mounted. It defaults to the mount point the server reports (`SCRIPT_NAME`, or ASGI's `root_path`), so the mounts above need nothing more.
-- `origin`: the public origin, such as `"https://app.example.com"`, to pin it whatever a request says. It then replaces the request's own for the cross-site check on writes, the cookie's `Secure` flag, redirects and the sign-in line.
+- `origin`: the public origin, such as `"https://app.example.com"`, to pin it whatever a request says. It then replaces the request's own for the cross-site check on writes, the cookie's `Secure` flag, redirects, and the sign-in line.
 - `trust_proxy`: take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host`, as the SDK's option does. Off by default.
 
-The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `GET /api` answers `{"ok":true,"library":"cronwatch-sdk","language":"python","version":"<cronwatch.__version__>","api":1}`, and silencing or unsilencing over the API answers the job's summary. `/api/check` also accepts the client's `cron_secret` as a bearer, so an outside cron can run the check over HTTP. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app). The ASGI app runs each request in a worker thread, so it needs an asyncio server (uvicorn, Hypercorn, Daphne).
+The token rules, cookie, cross-site rule, and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `GET /api` answers `{"ok":true,"library":"cronwatch-sdk","language":"python","version":"<cronwatch.__version__>","api":1}`, and silencing or unsilencing over the API answers the job's summary. `/api/check` also accepts the client's `cron_secret` as a bearer, so an outside cron can run the check over HTTP. The dashboard is installable as a web app, with its manifest, icons, and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app). The ASGI app runs each request in a worker thread, so it needs an asyncio server (uvicorn, Hypercorn, Daphne).
 
 ## Jobs a URL starts
 
@@ -193,7 +193,7 @@ lambda_handler = hook.aws_lambda
 
 The secret is `handler(fn, secret=...)`, else the client's `cron_secret`, which reads `CRON_SECRET` by default; it is compared in constant time. A wrong or missing bearer is answered 401 and runs nothing. With no secret at all, outside development, the handler answers 503 and reports it once to `on_error`, rather than let anyone on the internet run the job; `secret=None` opts out on purpose, for an endpoint your platform already protects. A run is answered 200 or 500 with `{"ok", "job", "run", "status", "durationMs"}`, and a function that returns a response of its own is answered with it.
 
-A response with a status of 400 or more fails the run, recorded as `HTTP <status>` and its reason, whether a handler, `run()` or `finish(result=...)` got it. Django, Flask, Starlette and FastAPI, requests, httpx and `http.client` responses are all recognised, so a job that calls an API and returns its answer fails when the API does.
+A response with a status of 400 or more fails the run, recorded as `HTTP <status>` and its reason, whether a handler, `run()`, or `finish(result=...)` got it. Django, Flask, Starlette and FastAPI, requests, httpx, and `http.client` responses are all recognised, so a job that calls an API and returns its answer fails when the API does.
 
 ## Runs that span calls
 
@@ -209,7 +209,7 @@ run.log("imported", count, "rows")
 run.finish()                        # or run.fail(error), or run.finish(result="text")
 ```
 
-`start(trigger=None, id=None)` takes your own stable id, 1 to 200 characters: a start with an id already recorded for this job records nothing and returns a handle on that run. A store that fails is reported to `on_error`, never raised. The handle has `log`, `metric`, `metrics`, `flush()` (append what is logged so far to the stored run), `finish()` and `fail(error)`, and `active()`, false once it is finished. A run is judged once however many times it is finished: a second finish, or one on a run another process finished, records nothing and is reported to `on_error`. A run that is never finished is marked stuck by the first check after the job's `timeout`, so set `timeout` to cover the whole span. The [Ruby page](/docs/ruby/#runs-that-span-calls) has the full rules, which are the same.
+`start(trigger=None, id=None)` takes your own stable id, 1 to 200 characters: a start with an id already recorded for this job records nothing and returns a handle on that run. A store that fails is reported to `on_error`, never raised. The handle has `log`, `metric`, `metrics`, `flush()` (append what is logged so far to the stored run), `finish()`, `fail(error)`, and `active()`, false once it is finished. A run is judged once however many times it is finished: a second finish, or one on a run another process finished, records nothing and is reported to `on_error`. A run that is never finished is marked stuck by the first check after the job's `timeout`, so set `timeout` to cover the whole span. The [Ruby page](/docs/ruby/#runs-that-span-calls) has the full rules, which are the same.
 
 ## APScheduler
 
@@ -224,11 +224,11 @@ scheduler.start()
 cw.start_checking()  # the check, for runs that never happened
 ```
 
-`pip install "cronwatch-sdk[apscheduler]"` (APScheduler 3.10 or newer). `watch` adds a listener to an APScheduler 3 scheduler (background, blocking, asyncio or any other) and needs no change to your jobs. Every job becomes a CronWatch job named after its id, with its trigger as the schedule: a cron trigger becomes the same cron expression, checked against APScheduler's own fire times; an interval trigger is `every <interval>`; a date trigger runs once. A job added or rescheduled later is followed, and a removed one stops being expected.
+`pip install "cronwatch-sdk[apscheduler]"` (APScheduler 3.10 or newer). `watch` adds a listener to an APScheduler 3 scheduler (background, blocking, asyncio, or any other) and needs no change to your jobs. Every job becomes a CronWatch job named after its id, with its trigger as the schedule: a cron trigger becomes the same cron expression, checked against APScheduler's own fire times; an interval trigger is `every <interval>`; a date trigger runs once. A job added or rescheduled later is followed, and a removed one stops being expected.
 
-Each run is recorded from APScheduler's own events, with the trigger `apscheduler` (see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)): the return value is the output when it is a string (and checked by `expect`), an exception fails it, and a run APScheduler skipped because it could not start within `misfire_grace_time` is failed with that reason. The events are recorded in a thread of the listener's own, so neither the scheduler nor an asyncio loop waits on the store.
+Each run is recorded from APScheduler's own events, with the trigger `apscheduler` (see [Triggers, tags, and job names](/docs/dashboard/#triggers-tags-and-job-names)): the return value is the output when it is a string (and checked by `expect`), an exception fails it, and a run APScheduler skipped because it could not start within `misfire_grace_time` is failed with that reason. The events are recorded in a thread of the listener's own, so neither the scheduler nor an asyncio loop waits on the store.
 
-`watch`'s own options (`grace`, `timeout`, `failures_before_alert` and the rest) apply to every job it declares. `jobs=` gives options per job, by id, with `name=` for a job name other than the id and `schedule=` to replace the trigger's: `watch(scheduler, jobs={"nightly-report": {"timeout": "2h"}})`. `exclude=` leaves jobs out, by id or name.
+`watch`'s own options (`grace`, `timeout`, `failures_before_alert`, and the rest) apply to every job it declares. `jobs=` gives options per job, by id, with `name=` for a job name other than the id and `schedule=` to replace the trigger's: `watch(scheduler, jobs={"nightly-report": {"timeout": "2h"}})`. `exclude=` leaves jobs out, by id or name.
 
 `cronwatch.current()` is not available inside an APScheduler job (it is `None`), since APScheduler tells a listener only that a job was submitted and how it ended. Return the text to record, or wrap the job's body in `job.run()` yourself and leave the job out of `watch` with `exclude=`.
 
@@ -242,9 +242,9 @@ APScheduler 4 is still a pre-release that replaced the events and triggers this 
 
 `cronwatch.stores.postgres.PostgresStore(conninfo=None, pool=None, prefix="cronwatch_")` needs `cronwatch-sdk[postgres]`. With no connection string it reads `DATABASE_URL`. It writes through an autocommit connection of its own, so a run recorded inside your transaction is recorded when it happens and stays recorded if that transaction rolls back. It reconnects when the connection breaks, and a forked child opens its own rather than use the parent's. `pool=` takes a `psycopg_pool.ConnectionPool` of yours instead (anything whose `connection()` is a context manager giving a psycopg connection); `close()` leaves a pool you passed open. It creates its tables on first use, under an advisory lock, so many processes can start at once.
 
-`prefix` names the tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`): lowercase letters, digits and underscores, not starting with a digit, at most 47 characters (Postgres cuts names past 63). Any other prefix raises `ValueError`.
+`prefix` names the tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`): lowercase letters, digits, and underscores, not starting with a digit, at most 47 characters (Postgres cuts names past 63). Any other prefix raises `ValueError`.
 
-A store of your own is any object with the methods the memory store has: `upsert_job`, `get_job`, `list_jobs`, `delete_job`, `insert_run`, `update_run`, `update_run_if`, `get_run`, `list_runs`, `last_run`, `running_runs`, `get_state`, `set_state`, `prune`, and optionally `update_run_if`, `compare_and_set_state`, `init` and `close`. They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says, with epoch milliseconds for every time.
+A store of your own is any object with the methods the memory store has: `upsert_job`, `get_job`, `list_jobs`, `delete_job`, `insert_run`, `update_run`, `update_run_if`, `get_run`, `list_runs`, `last_run`, `running_runs`, `get_state`, `set_state`, `prune`, and optionally `update_run_if`, `compare_and_set_state`, `init`, and `close`. They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says, with epoch milliseconds for every time.
 
 `update_run_if` and `compare_and_set_state` are what keep two processes on one store from judging a run twice or losing each other's updates; see [two processes, one store](/docs/stores/#two-processes-one-store). Without them the client falls back to plain writes, which is safe only when one process uses the store.
 
@@ -273,7 +273,7 @@ Every alert goes to every channel at once; a channel that raises, or takes longe
 
 A channel is any object with `name` and `send(alert, context)` that raises when the alert went nowhere; a plain function works too, and one that takes only the alert is called with the alert alone. `context.on_error(error)` reports a problem that did not stop the alert going out (one of several recipients refusing it, say) to the client's `on_error`, as `"alert channel <name>"`.
 
-### Email, SMS and error trackers
+### Email, SMS, and error trackers
 
 The SDK's provider channels are in `cronwatch.alerts` too, on the standard library alone (`urllib.request`, with SES requests signed by SigV4 and no AWS SDK):
 
@@ -283,7 +283,7 @@ from cronwatch.alerts import (
     Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, NewRelic,
 )
 
-# Email. Each takes from_, to (one address or a list), subject_prefix and link.
+# Email. Each takes from_, to (one address or a list), subject_prefix, and link.
 Resend(api_key=os.environ["RESEND_API_KEY"], from_="CronWatch <alerts@example.com>", to="ops@example.com")
 Postmark(server_token=os.environ["POSTMARK_SERVER_TOKEN"], from_="alerts@example.com", to="ops@example.com")
 Sendgrid(api_key=os.environ["SENDGRID_API_KEY"], from_="alerts@example.com", to="ops@example.com")
@@ -322,9 +322,9 @@ NewRelic(account_id=os.environ["NEW_RELIC_ACCOUNT_ID"], api_key=os.environ["NEW_
 | New Relic | `region` (`"eu"`), `event_type`, `link` |
 | Webhook | `secret`, `headers` (extra headers sent with every request) |
 
-A missing key, address or account raises `ValueError` when the channel is made.
+A missing key, address, or account raises `ValueError` when the channel is made.
 
-Each sends exactly the request the SDK's does: the same URL, headers and body, byte for byte (the package's tests replay the SDK's recorded requests). One alert gets the same idempotency key, event id or UUID in every language, so a provider that deduplicates drops a resend whichever language sent it.
+Each sends exactly the request the SDK's does: the same URL, headers, and body, byte for byte (the package's tests replay the SDK's recorded requests). One alert gets the same idempotency key, event id, or UUID in every language, so a provider that deduplicates drops a resend whichever language sent it.
 
 Each request gives up 10 seconds after it starts. A refused request raises `"<Provider> <origin> answered <status>: <start of the body>"`, never the URL's path, with the channel's keys cut out of the quoted body. No channel follows a redirect, so credentials never reach another address. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
 
@@ -356,7 +356,7 @@ It still records and evaluates every run, but queues each alert in the store ins
 
 ## pg_cron
 
-pg_cron runs jobs inside Postgres, where nothing can wrap them. `PgCron` reads what pg_cron records instead: on every check it reads `cron.job`, declares each job with its schedule, and copies new rows of `cron.job_run_details` in as runs, so a job that stops running is missed, a failed run alerts and a run that never ends is stuck.
+pg_cron runs jobs inside Postgres, where nothing can wrap them. `PgCron` reads what pg_cron records instead: on every check it reads `cron.job`, declares each job with its schedule, and copies new rows of `cron.job_run_details` in as runs, so a job that stops running is missed, a failed run alerts, and a run that never ends is stuck.
 
 ```python
 from cronwatch.sources.pgcron import PgCron
@@ -369,11 +369,11 @@ cw = cronwatch.Cronwatch(
 cw.start_checking()
 ```
 
-The first argument is a connection string, a psycopg connection or pool, or anything with `query(sql, params)` that returns rows as dicts. On a connection that is not in autocommit mode it never ends a transaction of yours. The options (`jobs`, `prefix`, `job_name`, `options`, `timezone`) and the rules for renamed jobs, runs cut off by a restart and history seen for the first time are the SDK's; see [Supabase and pg_cron](/docs/supabase/).
+The first argument is a connection string, a psycopg connection or pool, or anything with `query(sql, params)` that returns rows as dicts. On a connection that is not in autocommit mode it never ends a transaction of yours. The options (`jobs`, `prefix`, `job_name`, `options`, `timezone`) and the rules for renamed jobs, runs cut off by a restart, and history seen for the first time are the SDK's; see [Supabase and pg_cron](/docs/supabase/).
 
 ## Redaction
 
-Before a run's output and error are stored, shown or sent anywhere, `redact` rewrites them. The default, `cronwatch.redact_secrets`, blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks. Redaction runs before the 16 KB cap, so the cut never keeps the rest of a secret whose label it cut off. An `expect` rule is checked before redaction, so it still sees what was logged.
+Before a run's output and error are stored, shown, or sent anywhere, `redact` rewrites them. The default, `cronwatch.redact_secrets`, blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google, and API key formats), exactly what the SDK's default blanks. Redaction runs before the 16 KB cap, so the cut never keeps the rest of a secret whose label it cut off. An `expect` rule is checked before redaction, so it still sees what was logged.
 
 ```python
 cronwatch.Cronwatch(redact=False)                                            # keep output as logged
@@ -397,7 +397,7 @@ cw = cronwatch.Cronwatch(triage=Anthropic(context="A Flask app on Postgres, jobs
 | Option | Default | |
 |---|---|---|
 | `model` | `"claude-opus-5"` | any current model id |
-| `effort` | `"medium"` | `"low"`, `"medium"` or `"high"` |
+| `effort` | `"medium"` | `"low"`, `"medium"`, or `"high"` |
 | `max_tokens` | `800` | a diagnosis is a paragraph |
 | `context` | | a sentence about the app, so advice is specific |
 | `fallbacks` | `True` | route a policy refusal to Anthropic's default fallback model inside the same request. Turn off if your account or gateway rejects the beta |
@@ -426,7 +426,7 @@ A triage of your own is any function that takes the context (`alert`, `recent_ru
 | `on_error` | the `cronwatch` logger | `lambda error, where: ...` for failures outside jobs: the store, a channel, triage |
 | `now` | the system clock | a function returning epoch milliseconds; for tests |
 
-`cw.job(name, **options)` takes `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the process's zone by default), `grace` (`"10m"`), `timeout` (`"1h"`), `max_duration`, `budget` (`{"metric": ceiling}`), `floor` (`{"metric": floor}`), `expect` (a string the output must contain, a compiled `re` pattern it must match, or a function), `failures_before_alert` (1), `description` and `tags`, with the rules in the [API reference](/docs/api/). An `expect` pattern, like an `expect` function, runs in your process with no time limit, so keep it clear of repeats that can backtrack without end (see [expect rules](/docs/conditions/#expect-rules)). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit. Bad options raise `ValueError` when the job is declared.
+`cw.job(name, **options)` takes `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the process's zone by default), `grace` (`"10m"`), `timeout` (`"1h"`), `max_duration`, `budget` (`{"metric": ceiling}`), `floor` (`{"metric": floor}`), `expect` (a string the output must contain, a compiled `re` pattern it must match, or a function), `failures_before_alert` (1), `description`, and `tags`, with the rules in the [API reference](/docs/api/). An `expect` pattern, like an `expect` function, runs in your process with no time limit, so keep it clear of repeats that can backtrack without end (see [expect rules](/docs/conditions/#expect-rules)). A name is 1 to 120 letters, digits, `.`, `_`, `:`, or `-`, starting with a letter or digit. Bad options raise `ValueError` when the job is declared.
 
 `timeout` and `max_duration` both measure a run's length, and are easy to mix up. `timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure) and the job is stuck. `max_duration` is for a run that finished: one that succeeded but took longer is slow, and stays a success. So set `timeout` well above `max_duration`: `max_duration="10m", timeout="1h"` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
 
@@ -449,9 +449,9 @@ The client:
 
 ## Sharing a database with the other languages
 
-The SQLite and Postgres stores write the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the PHP, Go, Rust, Elixir, Java and .NET stores: the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns. The package's tests share a SQLite file with the built SDK and check that each side reads what the other wrote. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
+The SQLite and Postgres stores write the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the PHP, Go, Rust, Elixir, Java, and .NET stores: the same names, columns, and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns. The package's tests share a SQLite file with the built SDK and check that each side reads what the other wrote. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
 
-A 1.x release keeps what it does not know: a key a newer release added to a job's state or definition, a condition, a run status or a trigger is read, carried through every write and written back as it was, so any 1.x of any language can share a store with any other. Releases before 1.0 do not promise this: upgrade every process to 1.0 together.
+A 1.x release keeps what it does not know: a key a newer release added to a job's state or definition, a condition, a run status or a trigger is read, carried through every write and written back as it was, so any 1.x of any language can share a store with any other. Releases before 0.11 do not promise this: upgrade every process to 0.11 or newer together.
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses, and run one checker for the store.
 
@@ -470,8 +470,8 @@ These names still work, each with a `DeprecationWarning`. A rename of documented
 | `hmac_sha256_hex(secret, body)` from `cronwatch.alerts.webhook` | `signature(secret, body)`, the name every port uses | 1.0 |
 | the internal modules and helpers under their old names (below) | what this page documents | 1.0 |
 
-Public means what this page and the README document; everything else is internal. The modules that only implement the client are underscored (`cronwatch._evaluate`, `cronwatch._client`, `cronwatch._schedule` and so on), and so are the helpers and constants of the public modules (`cronwatch.types.camel`, `cronwatch.alerts.twilio.sms_segments`, the pg_cron source's SQL). They were public by accident: under their old names (`cronwatch.evaluate`, `cronwatch.alerts.twilio.sms_segments`) they still work, warning when used, and go in 1.0. Each module's `__all__` lists what it promises.
+Public means what this page and the README document; everything else is internal. The modules that only implement the client are underscored (`cronwatch._evaluate`, `cronwatch._client`, `cronwatch._schedule`, and so on), and so are the helpers and constants of the public modules (`cronwatch.types.camel`, `cronwatch.alerts.twilio.sms_segments`, the pg_cron source's SQL). They were public by accident: under their old names (`cronwatch.evaluate`, `cronwatch.alerts.twilio.sms_segments`) they still work, warning when used, and go in 1.0. Each module's `__all__` lists what it promises.
 
 ## Kept in step
 
-The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, each channel's requests, stats and health) into `conformance/` in the repository, and the Python package's tests replay every one, as the other ports' do. The dashboard is checked the same way: `tests/test_web_golden.py` replays the SDK routes' answers to a fixed seed (`packages/ruby/test/web/golden.json`) and compares every page and header byte for byte. A change of behaviour lands in TypeScript first, the cases are regenerated, and the port is fixed until they pass. Where they disagree, the port is wrong: [open an issue](https://github.com/cronwatchdev/cronwatch/issues).
+The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, each channel's requests, stats, and health) into `conformance/` in the repository, and the Python package's tests replay every one, as the other ports' do. The dashboard is checked the same way: `tests/test_web_golden.py` replays the SDK routes' answers to a fixed seed (`packages/ruby/test/web/golden.json`) and compares every page and header byte for byte. A change of behaviour lands in TypeScript first, the cases are regenerated, and the port is fixed until they pass. Where they disagree, the port is wrong: [open an issue](https://github.com/cronwatchdev/cronwatch/issues).

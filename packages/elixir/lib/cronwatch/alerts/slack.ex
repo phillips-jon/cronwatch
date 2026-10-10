@@ -16,7 +16,7 @@ defmodule Cronwatch.Alerts.Slack do
       instance's, else `Cronwatch.Transport.HTTP`.
 
   The message goes in a code block cut to 2,900 characters, a triage in a
-  block of its own cut to 3,000, and Slack's `&`, `<` and `>` are escaped,
+  block of its own cut to 3,000, and Slack's `&`, `<`, and `>` are escaped,
   so job output cannot mention `@channel` or add links.
   """
 

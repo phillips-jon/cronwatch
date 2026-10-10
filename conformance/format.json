@@ -1015,7 +1015,7 @@
           "grace": "15m"
         },
         "title": "nightly recovered",
-        "message": "A run 2026-01-05 09:30:00 UTC (2m ago) succeeded after: missed, over budget, failed.\nRan 2s.",
+        "message": "A run 2026-01-05 09:30:00 UTC (2m ago) succeeded after: missed, over budget, and failed.\nRan 2s.",
         "at": 1767605520000
       }
     },
@@ -1074,7 +1074,7 @@
           "grace": "15m"
         },
         "title": "nightly recovered",
-        "message": "A run 2026-01-05 09:30:00 UTC (2m ago) succeeded after: under floor, slow.\nRan 2s.",
+        "message": "A run 2026-01-05 09:30:00 UTC (2m ago) succeeded after: under floor and slow.\nRan 2s.",
         "at": 1767605520000
       }
     },

@@ -51,7 +51,7 @@ public sealed class SendGridChannel : IChannel
     private readonly ITransport? _transport;
 
     /// <summary>The channel.</summary>
-    /// <exception cref="CronwatchException">Without an API key, a sender or a recipient.</exception>
+    /// <exception cref="CronwatchException">Without an API key, a sender, or a recipient.</exception>
     public SendGridChannel(SendGridOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);

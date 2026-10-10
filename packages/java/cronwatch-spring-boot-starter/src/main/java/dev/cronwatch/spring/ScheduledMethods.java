@@ -31,7 +31,7 @@ import org.springframework.util.ClassUtils;
 /**
  * Finds every {@code @Scheduled} (and {@code @Schedules}) method of every bean, reading the
  * annotations as Spring's own post-processor does: placeholders and expressions resolved, {@code
- * cron = "-"} disabled, {@code zone}, {@code fixedRate}, {@code fixedDelay} and their {@code
+ * cron = "-"} disabled, {@code zone}, {@code fixedRate}, {@code fixedDelay}, and their {@code
  * String} forms, and {@code timeUnit}. It only collects what it finds, so it depends on nothing and
  * starts no work; {@code CronwatchScheduling} declares the jobs once the beans are made. A bean
  * destroyed while the app runs is said to have gone, and its jobs are declared again without their
@@ -254,7 +254,7 @@ public final class ScheduledMethods
 
   /**
    * Whether Spring observes the method around a subscription rather than its work: one returning a
-   * Reactive Streams {@code Publisher} (a {@code Mono}, a {@code Flux}) or a Kotlin flow, or a
+   * Reactive Streams {@code Publisher} (a {@code Mono}, a {@code Flux}), or a Kotlin flow, or a
    * Kotlin {@code suspend} function.
    */
   static boolean reactive(Method method) {

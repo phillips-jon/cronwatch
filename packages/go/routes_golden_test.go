@@ -4,11 +4,11 @@ package cronwatch_test
 
 // Replays packages/ruby/test/web/golden.json, the SDK routes' answers to a
 // fixed seed (written by golden.mjs), against Client.Routes seeded the same
-// way, and compares status, headers and body byte for byte: straight into
+// way, and compares status, headers, and body byte for byte: straight into
 // the handler, and through a real server with the dashboard mounted by
 // http.StripPrefix and by a ServeMux pattern, its base path found from each.
 // Run ids are random on both sides, so each becomes <id:N> in order of
-// first appearance. The gem, the Python package and the PHP package replay
+// first appearance. The gem, the Python package, and the PHP package replay
 // the same file.
 
 import (
@@ -69,7 +69,7 @@ func readGolden(t *testing.T) goldenFile {
 	if len(g.Captures) != 82 {
 		t.Fatalf("golden.json has %d captures, not 82", len(g.Captures))
 	}
-	// GET /api names the library, its language and its version, and a page's
+	// GET /api names the library, its language, and its version, and a page's
 	// footer the library and its version, which the fixture holds as
 	// placeholders for each port to fill in with its own.
 	about := strings.NewReplacer(

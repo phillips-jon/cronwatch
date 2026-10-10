@@ -93,7 +93,7 @@ export class ReportsService {
 }
 ```
 
-`run()` rethrows, and `@nestjs/schedule` catches and logs what a `@Cron` method throws, so a failure is recorded, alerted and logged, and the scheduler carries on.
+`run()` rethrows, and `@nestjs/schedule` catches and logs what a `@Cron` method throws, so a failure is recorded, alerted, and logged, and the scheduler carries on.
 
 Without a `timeZone` the decorator uses the server's zone, and so does a job without `timezone`; set both or neither. `waitForCompletion: true` skips a tick that arrives while the previous run is still going. CronWatch then reports the skipped slot as missed once the grace passes, since nothing started. `@Interval(ms)` methods can be wrapped the same way, declared with `schedule: "every 15m"`.
 

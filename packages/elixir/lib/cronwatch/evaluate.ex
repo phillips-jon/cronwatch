@@ -41,7 +41,7 @@ defmodule Cronwatch.Evaluate do
 
   @doc """
   A stored state with every field present, or a fresh one. Read leniently,
-  since a foreign, hand-edited or damaged row must affect only its own job:
+  since a foreign, hand-edited, or damaged row must affect only its own job:
   a value that is not an object reads as no state, and each field of the
   wrong shape as its empty value (see `Cronwatch.JobState.from_value/1`).
   """
@@ -361,7 +361,7 @@ defmodule Cronwatch.Evaluate do
   def js_number(_), do: :nan
 
   # `Number(text)` for trimmed, non-empty text: decimal, Infinity, and the
-  # 0x, 0o and 0b integer forms; anything else is NaN.
+  # 0x, 0o, and 0b integer forms; anything else is NaN.
   defp string_to_number(text) do
     {sign, body} =
       case text do
@@ -407,7 +407,7 @@ defmodule Cronwatch.Evaluate do
   end
 
   # Float.parse wants digits before and after a point; JavaScript takes
-  # "5.", ".5" and "1e3".
+  # "5.", ".5", and "1e3".
   defp normalize_decimal(body) do
     body = if String.starts_with?(body, "."), do: "0" <> body, else: body
     String.replace(body, ~r/\.(?=[eE]|\z)/, ".0")
@@ -436,7 +436,7 @@ defmodule Cronwatch.Evaluate do
   defp max_one(n), do: if(n < 1, do: 1, else: n)
 
   @doc """
-  Called when a run finishes with status ok, failed or timeout. `history` is
+  Called when a run finishes with status ok, failed, or timeout. `history` is
   the job's earlier runs, newest first, not including this one. Answers
   `{:ok, {state, drafts}}`.
   """
@@ -716,7 +716,7 @@ defmodule Cronwatch.Evaluate do
   defp numeric_at?(%Alert{value: %Object{} = o}), do: Read.number?(Object.get(o, "at"))
   defp numeric_at?(%Alert{at: at}), do: is_number(at)
 
-  @doc "How a job looks at a glance. Silence wins, then stuck, failing and late."
+  @doc "How a job looks at a glance. Silence wins, then stuck, failing, and late."
   def job_health(def, last_run, state, now) do
     open = open_conditions(state)
 

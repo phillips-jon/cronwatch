@@ -238,6 +238,6 @@ async fn alert_keeps_every_channel_given() {
 #[tokio::test]
 async fn defaults_refuse_a_field_set_by_name() {
     let err = Client::builder().defaults(JobOptions::new().field("schedule", "@hourly")).build().unwrap_err();
-    assert_eq!(err.to_string(), "defaults takes grace, timeout, timezone and failuresBeforeAlert, not schedule");
+    assert_eq!(err.to_string(), "defaults takes grace, timeout, timezone, and failuresBeforeAlert, not schedule");
     assert!(Client::builder().defaults(JobOptions::new().field("grace", "5m")).build().is_ok());
 }

@@ -6,7 +6,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     the Go and Rust ports have it. On every check it reads `cron.job` and
     declares each job with its schedule, then copies new rows of
     `cron.job_run_details` in as runs (ids `pgcron:<prefix><runid>`), so the
-    usual evaluation raises missed, failed, stuck and slow alerts.
+    usual evaluation raises missed, failed, stuck, and slow alerts.
 
         {Cronwatch,
          store: {Cronwatch.Store.Ecto, repo: MyApp.Repo},
@@ -33,11 +33,11 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
         app's own (`"db:"`). It also keeps run ids apart. Default `""`.
       * `:job_name`: a function of a `Cronwatch.Sources.PgCron.Job` answering
         its CronWatch name. Default `job_name/1`. The prefix goes in front
-        either way. One that raises, throws or exits, or answers no string,
+        either way. One that raises, throws, or exits, or answers no string,
         like a `:pick` or `:options` function that fails, is reported once
         and fails only that job, which keeps its last declaration until the
         function works again.
-      * `:options`: job options (`grace`, `timeout`, `max_duration`, `expect`
+      * `:options`: job options (`grace`, `timeout`, `max_duration`, `expect`,
         and the rest) for every job, or a function of a
         `Cronwatch.Sources.PgCron.Job` answering them per job. The schedule
         and timezone always come from pg_cron.
@@ -46,7 +46,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
         only to roles with `pg_read_all_settings`; UTC (pg_cron's default) is
         assumed when it cannot be read.
 
-    A job that is renamed, unscheduled or no longer picked keeps its old
+    A job that is renamed, unscheduled, or no longer picked keeps its old
     name's runs and history, and that name is declared again without a
     schedule, so it is never reported missed. Its description says why.
 
@@ -58,7 +58,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     store's statements do.
 
     Where the source is between checks (each job's cursor, the runs still
-    going and the runs held before they start) lives in the instance's own
+    going, and the runs held before they start) lives in the instance's own
     table, so it ends with the instance, and a new instance finds its place
     again from the store.
     """
@@ -77,7 +77,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
 
     defmodule Job do
       @moduledoc """
-      A row of `cron.job`, as `:pick`, `:job_name` and `:options` are given
+      A row of `cron.job`, as `:pick`, `:job_name`, and `:options` are given
       it. `job_name` is nil for a job scheduled without a name.
       """
       defstruct job_id: 0, job_name: nil, schedule: "", database: "", username: "", active: true
@@ -215,7 +215,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     @doc false
     # The default CronWatch name for a pg_cron job, before the prefix: its
     # jobname with each run of anything other than letters, digits, `.`, `_`,
-    # `:` and `-` turned into `-`, leading punctuation dropped, at most 100
+    # `:`, and `-` turned into `-`, leading punctuation dropped, at most 100
     # characters, or `pg_cron:<jobid>` when nothing is left.
     @spec default_name(Job.t() | map()) :: String.t()
     def default_name(%{job_id: id} = job) do
@@ -251,7 +251,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     # A row of `cron.job_run_details` as a CronWatch run, or nil for one that
     # has not started (no start time, not finished). The row is a map of the
     # table's columns (`"runid"`, `"jobid"`, `"status"`, `"return_message"`,
-    # `"start_time"`, `"end_time"`), times as `DateTime`s, epoch milliseconds
+    # `"start_time"`, `"end_time"`), times as `DateTime`s, epoch milliseconds,
     # or ISO text. A finished row with no start time (pg_cron writes these for
     # runs a server restart cut off, "server restarted") starts at its end
     # time, else at `fallback_at` (the source passes the job's newest run's
@@ -683,7 +683,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
         end)
 
       # A name this source used for a job that has since been renamed,
-      # unscheduled or dropped from the jobs picked.
+      # unscheduled, or dropped from the jobs picked.
       in_use = MapSet.new(Map.values(names))
       update_st(&%{&1 | retired: MapSet.difference(&1.retired, in_use)})
 
@@ -1005,7 +1005,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
 
         # A run copied under a retired name that was then forgotten (the
         # dashboard's forget) has no job to go to: it is let go, never
-        # recorded and never read again.
+        # recorded, and never read again.
         name not in Map.values(names) and Runs.job(c.name, name) == nil ->
           update_st(
             &%{

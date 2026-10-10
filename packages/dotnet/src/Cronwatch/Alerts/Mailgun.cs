@@ -54,7 +54,7 @@ public sealed class MailgunChannel : IChannel
     private readonly ITransport? _transport;
 
     /// <summary>The channel.</summary>
-    /// <exception cref="CronwatchException">Without an API key, a domain, a sender or a recipient.</exception>
+    /// <exception cref="CronwatchException">Without an API key, a domain, a sender, or a recipient.</exception>
     public MailgunChannel(MailgunOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);

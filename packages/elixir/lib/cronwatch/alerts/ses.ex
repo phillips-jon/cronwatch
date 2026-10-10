@@ -16,7 +16,7 @@ defmodule Cronwatch.Alerts.SES do
   (for temporary credentials, an assumed role say),
   `:configuration_set_name` (for event publishing), the email options of
   `Cronwatch.Alerts.Email`, `:now` (a clock in epoch milliseconds the
-  request is signed with, for tests) and `:transport`.
+  request is signed with, for tests), and `:transport`.
   """
   @behaviour Cronwatch.Channel
 

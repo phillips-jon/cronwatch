@@ -515,7 +515,7 @@ internal static class Evaluate
 
     /// <summary>
     /// <c>Number(text)</c> for trimmed, non-empty text: decimal, <c>Infinity</c>, and the
-    /// <c>0x</c>, <c>0o</c> and <c>0b</c> integer forms; anything else is NaN.
+    /// <c>0x</c>, <c>0o</c>, and <c>0b</c> integer forms; anything else is NaN.
     /// </summary>
     internal static double StringToNumber(string text)
     {
@@ -616,7 +616,7 @@ internal static class Evaluate
     }
 
     /// <summary>
-    /// Called when a run finishes with status ok, failed or timeout. <paramref name="history"/> is
+    /// Called when a run finishes with status ok, failed, or timeout. <paramref name="history"/> is
     /// the job's earlier runs, newest first, not including this one.
     /// </summary>
     public static Evaluation OnRunFinish(Definition def, Run run, JobState state, IReadOnlyList<Run> history, long now)
@@ -880,7 +880,7 @@ internal static class Evaluate
         return openedAt == null || openedAt.Value != alert.At;
     }
 
-    /// <summary>How a job looks at a glance. Silence wins, then stuck, failing and late.</summary>
+    /// <summary>How a job looks at a glance. Silence wins, then stuck, failing, and late.</summary>
     public static JobHealth JobHealthOf(Definition def, Run? lastRun, JobState state, long now)
     {
         var open = OpenConditions(state);

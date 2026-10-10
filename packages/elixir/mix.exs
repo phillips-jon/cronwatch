@@ -15,7 +15,7 @@ defmodule Cronwatch.MixProject do
       deps: deps(),
       aliases: aliases(),
       description:
-        "Know when your cron jobs fail, run late or never run. " <>
+        "Know when your cron jobs fail, run late, or never run. " <>
           "The library behind cronwatch.dev, for Elixir and Erlang services.",
       package: package(),
       source_url: @source_url,

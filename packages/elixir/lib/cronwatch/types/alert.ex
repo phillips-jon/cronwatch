@@ -9,11 +9,11 @@ defmodule Cronwatch.Alert do
     * `"failed"` and `"stuck"`: `consecutive_failures`, `threshold`
     * `"slow"`: `duration_ms`, `threshold_ms`, `basis`
     * `"over_budget"` and `"under_floor"`: `breaches`, each a map of
-      `metric`, `value`, `limit` and `basis` (for `"under_floor"`, `limit`
+      `metric`, `value`, `limit`, and `basis` (for `"under_floor"`, `limit`
       is the floor, or for a metric without one the lowest of the earlier
       runs it was judged against)
     * `"recovered"`: `after` (the conditions that closed), `reason` (`nil`, or
-      `"unscheduled"` when missed closed because the job lost its schedule)
+      `"unscheduled"` when missed closed because the job lost its schedule),
       and `since` (when missed opened, for that reason)
 
   Each details map also holds `extra`, the keys a newer release added, in

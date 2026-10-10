@@ -24,7 +24,7 @@ import org.springframework.scheduling.support.CronExpression;
 
 /**
  * A report, not a gate: generated cron expressions read by Spring's {@code CronExpression},
- * Quartz's and cron-utils', each checked against CronWatch's reading (the croner port) as the
+ * Quartz's, and cron-utils', each checked against CronWatch's reading (the croner port) as the
  * integrations check a schedule ({@link SchedulerBridge#checkFires}), and how many each reads alike
  * printed, with why the rest differ. It keeps measured why CronWatch ports croner rather than
  * depending on a Java cron library (see DESIGN.md, Keeping in step), as the Rust port's report on
@@ -60,7 +60,7 @@ class ReadingsReportTest {
     return lo + Long.remainderUnsigned(next(), hi - lo + 1);
   }
 
-  /** A field in the grammar every library here shares: *, a value, a range, a step or a list. */
+  /** A field in the grammar every library here shares: *, a value, a range, a step, or a list. */
   private String field(long low, long high) {
     double kind = chance();
     if (kind < 0.35) {

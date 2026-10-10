@@ -20,7 +20,7 @@ import (
 	"cronwatch.dev/go/internal/js"
 )
 
-// Timeout is how long one request may take, connecting, sending and reading
+// Timeout is how long one request may take, connecting, sending, and reading
 // the answer, as the SDK's AbortSignal.timeout(10_000). A variable only
 // so tests can wait less.
 var Timeout = 10 * time.Second
@@ -62,7 +62,7 @@ type Response struct {
 func (r Response) OK() bool { return r.Status >= 200 && r.Status < 300 }
 
 // Clean is a URL as the URL parser (and so fetch) reads it: characters
-// U+0000 to U+0020 around it dropped, and every tab, CR and LF inside it
+// U+0000 to U+0020 around it dropped, and every tab, CR, and LF inside it
 // removed (a pasted webhook URL often ends in a newline).
 func Clean(raw string) string {
 	s := strings.TrimFunc(raw, func(r rune) bool { return r <= 0x20 })
@@ -101,7 +101,7 @@ func Postable(raw string) (string, error) {
 
 var defaultPorts = map[string]string{"http": "80", "https": "443", "ws": "80", "wss": "443", "ftp": "21"}
 
-// Origin is new URL(url).origin: the scheme, host and port only, a port
+// Origin is new URL(url).origin: the scheme, host, and port only, a port
 // that is the scheme's own left out. A URL's path or query can hold a
 // credential, so an error names only this.
 func Origin(raw string) string {
@@ -183,7 +183,7 @@ func token(name string) bool {
 }
 
 // Headers are the headers as a request sends them: each name an HTTP
-// token, each value without the spaces, tabs and line breaks around it,
+// token, each value without the spaces, tabs, and line breaks around it,
 // as fetch sends it. A name that is not a token, or a value with a line
 // break or NUL inside, is refused, as fetch refuses them, so no header can
 // add another; the error names the header, never its value, which may be
@@ -193,7 +193,7 @@ func Headers(list []Header) (http.Header, error) {
 	h := http.Header{}
 	for _, header := range list {
 		if !token(header.Name) {
-			return nil, errors.New("a header name must be a token (letters, digits and !#$%&'*+.^_`|~-)")
+			return nil, errors.New("a header name must be a token (letters, digits, and !#$%&'*+.^_`|~-)")
 		}
 		value := strings.Trim(header.Value, " \t\r\n")
 		if strings.ContainsAny(value, "\r\n\x00") {

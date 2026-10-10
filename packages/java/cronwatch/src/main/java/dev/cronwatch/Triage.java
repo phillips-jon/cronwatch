@@ -8,7 +8,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Adds a short diagnosis to every alert except recoveries: Claude triage ({@code
  * dev.cronwatch.triage.Anthropic}) or any function. It runs on a virtual thread of the client's and
- * is waited on for 25 seconds, then interrupted; a throw, a timeout or an empty answer is no
+ * is waited on for 25 seconds, then interrupted; a throw, a timeout, or an empty answer is no
  * diagnosis, and triage is not tried again for that alert.
  */
 @FunctionalInterface

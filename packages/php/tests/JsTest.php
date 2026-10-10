@@ -29,7 +29,7 @@ final class JsTest extends TestCase
         $this->assertSame('{"2":"b","10":"c","a":1,"0x":2}', Js::stringify(['a' => 1, '10' => 'c', '2' => 'b', '0x' => 2]), 'array-index keys first, ascending');
         $this->assertSame('{}', Js::stringify(Js::obj([])));
         $this->assertSame('[]', Js::stringify([]));
-        $this->assertSame('"a\u0001\n\"\\\\/é😀' . "\u{2028}\"", Js::stringify("a\x01\n\"\\/é😀\u{2028}"), 'only control characters, quotes and backslashes escaped');
+        $this->assertSame('"a\u0001\n\"\\\\/é😀' . "\u{2028}\"", Js::stringify("a\x01\n\"\\/é😀\u{2028}"), 'only control characters, quotes, and backslashes escaped');
     }
 
     public function testLengthsAndCutsAreInUtf16CodeUnits(): void

@@ -352,7 +352,7 @@ def _named(view: Callable[..., Any], handler: Handler) -> Callable[..., Any]:
 
 
 def _parts(response: Any) -> tuple[int, list[tuple[str, str]], bytes]:
-    """Status, headers and body of a response of any of the kinds handled here."""
+    """Status, headers, and body of a response of any of the kinds handled here."""
     from .web import Response
 
     if isinstance(response, Response):

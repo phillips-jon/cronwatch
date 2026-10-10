@@ -44,7 +44,7 @@ test("everything needs the token", async () => {
   assert.equal((await get("/cronwatch/api/jobs", { headers: { authorization: "Bearer tok" } })).status, 200);
 });
 
-test("GET /api names the library, its language, its version and the API's version, behind the token", async () => {
+test("GET /api names the library, its language, its version, and the API's version, behind the token", async () => {
   const { get, auth } = app();
   const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
   assert.equal(VERSION, pkg.version, "src/version.ts is in step with package.json");
@@ -158,7 +158,7 @@ test("a long name may break after its separators wherever it is text, and nowher
   assert.equal(page.match(/<wbr>/g)?.length, 8, "only in the crumb and the heading");
 });
 
-test("check, silence, unsilence and forget over the API", async () => {
+test("check, silence, unsilence, and forget over the API", async () => {
   const { cw, routes, auth } = app();
   await cw.run("s", async () => {});
   const post = (path: string, body?: unknown) => routes.POST(new Request(`http://app.test${path}`, {

@@ -12,7 +12,7 @@ use Cronwatch\Tests\Symfony\Fixtures\TestKernel;
 use Symfony\Component\HttpKernel\KernelInterface;
 
 // The Symfony tests run on FrameworkBundle's test kernel with the
-// Scheduler, Messenger and SecurityBundle, which the CI entries for each
+// Scheduler, Messenger, and SecurityBundle, which the CI entries for each
 // supported Symfony install (see DESIGN.md); without them they are skipped,
 // so the core suite runs on its own.
 if (class_exists(\Symfony\Bundle\FrameworkBundle\Test\WebTestCase::class)
@@ -99,7 +99,7 @@ if (class_exists(\Symfony\Bundle\FrameworkBundle\Test\WebTestCase::class)
     {
         protected function setUp(): void
         {
-            $this->markTestSkipped('the Symfony tests need symfony/framework-bundle, symfony/scheduler, symfony/messenger, symfony/security-bundle and symfony/browser-kit');
+            $this->markTestSkipped('the Symfony tests need symfony/framework-bundle, symfony/scheduler, symfony/messenger, symfony/security-bundle, and symfony/browser-kit');
         }
     }
 }

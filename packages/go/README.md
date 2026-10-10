@@ -1,8 +1,8 @@
 # cronwatch.dev/go
 
-Cron and scheduled-job monitoring that lives inside your Go app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make.
+Cron and scheduled-job monitoring that lives inside your Go app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget, or quietly does nothing. No server to run, no account to make.
 
-This is the Go port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Go process and a Node, Ruby, Python, PHP, Rust, Elixir, Java or .NET process can share one database, and every port reads the tables the others write. It has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook), the memory store, a `database/sql` store for SQLite, Postgres, MySQL and MariaDB, the SDK's alert channels, Claude triage, the pg_cron source, the dashboard with its JSON API, job handlers for platform crons, and integrations for robfig/cron, gocron, River and Asynq ([DESIGN.md](DESIGN.md) has how each part works).
+This is the Go port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text, and the same stored rows, so a Go process and a Node, Ruby, Python, PHP, Rust, Elixir, Java, or .NET process can share one database, and every port reads the tables the others write. It has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery, and the triage hook), the memory store, a `database/sql` store for SQLite, Postgres, MySQL, and MariaDB, the SDK's alert channels, Claude triage, the pg_cron source, the dashboard with its JSON API, job handlers for platform crons, and integrations for robfig/cron, gocron, River, and Asynq ([DESIGN.md](DESIGN.md) has how each part works).
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
@@ -56,7 +56,7 @@ func main() {
 	err = nightly.Run(context.Background(), func(ctx context.Context, job *cronwatch.JobContext) error {
 		path, err := buildReport(ctx) // ctx is cancelled when the job's timeout passes
 		job.Log("Report written:", path) // kept with the run, shown in alerts
-		job.Metric("cost", 1.2)          // watched against budgets, floors and baselines
+		job.Metric("cost", 1.2)          // watched against budgets, floors, and baselines
 		return err
 	})
 	if err != nil {
@@ -79,7 +79,7 @@ c.AddFunc("0 2 * * *", jobs.NightlyReport)
 c.AddJob("*/15 * * * *", robfigcron.Named("sync-invoices", syncJob, cronwatch.Grace("5m")))
 ```
 
-**gocron v2** (`go get cronwatch.dev/go/gocron`, gocron 2.21 or newer): its event listeners, as a scheduler option. Cron, duration, and daily, weekly and monthly jobs are read as schedules; a job is named by `gocron.WithName`, else its function.
+**gocron v2** (`go get cronwatch.dev/go/gocron`, gocron 2.21 or newer): its event listeners, as a scheduler option. Cron, duration, and daily, weekly, and monthly jobs are read as schedules; a job is named by `gocron.WithName`, else its function.
 
 ```go
 s, err := gocron.NewScheduler(cwgocron.New(cw, cwgocron.Options{}).Option())
@@ -117,11 +117,11 @@ mux.Use(w.Middleware())
 mux.Handle(cwasynq.CheckType, w.CheckHandler())
 ```
 
-Retries follow one rule everywhere: each attempt is a run, failing attempts open one alert and the attempt that succeeds closes it. An attempt given back without failing (a River snooze or cancel, an Asynq revoke) leaves no run.
+Retries follow one rule everywhere: each attempt is a run, failing attempts open one alert, and the attempt that succeeds closes it. An attempt given back without failing (a River snooze or cancel, an Asynq revoke) leaves no run.
 
 ## Alerts
 
-Alerts go to the console until you give channels. `cronwatch.dev/go/alerts` has the SDK's, on `net/http` alone: Slack, Discord, a signed webhook, email through Resend, Postmark, SendGrid, Mailgun or SES, SMS through Twilio, and Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic.
+Alerts go to the console until you give channels. `cronwatch.dev/go/alerts` has the SDK's, on `net/http` alone: Slack, Discord, a signed webhook, email through Resend, Postmark, SendGrid, Mailgun, or SES, SMS through Twilio, and Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, and New Relic.
 
 ```go
 slack, err := alerts.Slack(alerts.SlackOptions{WebhookURL: os.Getenv("SLACK_WEBHOOK_URL")})
@@ -145,7 +145,7 @@ cw, err := cronwatch.New(cronwatch.WithAlerts(slack), cronwatch.WithTriage(diagn
 
 ## pg_cron
 
-`cronwatch.dev/go/pgcron` watches pg_cron's jobs, which run inside Postgres where nothing can wrap them: each check reads `cron.job` and `cron.job_run_details` through your `*sql.DB` (any driver) and records their runs, so missed, failed, stuck and slow jobs alert like your own.
+`cronwatch.dev/go/pgcron` watches pg_cron's jobs, which run inside Postgres where nothing can wrap them: each check reads `cron.job` and `cron.job_run_details` through your `*sql.DB` (any driver) and records their runs, so missed, failed, stuck, and slow jobs alert like your own.
 
 ```go
 cw, err := cronwatch.New(cronwatch.WithStore(store), cronwatch.WithSources(pgcron.New(db, pgcron.Options{Prefix: "db:"})))
@@ -157,7 +157,7 @@ cw.StartChecking(time.Minute)
 
 ## Dashboard
 
-`cw.Routes(...)` is the dashboard and its small JSON API as an `http.Handler`: every job's health, its last day and week drawn as timelines, its runs with their output, and buttons to check, silence and forget. It is the SDK's, page for page and byte for byte, so the `@cronwatch/mcp` server works against it as it does against a Node app. It installs as an app on a phone (a manifest, icons and a service worker, served without the token).
+`cw.Routes(...)` is the dashboard and its small JSON API as an `http.Handler`: every job's health, its last day and week drawn as timelines, its runs with their output, and buttons to check, silence, and forget. It is the SDK's, page for page and byte for byte, so the `@cronwatch/mcp` server works against it as it does against a Node app. It installs as an app on a phone (a manifest, icons, and a service worker, served without the token).
 
 ```go
 routes, err := cw.Routes(cronwatch.WithToken(os.Getenv("CRONWATCH_TOKEN")))
@@ -165,7 +165,7 @@ mux.Handle("/cronwatch/", routes)                               // mounted at /c
 mux.Handle("/ops/cron/", http.StripPrefix("/ops/cron", routes)) // or anywhere, stripped
 ```
 
-Everything needs the token: send it as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps the browser signed in. `/api/check` also takes the client's cron secret, so a platform cron can run checks. With no token, the routes answer 503, except in development (the first of `CRONWATCH_ENV`, `APP_ENV` and `GO_ENV` set to more than whitespace naming `development`, `dev`, `local`, `test` or `testing`), where they make one and print a sign-in link on the first request (naming the host only when `WithOrigin` is set or the request's host is loopback, since a client chooses it); `cronwatch.WithoutToken()` serves them open, behind your own auth. The base path is found from the request: what `http.StripPrefix` took off, else the part of the `ServeMux` pattern before its wildcard or trailing slash, else `/cronwatch`; `cronwatch.WithBasePath` sets it. Behind a proxy, `cronwatch.WithOrigin("https://app.example.com")` or `cronwatch.WithTrustProxy()` gives the public origin the cross-site check and the cookie use.
+Everything needs the token: send it as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps the browser signed in. `/api/check` also takes the client's cron secret, so a platform cron can run checks. With no token, the routes answer 503, except in development (the first of `CRONWATCH_ENV`, `APP_ENV`, and `GO_ENV` set to more than whitespace naming `development`, `dev`, `local`, `test`, or `testing`), where they make one and print a sign-in link on the first request (naming the host only when `WithOrigin` is set or the request's host is loopback, since a client chooses it); `cronwatch.WithoutToken()` serves them open, behind your own auth. The base path is found from the request: what `http.StripPrefix` took off, else the part of the `ServeMux` pattern before its wildcard or trailing slash, else `/cronwatch`; `cronwatch.WithBasePath` sets it. Behind a proxy, `cronwatch.WithOrigin("https://app.example.com")` or `cronwatch.WithTrustProxy()` gives the public origin the cross-site check and the cookie use.
 
 ## Platform crons
 
@@ -213,38 +213,37 @@ Each still works and is marked `Deprecated:` in its doc comment:
 | `robfigcron.Watch(cw, o)`, `cwgocron.Watch(cw, o)` | `robfigcron.New(cw, o).Option()`, `cwgocron.New(cw, o).Option()` | 2.0 |
 | `cwgocron.Converted` | `robfigcron.Converted`, the same type, which every integration's `Convert` returns | 1.0 |
 | `cwgocron.Panic` | `cwgocron.PanicError`, the same type | 1.0 |
-| `JSValue()` on `Alert`, `CheckResult`, `Definition`, `JobState`, `JobSummary`, `Metrics` and `Run` | `MarshalJSON`, or `encoding/json`, for the same bytes | 1.0 |
+| `JSValue()` on `Alert`, `CheckResult`, `Definition`, `JobState`, `JobSummary`, `Metrics`, and `Run` | `MarshalJSON`, or `encoding/json`, for the same bytes | 1.0 |
 | `cronwatch.Stderr`, `cronwatch.Stdout` | `WithErrorHandler`, and a channel of your own in place of `Console` | 1.0 |
 | `cronwatch.MaxBody`, `cronwatch.ReservedRunIDPrefix` | nothing: the 1 MiB limit and the `pgcron:` prefix are documented and do not change | 1.0 |
 | `pgcron.Hold`, `pgcron.Schedule`, `pgcron.JobName`, `pgcron.RunOf` | nothing: they are the source's internals | 1.0 |
 | `triage.System` | nothing: the prompt is not part of the promise | 1.0 |
+| everything in `storetest` but `Run` (`ReplayFixture`, `ReplayForeignVersions`, `FinishOnce`, `Shared`, `Clock`, `T0`, and the other fixture helpers) | `storetest.Run`, the contract test | 1.0 |
 
 `cronwatch.dev/go/bridge`, what the scheduler integrations share, is outside the 1.x promise: it may change in any minor release.
 
 ## Testing
 
 ```bash
-cd packages/go && go test -race ./...           # the core, the dashboard, the channels, triage and pg_cron (against fakes), standard library only
-cd packages/go/sqltest && go test -race ./...   # the SQL store with real drivers
-cd packages/go/robfigcron && go test -race ./... # and gocron, river, asynq, examples: each a module of its own
+cd packages/go && go test -race ./...            # the core, the dashboard, the channels, triage, and pg_cron (against fakes)
+cd packages/go/sqltest && go test -race ./...    # the SQL store with real drivers
+cd packages/go/robfigcron && go test -race ./... # and gocron, river, asynq, and examples: each a module of its own
 ```
 
-The integrations require their schedulers at the oldest release they support; CI also tests the newest (`go get` it first). River's tests need a Postgres (`CRONWATCH_TEST_PG`, each run in a schema of its own) and Asynq's end-to-end test a Redis (`CRONWATCH_TEST_REDIS=redis://127.0.0.1:56379/0`, from `docker run -d --name cw-redis -p 56379:6379 redis:7-alpine`); both skip without them.
-
-Run `npm ci && npm run build` at the repository root first: the croner parity test (`internal/schedule`) and the SQLite file shared with Node (`sqltest`) use the built SDK, and skip, with the reason, without it. The dashboard is checked against `packages/ruby/test/web/golden.json`, the SDK's answers to a fixed seed, and `CRONWATCH_TEST_GO=1 npm test --workspace packages/mcp` drives the MCP server against it. The tests set the process zone to UTC, as the conformance fixtures are made in UTC.
-
-`sqltest` is a module of its own so that the drivers it uses (`modernc.org/sqlite`, `github.com/jackc/pgx/v5`, `github.com/lib/pq`, `github.com/go-sql-driver/mysql`) never appear in the `cronwatch.dev/go` module. SQLite always runs; Postgres, MySQL and MariaDB run when these are set, and the pg_cron source against a real pg_cron (through pgx and lib/pq) when `CRONWATCH_TEST_PGCRON` names a Postgres with the extension preloaded:
+SQLite always runs. Postgres, MySQL, and MariaDB (the SQL store, in `sqltest`), pg_cron (the pg_cron source, against a Postgres with the extension preloaded), and Redis (Asynq's end-to-end test) are used when the variables below name them, and their tests skip without them; `CRONWATCH_TEST_PG` also runs River's tests, each in a schema of its own.
 
 ```bash
 docker run -d --name cw-pg -e POSTGRES_PASSWORD=cw -p 55432:5432 postgres:17
 docker run -d --name cw-mysql -e MYSQL_ROOT_PASSWORD=cw -e MYSQL_DATABASE=cw -p 53306:3306 mysql:8.4
 docker run -d --name cw-mariadb -e MARIADB_ROOT_PASSWORD=cw -e MARIADB_DATABASE=cw -p 53307:3306 mariadb:11.4
+docker run -d --name cw-redis -p 56379:6379 redis:7-alpine
 # pg_cron: postgres:16 with postgresql-16-cron installed, run with
 #   postgres -c shared_preload_libraries=pg_cron -c cron.database_name=cw
 
-CRONWATCH_TEST_PG=postgres://postgres:cw@127.0.0.1:55432/postgres \
-CRONWATCH_TEST_MYSQL=mysql://root:cw@127.0.0.1:53306/cw \
-CRONWATCH_TEST_MARIADB=mysql://root:cw@127.0.0.1:53307/cw \
-CRONWATCH_TEST_PGCRON=postgres://postgres:cw@127.0.0.1:55433/cw \
-go test -race ./...
+export CRONWATCH_TEST_PG=postgres://postgres:cw@127.0.0.1:55432/postgres
+export CRONWATCH_TEST_MYSQL=mysql://root:cw@127.0.0.1:53306/cw
+export CRONWATCH_TEST_MARIADB=mysql://root:cw@127.0.0.1:53307/cw
+export CRONWATCH_TEST_PGCRON=postgres://postgres:cw@127.0.0.1:55433/cw
+export CRONWATCH_TEST_REDIS=redis://127.0.0.1:56379/0
+cd packages/go/sqltest && go test -race ./... # and in river and asynq
 ```

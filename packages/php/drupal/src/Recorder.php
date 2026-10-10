@@ -36,7 +36,7 @@ use Psr\Log\LoggerInterface;
  *   under CronWatch's settings (what the system crontab does), else Automated
  *   Cron's interval as "every <interval>s", else none. A cron that stops is
  *   one missed alert, not one per module; each module's own job reports its
- *   failures, slow runs and stuck runs.
+ *   failures, slow runs, and stuck runs.
  * - Queue workers opt in (the settings' list, or #[Cronwatch\Watch] on the
  *   worker's class), and then every item processed is a run of
  *   "drupal:queue:<worker id>", in cron, `drush queue:run` or anywhere else.
@@ -213,7 +213,7 @@ final class Recorder {
       $secret = (string) $settings->get('webhook_secret');
       $channels[] = new Webhook($webhook, [], $secret !== '' ? $secret : NULL);
     }
-    // Discord, the email providers, Twilio and the error trackers, each once its required fields are set.
+    // Discord, the email providers, Twilio, and the error trackers, each once its required fields are set.
     array_push($channels, ...ChannelSettings::channels(
       fn (string $key): string => (string) $settings->get($key),
       $link,
@@ -272,7 +272,7 @@ final class Recorder {
    *
    * @return array{?string, string}
    *   The schedule (null for none) and its source: "settings",
-   *   "automated_cron" or "none".
+   *   "automated_cron", or "none".
    */
   public function cronSchedule(): array {
     $set = trim((string) $this->settings()->get('schedule'));
@@ -319,7 +319,7 @@ final class Recorder {
    * @param array<string, mixed> $options
    *   The job's options.
    * @param array<string, string> $context
-   *   What the job is: kind (cron, module or queue) and module or queue.
+   *   What the job is: kind (cron, module, or queue) and module or queue.
    */
   private function declare(string $name, array $options, array $context): JobHandle {
     $altered = $options;
@@ -705,7 +705,7 @@ final class Recorder {
    * One queue item, processed by `process` as a run of the worker's job.
    *
    * What it throws is recorded as the failure and thrown again, so the
-   * queue runner releases, delays or keeps the item as it would.
+   * queue runner releases, delays, or keeps the item as it would.
    */
   public function queueItem(string $id, string $class, callable $process): mixed {
     $key = NULL;

@@ -1,6 +1,6 @@
 defmodule Cronwatch.Core do
   @moduledoc false
-  # What runs, handles and checks share (client.ts's private methods): the
+  # What runs, handles, and checks share (client.ts's private methods): the
   # store calls, the one read-modify-write of a job's state, and the finish
   # of a run, written only by the process whose conditional write lands.
   #

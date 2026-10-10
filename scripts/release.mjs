@@ -129,7 +129,7 @@ const PUBLISH = [
   // watches, once PHP_SPLIT_ENABLED is on (packages/php/DESIGN.md, Releasing).
   // The WordPress plugin: the same tag starts
   // .github/workflows/wordpress-zip.yml, which builds its zip, attaches it to
-  // the tag's GitHub release (making the release if needed) and commits it to
+  // the tag's GitHub release (making the release if needed), and commits it to
   // the plugin directory's SVN, once WPORG_ENABLED is on.
   { dir: "packages/php", commands: (v) => [
     `# packages/php: the pushed tag v${v} is split to its own repository by .github/workflows/php-split.yml (packages/php/DESIGN.md, Releasing)`,
@@ -189,9 +189,9 @@ const REGENERATED = ["package-lock.json", "conformance/*.json (sdkVersion)", "pa
 const ROOT = process.cwd();
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 
-/** "a", "a and b", "a, b and c". */
+/** "a", "a and b", "a, b, and c". */
 function listed(items) {
-  return items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+  return items.length < 3 ? items.join(" and ") : `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
 }
 
 function fail(message) {
@@ -225,7 +225,7 @@ function parseArgs(argv) {
   return options;
 }
 
-/** Semver precedence: negative, zero or positive, as a is lower, equal or higher. Build metadata is ignored. */
+/** Semver precedence: negative, zero, or positive, as a is lower, equal, or higher. Build metadata is ignored. */
 function compareVersions(a, b) {
   const [, ...pa] = SEMVER.exec(a);
   const [, ...pb] = SEMVER.exec(b);

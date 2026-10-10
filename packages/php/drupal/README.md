@@ -1,8 +1,8 @@
 # CronWatch for Drupal
 
-Cron monitoring that lives inside your Drupal site. Every cron run and each module's `hook_cron` in it is recorded in the site's own database, and you are told when cron is missed, when a `hook_cron` fails, gets stuck or runs much slower than usual, and again when it recovers. Queue workers you choose are watched too, each item a run. No server to run, no account to make.
+Cron monitoring that lives inside your Drupal site. Every cron run and each module's `hook_cron` in it is recorded in the site's own database, and you are told when cron is missed, when a `hook_cron` fails, gets stuck, or runs much slower than usual, and again when it recovers. Queue workers you choose are watched too, each item a run. No server to run, no account to make.
 
-This is the Drupal module of [the CronWatch library](https://cronwatch.dev/) (`cronwatch/cronwatch`), which also watches jobs in TypeScript, Ruby, Python, Go, Rust, Elixir, Java and .NET apps, plain PHP, Laravel, Symfony, WordPress and Craft CMS, and keeps the same tables in every language.
+This is the Drupal module of [the CronWatch library](https://cronwatch.dev/) (`cronwatch/cronwatch`), which also watches jobs in TypeScript, Ruby, Python, Go, Rust, Elixir, Java, and .NET apps, plain PHP, Laravel, Symfony, WordPress, and Craft CMS, and keeps the same tables in every language.
 
 ## Requirements
 
@@ -17,7 +17,7 @@ composer require drupal/cronwatch
 drush pm:install cronwatch
 ```
 
-Installing makes three tables in the site's database (`cronwatch_jobs`, `cronwatch_runs` and `cronwatch_state`, after the site's table prefix); uninstalling drops them.
+Installing makes three tables in the site's database (`cronwatch_jobs`, `cronwatch_runs`, and `cronwatch_state`, after the site's table prefix); uninstalling drops them.
 
 ## What is watched
 
@@ -42,7 +42,7 @@ and set the schedule under the settings to match (`*/5 * * * *`). A missed `drup
 
 ## Settings
 
-Configuration, System, CronWatch (`/admin/config/system/cronwatch`), for users with "Administer CronWatch": where alerts go (email through the site's mail system, a Slack incoming webhook, a webhook, signed when given a secret, and under More channels Discord, email through Resend, Postmark, SendGrid, Mailgun or Amazon SES, text messages through Twilio, and Sentry, Honeybadger, Datadog, Rollbar, Bugsnag or New Relic, each once its required fields are set), the grace a run is given (10 minutes by default), cron's schedule, whether the check runs after each cron run, and the watched queues. "Send a test alert" sends one to every channel and says what each answered. Nothing leaves the site until a channel is set; with none, alerts go to the site's log.
+Configuration, System, CronWatch (`/admin/config/system/cronwatch`), for users with "Administer CronWatch": where alerts go (email through the site's mail system, a Slack incoming webhook, a webhook, signed when given a secret, and under More channels Discord, email through Resend, Postmark, SendGrid, Mailgun, or Amazon SES, text messages through Twilio, and Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, or New Relic, each once its required fields are set), the grace a run is given (10 minutes by default), cron's schedule, whether the check runs after each cron run, and the watched queues. "Send a test alert" sends one to every channel and says what each answered. Nothing leaves the site until a channel is set; with none, alerts go to the site's log.
 
 The settings are configuration, so they are exported with it; keep a credential out of the export by setting it in `settings.php`:
 
@@ -54,7 +54,7 @@ $config['cronwatch.settings']['slack_webhook_url'] = getenv('SLACK_WEBHOOK_URL')
 
 ## The dashboard
 
-Reports, CronWatch (`/admin/reports/cronwatch`), for users with "View the CronWatch dashboard": the jobs' health, the last day as a timeline, each job's runs and output. Silencing, forgetting and "Run check now" need "Administer CronWatch" as well, and carry Drupal's CSRF token.
+Reports, CronWatch (`/admin/reports/cronwatch`), for users with "View the CronWatch dashboard": the jobs' health, the last day as a timeline, each job's runs and output. Silencing, forgetting, and "Run check now" need "Administer CronWatch" as well, and carry Drupal's CSRF token.
 
 The JSON API that [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) talks to is off until a token is set in `settings.php` (`$settings['cronwatch_token'] = '...'`, or the `CRONWATCH_TOKEN` environment variable); it is then at `https://example.com/cronwatch/api`, with the token as a bearer token.
 

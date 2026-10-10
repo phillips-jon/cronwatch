@@ -95,7 +95,7 @@ defmodule Cronwatch.Run.Exec do
     end
   end
 
-  # The run as its function ended: judged, recorded and alerted on.
+  # The run as its function ended: judged, recorded, and alerted on.
   defp record_outcome(c, job, info, outcome) do
     lines = Runs.table(c.name, :lines)
     failure = failure_text(outcome)
@@ -187,10 +187,10 @@ defmodule Cronwatch.Run.Exec do
   @doc """
   Opens a run in the calling process, for an integration that sees a run's
   start and end as two events (a telemetry handler): the running row, the
-  monitor on this process, the context for `current/0` and the Logger
+  monitor on this process, the context for `current/0`, and the Logger
   metadata, as `run/3` sets them up. `close/2` or `take_back/2` must follow
   in the same process. Options: `trigger`, `id` (a run id of the
-  integration's own) and `defer` (close missed and stuck only once the run
+  integration's own), and `defer` (close missed and stuck only once the run
   is known not to be given back).
   """
   def open(%Job{} = job, opts) do
@@ -231,7 +231,7 @@ defmodule Cronwatch.Run.Exec do
   @doc """
   Closes a run `open/2` opened, with its outcome as `run/3` sees one
   (`{:returned, value}`, `{:error, exception, stacktrace}`, `{:throw, value,
-  stacktrace}` or `{:exit, reason, stacktrace}`), and records it. Nothing is
+  stacktrace}`, or `{:exit, reason, stacktrace}`), and records it. Nothing is
   recorded when the monitor already has (the process died meanwhile).
   """
   def close(%{config: c, job: job, info: info} = state, outcome) do
@@ -596,7 +596,7 @@ defmodule Cronwatch.Run.Exec do
   defp returned_text({:ok, text}) when is_binary(text), do: text
   defp returned_text(_), do: nil
 
-  # A raise, throw or exit is raised again with its stacktrace, so the
+  # A raise, throw, or exit is raised again with its stacktrace, so the
   # caller's own handling sees exactly what it would have without
   # CronWatch; a returned value is returned. An isolated run's crash is
   # handed back as an exit.

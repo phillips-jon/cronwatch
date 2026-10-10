@@ -1,11 +1,11 @@
 //! A Node process and a Rust process sharing one SQLite file: the SDK's store
 //! (from the built packages/sdk/dist) and `SqlStore` replay the same store
-//! calls (testdata/shared_store.json, the Ruby, Python and Go ports'
+//! calls (testdata/shared_store.json, the Ruby, Python, and Go ports'
 //! fixture), and each must read what the other wrote exactly as it reads its
 //! own, down to the bytes and SQLite type of every column. Then a Node client
 //! and a Rust client take turns on one file, and on one job's state version.
 //!
-//! Needs node on the PATH, the SDK built and its SQLite driver installed
+//! Needs node on the PATH, the SDK built, and its SQLite driver installed
 //! (`npm ci && npm run build` at the repository root); skipped, with the
 //! reason, without them.
 

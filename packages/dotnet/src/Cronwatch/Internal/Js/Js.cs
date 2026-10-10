@@ -6,13 +6,13 @@ namespace Cronwatch.Internal;
 
 /// <summary>
 /// What the port needs of JavaScript's own behaviour, so that every value the SDK writes,
-/// compares or counts is written, compared and counted the same way here: numbers as
+/// compares, or counts is written, compared, and counted the same way here: numbers as
 /// <c>Number.prototype.toString</c> prints them, the characters <c>\s</c> matches and
 /// <c>trim</c> removes, <c>Date</c>'s calendar arithmetic and <c>toISOString</c>, and strings
 /// written out as UTF-8 with a lone surrogate as U+FFFD.
 /// </summary>
 /// <remarks>
-/// .NET strings are UTF-16, as JavaScript's are, so <c>Length</c>, <c>Substring</c> and the
+/// .NET strings are UTF-16, as JavaScript's are, so <c>Length</c>, <c>Substring</c>, and the
 /// indexer count and cut as the SDK does.
 /// </remarks>
 internal static class Js
@@ -313,7 +313,7 @@ internal static class Js
         return era * 146_097 + doe - 719_468;
     }
 
-    /// <summary>The date of a day counted from 1970-01-01: year, month (1 to 12) and day.</summary>
+    /// <summary>The date of a day counted from 1970-01-01: year, month (1 to 12), and day.</summary>
     public static (long Year, long Month, long Day) CivilFromDays(long z0)
     {
         long z = z0 + 719_468;

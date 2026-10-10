@@ -1,6 +1,6 @@
 # cronwatch-sqlx
 
-The SQL store for [`cronwatch`](https://crates.io/crates/cronwatch), the Rust port of the library behind [cronwatch.dev](https://cronwatch.dev). It keeps CronWatch's jobs, runs and state in the app's own database through sqlx and the app's own pool, in the same tables and bytes as the Node SDK and the Ruby, Python, PHP, Go, Elixir, Java and .NET ports, so processes in any of them can share one database. It also has the pg_cron source, which watches the jobs pg_cron runs inside Postgres.
+The SQL store for [`cronwatch`](https://crates.io/crates/cronwatch), the Rust port of the library behind [cronwatch.dev](https://cronwatch.dev). It keeps CronWatch's jobs, runs, and state in the app's own database through sqlx and the app's own pool, in the same tables and bytes as the Node SDK and the Ruby, Python, PHP, Go, Elixir, Java, and .NET ports, so processes in any of them can share one database. It also has the pg_cron source, which watches the jobs pg_cron runs inside Postgres.
 
 Each database is a feature (sqlx 0.9, Rust 1.94 or newer):
 
@@ -46,11 +46,11 @@ cw.start_checking(std::time::Duration::from_secs(60));
 # }
 ```
 
-On every check the source reads `cron.job`, declares each job with its schedule (in `cron.timezone`, read from `pg_settings`, else UTC), and copies new rows of `cron.job_run_details` in as runs, so missed, failed, stuck and slow runs alert as any other job's do. The first time it sees a job it copies the twenty newest runs without alerting. A job renamed, unscheduled or no longer picked keeps its history under its old name, declared again without a schedule. `PgCronOptions` picks jobs (`jobs`, `job_ids` or `pick`), names them (`prefix`, `job_name`) and gives them options (`options`, `options_for`). The pool must be on the database pg_cron runs in (its `cron.database_name`); pg_cron's row level security shows a role only its own jobs.
+On every check the source reads `cron.job`, declares each job with its schedule (in `cron.timezone`, read from `pg_settings`, else UTC), and copies new rows of `cron.job_run_details` in as runs, so missed, failed, stuck, and slow runs alert as any other job's do. The first time it sees a job it copies the twenty newest runs without alerting. A job renamed, unscheduled, or no longer picked keeps its history under its old name, declared again without a schedule. `PgCronOptions` picks jobs (`jobs`, `job_ids`, or `pick`), names them (`prefix`, `job_name`), and gives them options (`options`, `options_for`). The pool must be on the database pg_cron runs in (its `cron.database_name`); pg_cron's row level security shows a role only its own jobs.
 
 ## Tests
 
-`cargo test -p cronwatch-sqlx --all-features` runs the SQLite tests always, and the Postgres, MySQL, MariaDB and pg_cron tests when these are set:
+`cargo test -p cronwatch-sqlx --all-features` runs the SQLite tests always, and the Postgres, MySQL, MariaDB, and pg_cron tests when these are set:
 
 ```text
 CRONWATCH_TEST_PG=postgres://postgres:pw@127.0.0.1:5432/cw

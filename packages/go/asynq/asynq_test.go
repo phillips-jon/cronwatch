@@ -226,7 +226,7 @@ func TestTypesNotJobsAreForgottenAfterTheirMinute(t *testing.T) {
 	}
 }
 
-// TestAsynqEndToEnd runs a real server, scheduler and periodic task
+// TestAsynqEndToEnd runs a real server, scheduler, and periodic task
 // manager on the Redis CRONWATCH_TEST_REDIS names.
 func TestAsynqEndToEnd(t *testing.T) {
 	t.Setenv("CRONWATCH_APP_ID", "billing")

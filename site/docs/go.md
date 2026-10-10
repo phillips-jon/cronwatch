@@ -7,7 +7,7 @@ group: Go
 
 # Go
 
-`cronwatch.dev/go` is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow, over budget and under floor by the same rules, sends the same alert text, and writes the same rows, so a Go process can share one database with a Node, Ruby, Python, PHP, Rust, Elixir, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers the module itself: a `main` a crontab runs, a service with a `net/http` server, a Lambda function. robfig/cron, gocron, River and Asynq have a page of their own: [Go schedulers](/docs/go-schedulers/).
+`cronwatch.dev/go` is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow, over budget, and under floor by the same rules, sends the same alert text, and writes the same rows, so a Go process can share one database with a Node, Ruby, Python, PHP, Rust, Elixir, Java, or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers the module itself: a `main` a crontab runs, a service with a `net/http` server, a Lambda function. robfig/cron, gocron, River, and Asynq have a page of their own: [Go schedulers](/docs/go-schedulers/).
 
 ```bash
 go get cronwatch.dev/go
@@ -19,9 +19,9 @@ The package is `cronwatch`, so the import reads `cronwatch "cronwatch.dev/go"`, 
 
 | Import | For |
 |---|---|
-| `cronwatch.dev/go` | the client, jobs and runs, the memory store, the dashboard and job handlers as `http.Handler`s, the Lambda adapter, `Console` and `ChannelFunc` |
-| `cronwatch.dev/go/sqlstore` | SQLite, Postgres, MySQL and MariaDB through `database/sql` |
-| `cronwatch.dev/go/alerts` | Slack, Discord, webhook, email, SMS and error tracker channels, on `net/http` alone |
+| `cronwatch.dev/go` | the client, jobs and runs, the memory store, the dashboard and job handlers as `http.Handler`s, the Lambda adapter, `Console`, and `ChannelFunc` |
+| `cronwatch.dev/go/sqlstore` | SQLite, Postgres, MySQL, and MariaDB through `database/sql` |
+| `cronwatch.dev/go/alerts` | Slack, Discord, webhook, email, SMS, and error tracker channels, on `net/http` alone |
 | `cronwatch.dev/go/triage` | Claude triage, over plain HTTP |
 | `cronwatch.dev/go/pgcron` | watching pg_cron's jobs |
 | `cronwatch.dev/go/storetest` | the contract test for a store of your own |
@@ -65,7 +65,7 @@ if err != nil {
 defer cw.Close()
 ```
 
-One client per app, made once at startup and shared: it is safe for use by many goroutines at once, as are its jobs, run handles, job contexts and every store. Options are functions, applied in the order given, and `New` returns an error for one it cannot take. `cronwatch.MustNew(...)` panics instead, for a package-level variable. With no options the client keeps everything in memory and writes alerts to the console.
+One client per app, made once at startup and shared: it is safe for use by many goroutines at once, as are its jobs, run handles, job contexts, and every store. Options are functions, applied in the order given, and `New` returns an error for one it cannot take. `cronwatch.MustNew(...)` panics instead, for a package-level variable. With no options the client keeps everything in memory and writes alerts to the console.
 
 ## Declare and run a job
 
@@ -84,16 +84,16 @@ err = nightly.Run(ctx, func(ctx context.Context, job *cronwatch.JobContext) erro
 		return err
 	}
 	job.Log("Report written:", path) // kept with the run, shown in alerts
-	job.Metric("cost", 1.2)          // watched against budgets, floors and baselines
+	job.Metric("cost", 1.2)          // watched against budgets, floors, and baselines
 	return nil
 })
 ```
 
 The run is recorded when the function returns. A returned error is the failure, and `Run` returns it, so your own error handling still works. A panic is recorded as a failed run (`panic: <value>` and the frames where it happened) and then carries on up the stack, so a run is never left running to be reported stuck later. The store failing never stops a job: store errors go to the error handler (`cronwatch.WithErrorHandler`, standard error by default), and the job's own outcome is returned. A run is recorded as it ended even when the caller's context was cancelled first: the store is written under `context.WithoutCancel`, so the context's values (a trace id) still reach it.
 
-Declare each job once, at startup, and keep the handle; `cw.MustJob` panics where `Job` returns an error, for a package-level declaration. Without a handle, `cw.Run(ctx, "nightly-report", fn)` declares the job on first use (or again, when given options). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit.
+Declare each job once, at startup, and keep the handle; `cw.MustJob` panics where `Job` returns an error, for a package-level declaration. Without a handle, `cw.Run(ctx, "nightly-report", fn)` declares the job on first use (or again, when given options). A name is 1 to 120 letters, digits, `.`, `_`, `:`, or `-`, starting with a letter or digit.
 
-Options are applied in the order given, and a stored definition keeps that order, so a Go process writes the same JSON a Node process does for the same options in the same order. Durations take the SDK's text or a Go value: `Grace("15m")`, `Grace(15*time.Minute)` and `Grace(900000)` (milliseconds) are all the same grace. Text is stored as written, a `time.Duration` as its milliseconds.
+Options are applied in the order given, and a stored definition keeps that order, so a Go process writes the same JSON a Node process does for the same options in the same order. Durations take the SDK's text or a Go value: `Grace("15m")`, `Grace(15*time.Minute)`, and `Grace(900000)` (milliseconds) are all the same grace. Text is stored as written, a `time.Duration` as its milliseconds.
 
 A function that returns a value runs through `cronwatch.RunValue`, which returns it. A string is the run's output when nothing was logged (and what `Expect` checks), and an `*http.Response` with a status of 400 or more fails the run with `HTTP <status> <reason>`, so a job that calls an API and returns its answer fails when the API does:
 
@@ -107,7 +107,7 @@ res, err := cronwatch.RunValue(ctx, sync, func(ctx context.Context, job *cronwat
 })
 ```
 
-The `JobContext` has `Name()`, `RunID()`, `StartedAt()` (epoch milliseconds), `Log(parts...)`, `Metric(name, value)` and `Metrics(values)`. `Log` joins its parts with spaces: strings as they are, errors as `Name: message` (`PathError: open x: no such file or directory`, or `Error: ...` for an unnamed error), anything else as JSON. The run keeps the last 16 KB. Code deep in a call chain finds the run with `cronwatch.Current(ctx)`, which is nil outside one.
+The `JobContext` has `Name()`, `RunID()`, `StartedAt()` (epoch milliseconds), `Log(parts...)`, `Metric(name, value)`, and `Metrics(values)`. `Log` joins its parts with spaces: strings as they are, errors as `Name: message` (`PathError: open x: no such file or directory`, or `Error: ...` for an unnamed error), anything else as JSON. The run keeps the last 16 KB. Code deep in a call chain finds the run with `cronwatch.Current(ctx)`, which is nil outside one.
 
 ### Context and the timeout
 
@@ -156,11 +156,11 @@ default:
 }
 ```
 
-[`examples/crontab`](https://github.com/cronwatchdev/cronwatch/tree/main/packages/go/examples/crontab) in the repository is this program, with a test that runs its two commands on one SQLite file. `Check` returns a `*CheckResult` with `CheckedAt`, `Jobs`, `Alerts` and `Pruned`; its error is for the store failing as the check starts. Calls at the same time share one check, which runs to the end even when the first caller's context is cancelled, while each caller stops waiting when its own context ends.
+[`examples/crontab`](https://github.com/cronwatchdev/cronwatch/tree/main/packages/go/examples/crontab) in the repository is this program, with a test that runs its two commands on one SQLite file. `Check` returns a `*CheckResult` with `CheckedAt`, `Jobs`, `Alerts`, and `Pruned`; its error is for the store failing as the check starts. Calls at the same time share one check, which runs to the end even when the first caller's context is cancelled, while each caller stops waiting when its own context ends.
 
 ## The dashboard
 
-`cw.Routes(...)` is the dashboard and JSON API as an `http.Handler`, the same pages and endpoints as the TypeScript routes, byte for byte: the board's counts by health, a timeline of the last day with a lane per job, the table of every job, and for each job its last seven days, runs and definition, all drawn on the server with no script.
+`cw.Routes(...)` is the dashboard and JSON API as an `http.Handler`, the same pages and endpoints as the TypeScript routes, byte for byte: the board's counts by health, a timeline of the last day with a lane per job, the table of every job, and for each job its last seven days, runs, and definition, all drawn on the server with no script.
 
 ```go
 routes, err := cw.Routes(cronwatch.WithToken(os.Getenv("CRONWATCH_TOKEN")))
@@ -174,12 +174,12 @@ mux.Handle("/ops/cron/", http.StripPrefix("/ops/cron", routes)) // or anywhere, 
 
 The base path its links use is found from the request: what `http.StripPrefix` took off, else the part of the `ServeMux` pattern before its trailing slash or wildcard (`/cronwatch/`, `/cronwatch/{path...}` and `GET /t/{tenant}/cron/` all work), else `/cronwatch`. A router that does neither passes `cronwatch.WithBasePath("/ops/cron")`, or `""` for the root. `cw.MustRoutes(...)` panics where `Routes` returns an error, which is only for a `WithOrigin` that is not an http or https URL.
 
-- `cronwatch.WithToken(t)`: the token. Without the option it reads `CRONWATCH_TOKEN`; a token, given or read, that is empty or only whitespace counts as unset, and any other is used as it is. Send it as `Authorization: Bearer <token>` (only a `Bearer` header counts: a proxy's Basic auth leaves the cookie to sign in), or enter it in the sign-in page's form, which posts it to `<base>/signin`, or open the dashboard once with `?token=<token>`; a cookie then keeps the browser signed in. Without a token, while the environment is development, the routes make a token of their own and print a sign-in link to standard output on the first request (naming the host only when `WithOrigin` is set or the request's host is loopback, `localhost`, a name ending in `.localhost`, `127.0.0.0/8` or `::1`, and otherwise leaving it out, since a client chooses it: `Sign in: /cronwatch/?token=... on this server (the first request's host is not local, so the link leaves it out)`); anywhere else they answer 503. The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `GO_ENV` set to more than whitespace (see [Environment variables](/docs/environment/)), and `development`, `dev`, `local`, `test` and `testing` count as development.
+- `cronwatch.WithToken(t)`: the token. Without the option it reads `CRONWATCH_TOKEN`; a token, given or read, that is empty or only whitespace counts as unset, and any other is used as it is. Send it as `Authorization: Bearer <token>` (only a `Bearer` header counts: a proxy's Basic auth leaves the cookie to sign in), or enter it in the sign-in page's form, which posts it to `<base>/signin`, or open the dashboard once with `?token=<token>`; a cookie then keeps the browser signed in. Without a token, while the environment is development, the routes make a token of their own and print a sign-in link to standard output on the first request (naming the host only when `WithOrigin` is set or the request's host is loopback, `localhost`, a name ending in `.localhost`, `127.0.0.0/8`, or `::1`, and otherwise leaving it out, since a client chooses it: `Sign in: /cronwatch/?token=... on this server (the first request's host is not local, so the link leaves it out)`); anywhere else they answer 503. The environment is the first of `CRONWATCH_ENV`, `APP_ENV`, and `GO_ENV` set to more than whitespace (see [Environment variables](/docs/environment/)), and `development`, `dev`, `local`, `test`, and `testing` count as development.
 - `cronwatch.WithoutToken()`: serve the routes to anyone, for a mount behind your own auth.
-- `cronwatch.WithOrigin("https://app.example.com")`: the public origin, pinned whatever a request says, for the cross-site check on writes, the cookie's `Secure` flag, redirects and the sign-in line.
+- `cronwatch.WithOrigin("https://app.example.com")`: the public origin, pinned whatever a request says, for the cross-site check on writes, the cookie's `Secure` flag, redirects, and the sign-in line.
 - `cronwatch.WithTrustProxy()`: take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host`. Only behind a proxy that sets or overwrites both.
 
-The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `GET /api` answers `{"ok":true,"library":"cronwatch.dev/go","language":"go","version":"<cronwatch.Version>","api":1}`, and silencing or unsilencing over the API answers the job's summary. `/api/check` also accepts the client's cron secret as a bearer, so an outside cron can run the check over HTTP (`POST`, or `GET` with the bearer). A body over 1 MiB is answered 413. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app). A store failure, or a panic, is answered 500 and reported to the error handler as `routes`.
+The token rules, cookie, cross-site rule, and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `GET /api` answers `{"ok":true,"library":"cronwatch.dev/go","language":"go","version":"<cronwatch.Version>","api":1}`, and silencing or unsilencing over the API answers the job's summary. `/api/check` also accepts the client's cron secret as a bearer, so an outside cron can run the check over HTTP (`POST`, or `GET` with the bearer). A body over 1 MiB is answered 413. The dashboard is installable as a web app, with its manifest, icons, and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app). A store failure, or a panic, is answered 500 and reported to the error handler as `routes`.
 
 ## Jobs a URL starts
 
@@ -216,7 +216,7 @@ A function EventBridge Scheduler invokes directly has no headers to carry a bear
 
 ## Stores
 
-`cronwatch.NewMemoryStore()` is the default. Nothing survives a restart, so a miss cannot be noticed across one, and each process has its own. When the environment is production (the first of `CRONWATCH_ENV`, `APP_ENV` and `GO_ENV` set to more than whitespace names `production` or `prod`), the client warns once that it is using it.
+`cronwatch.NewMemoryStore()` is the default. Nothing survives a restart, so a miss cannot be noticed across one, and each process has its own. When the environment is production (the first of `CRONWATCH_ENV`, `APP_ENV`, and `GO_ENV` set to more than whitespace names `production` or `prod`), the client warns once that it is using it.
 
 `sqlstore.New(db, dialect, sqlstore.Prefix("cronwatch_"))` keeps the same three tables as the SDK's SQL stores in your database, through the `*sql.DB` you opened, with your driver. The package imports none:
 
@@ -228,7 +228,7 @@ A function EventBridge Scheduler invokes directly has no headers to carry a bear
 
 The tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) are made on the client's first use. On Postgres and MySQL each statement runs on the pool on its own, in autocommit, so a run recorded inside a transaction of yours stays recorded if it rolls back. On SQLite the store holds one connection of the pool for its statements, so a pool limited to one connection (`db.SetMaxOpenConns(1)`) leaves your app none: give it room. MySQL commits `CREATE TABLE` at once, so let the first use happen outside a transaction. `store.Close()`, which `cw.Close()` calls, gives SQLite's connection back to the pool; the `*sql.DB` is yours and stays open. `Prefix` names the tables: lowercase letters, digits and underscores, not starting with a digit, at most 47 characters (Postgres cuts a name at 63, and the longest the store makes adds 16).
 
-A store of your own implements `cronwatch.Store`: `Init`, `UpsertJob`, `GetJob`, `ListJobs`, `DeleteJob`, `InsertRun`, `UpdateRun`, `GetRun`, `ListRuns`, `LastRun`, `RunningRuns`, `GetState`, `SetState`, `Prune` and `Close`, with epoch milliseconds for every time. Three optional interfaces, checked by type assertion, are what keep processes sharing a store from judging a run twice or losing each other's updates: `RunUpdater` (`UpdateRunIf`), `StateComparer` (`CompareAndSetState`) and `RunDeleter` (`DeleteRunIf`, which takes back a queue attempt given back without failing; see [Go schedulers](/docs/go-schedulers/#retries)). They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says. `storetest.Run(t, newStore)` runs the contract test the built-in stores pass; it is the one promised name in `storetest`, whose other names are the module's own test kit, deprecated.
+A store of your own implements `cronwatch.Store`: `Init`, `UpsertJob`, `GetJob`, `ListJobs`, `DeleteJob`, `InsertRun`, `UpdateRun`, `GetRun`, `ListRuns`, `LastRun`, `RunningRuns`, `GetState`, `SetState`, `Prune`, and `Close`, with epoch milliseconds for every time. Three optional interfaces, checked by type assertion, are what keep processes sharing a store from judging a run twice or losing each other's updates: `RunUpdater` (`UpdateRunIf`), `StateComparer` (`CompareAndSetState`), and `RunDeleter` (`DeleteRunIf`, which takes back a queue attempt given back without failing; see [Go schedulers](/docs/go-schedulers/#retries)). They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says. `storetest.Run(t, newStore)` runs the contract test the built-in stores pass; it is the one promised name in `storetest`, whose other names are the module's own test kit, deprecated.
 
 ## Alerts
 
@@ -254,11 +254,11 @@ cw, err := cronwatch.New(cronwatch.WithStore(store),
 	cronwatch.WithAlerts(slack, discord, hook, page, cronwatch.Console()))
 ```
 
-Each channel is made from an options struct and returns a `cronwatch.Channel`, or an error when a key, address or URL is missing. Every alert goes to every channel at once, each in a goroutine of its own with a 15 second context; a channel that returns an error goes to the error handler (as `alert channel <name>`) and never holds up the others. A channel that ignores its context and has not returned by then is left to finish, and gets nothing more until it has. `WithAlerts()` with no channels sends nothing.
+Each channel is made from an options struct and returns a `cronwatch.Channel`, or an error when a key, address, or URL is missing. Every alert goes to every channel at once, each in a goroutine of its own with a 15 second context; a channel that returns an error goes to the error handler (as `alert channel <name>`) and never holds up the others. A channel that ignores its context and has not returned by then is left to finish, and gets nothing more until it has. `WithAlerts()` with no channels sends nothing.
 
 A channel is any type with `Name() string` and `Send(ctx, alert, cc) error` that returns an error when the alert went nowhere; `cc.ReportError(err)` reports a problem that did not stop it (one of several recipients refusing it, say) to the error handler.
 
-### Email, SMS and error trackers
+### Email, SMS, and error trackers
 
 The SDK's provider channels are in `cronwatch.dev/go/alerts` too, on `net/http` alone, with SES requests signed by SigV4 and no AWS SDK:
 
@@ -290,9 +290,9 @@ alerts.NewRelic(alerts.NewRelicOptions{AccountID: os.Getenv("NEW_RELIC_ACCOUNT_I
 	APIKey: os.Getenv("NEW_RELIC_LICENSE_KEY")})
 ```
 
-The options are the SDK's in Go's case: `SubjectPrefix` and `Link` in `EmailOptions`; `MessageStream` (Postmark); `Region` (`"eu"` for SendGrid, Mailgun and New Relic, the AWS region for SES); `SessionToken` and `ConfigurationSetName` (SES); `APIKeySID`, `APIKeySecret`, `MessagingServiceSID` and `Segments` (Twilio, 1 to 10, 0 for the default of 3); `Environment` (Sentry, Honeybadger and Rollbar, `"production"` when empty); `Release` (Sentry); `Headers` (the webhook, extra request headers such as an `Authorization`); `Endpoint` (Honeybadger, Bugsnag); `Host` (Datadog); `ReleaseStage` (Bugsnag); `EventType` (New Relic); and `Recovered` and `Link` wherever the SDK has them. The zero value is always the default, so where the SDK sends recoveries unless told not to, Go has the negative: `SkipRecovered` for Sentry and Rollbar.
+The options are the SDK's in Go's case: `SubjectPrefix` and `Link` in `EmailOptions`; `MessageStream` (Postmark); `Region` (`"eu"` for SendGrid, Mailgun, and New Relic, the AWS region for SES); `SessionToken` and `ConfigurationSetName` (SES); `APIKeySID`, `APIKeySecret`, `MessagingServiceSID`, and `Segments` (Twilio, 1 to 10, 0 for the default of 3); `Environment` (Sentry, Honeybadger, and Rollbar, `"production"` when empty); `Release` (Sentry); `Headers` (the webhook, extra request headers such as an `Authorization`); `Endpoint` (Honeybadger, Bugsnag); `Host` (Datadog); `ReleaseStage` (Bugsnag); `EventType` (New Relic); and `Recovered` and `Link` wherever the SDK has them. The zero value is always the default, so where the SDK sends recoveries unless told not to, Go has the negative: `SkipRecovered` for Sentry and Rollbar.
 
-Each sends exactly the request the SDK's does: the same URL, headers and body, byte for byte (the package's tests replay the SDK's recorded requests), with the same idempotency key, event id or UUID for one alert, so a provider that deduplicates drops a resend whichever language sent it. Each request has one ten second deadline for connecting, sending and reading the answer, reads at most 1 MiB of it, and follows no redirect, so credentials never reach another address. A refused request is `<Provider> <origin> answered <status>: <start of the body>`, never the URL's path, with the channel's keys cut out. Every options struct takes an `HTTPClient` for a proxy or a test; without one, Go's default transport is used, which honours `HTTP_PROXY` and `HTTPS_PROXY`. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
+Each sends exactly the request the SDK's does: the same URL, headers, and body, byte for byte (the package's tests replay the SDK's recorded requests), with the same idempotency key, event id, or UUID for one alert, so a provider that deduplicates drops a resend whichever language sent it. Each request has one ten second deadline for connecting, sending, and reading the answer, reads at most 1 MiB of it, and follows no redirect, so credentials never reach another address. A refused request is `<Provider> <origin> answered <status>: <start of the body>`, never the URL's path, with the channel's keys cut out. Every options struct takes an `HTTPClient` for a proxy or a test; without one, Go's default transport is used, which honours `HTTP_PROXY` and `HTTPS_PROXY`. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
 
 The webhook posts the alert as JSON with `"schema": 1` as its first field, the same body every CronWatch library sends; its [JSON Schema](/docs/alerts/#the-webhooks-schema) is published. Parse the fields, not `title` and `message`, whose wording is not promised. With a `Secret`, it signs the body with `X-CronWatch-Signature: sha256=<hex>`. `alerts.Signature(secret, body)` is that hex, for a receiver in Go, checked with a constant-time compare:
 
@@ -318,7 +318,7 @@ It still records and evaluates every run, but queues each alert in the store ins
 
 ## pg_cron
 
-pg_cron runs jobs inside Postgres, where nothing can wrap them. The `pgcron` source reads what pg_cron records instead: on every check it reads `cron.job`, declares each job with its schedule, and copies new rows of `cron.job_run_details` in as runs, so a job that stops running is missed, a failed run alerts and a run that never ends is stuck.
+pg_cron runs jobs inside Postgres, where nothing can wrap them. The `pgcron` source reads what pg_cron records instead: on every check it reads `cron.job`, declares each job with its schedule, and copies new rows of `cron.job_run_details` in as runs, so a job that stops running is missed, a failed run alerts, and a run that never ends is stuck.
 
 ```go
 import "cronwatch.dev/go/pgcron"
@@ -331,11 +331,11 @@ if err != nil {
 cw.StartChecking(time.Minute)
 ```
 
-It reads through anything with `QueryContext`: a `*sql.DB`, `*sql.Conn` or `*sql.Tx`, opened with whatever Postgres driver the app uses (pgx's `stdlib` and `lib/pq` are both tested). Settings are read from `pg_settings`, so a setting the role may not read never aborts your transaction, and the source never commits or rolls back. `pgcron.Options` has `Jobs`, `JobIDs` and `Pick` to choose jobs, `Prefix`, `JobName`, `Options` and `OptionsFor` (job options for every job, or per job; the schedule and zone always come from pg_cron) and `Timezone` (by default the server's `cron.timezone`, else UTC). The rules for renamed jobs, runs cut off by a restart and history seen for the first time are the SDK's; see [Supabase and pg_cron](/docs/supabase/).
+It reads through anything with `QueryContext`: a `*sql.DB`, `*sql.Conn`, or `*sql.Tx`, opened with whatever Postgres driver the app uses (pgx's `stdlib` and `lib/pq` are both tested). Settings are read from `pg_settings`, so a setting the role may not read never aborts your transaction, and the source never commits or rolls back. `pgcron.Options` has `Jobs`, `JobIDs`, and `Pick` to choose jobs, `Prefix`, `JobName`, `Options` and `OptionsFor` (job options for every job, or per job; the schedule and zone always come from pg_cron), and `Timezone` (by default the server's `cron.timezone`, else UTC). The rules for renamed jobs, runs cut off by a restart, and history seen for the first time are the SDK's; see [Supabase and pg_cron](/docs/supabase/).
 
 ## Redaction
 
-Before a run's output and error are stored, shown or sent anywhere, they are redacted. The default blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks: the patterns are the SDK's, run by an engine with JavaScript's semantics, so every case the SDK's tests hold gives the same bytes. Redaction runs before the cap, so the cut never keeps the rest of a secret whose label it cut off. An `Expect` rule is checked before redaction, so it still sees what was logged.
+Before a run's output and error are stored, shown, or sent anywhere, they are redacted. The default blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google, and API key formats), exactly what the SDK's default blanks: the patterns are the SDK's, run by an engine with JavaScript's semantics, so every case the SDK's tests hold gives the same bytes. Redaction runs before the cap, so the cut never keeps the rest of a secret whose label it cut off. An `Expect` rule is checked before redaction, so it still sees what was logged.
 
 ```go
 cardNumber := regexp.MustCompile(`\b\d{4}(?:[ -]?\d{4}){3}\b`)
@@ -371,7 +371,7 @@ cw, err := cronwatch.New(cronwatch.WithAlerts(slack), cronwatch.WithTriage(diagn
 | Field | Default | |
 |---|---|---|
 | `Model` | `"claude-opus-5"` | any current model id |
-| `Effort` | `"medium"` | `"low"`, `"medium"` or `"high"` |
+| `Effort` | `"medium"` | `"low"`, `"medium"`, or `"high"` |
 | `MaxTokens` | `800` | a diagnosis is a paragraph |
 | `Context` | | a sentence about the app, so advice is specific |
 | `NoFallbacks` | `false` | set it to stop routing a policy refusal to Anthropic's default fallback model inside the same request, if your account or gateway rejects the beta |
@@ -393,13 +393,13 @@ There is no Anthropic SDK to install: the Messages API is one POST, and it sends
 | `WithSources(sources...)` | | where runs this process does not wrap come from, such as [pg_cron](#pg-cron). Each is synced at the start of every check; one that fails is reported and the check carries on |
 | `WithCronSecret(s)`, `WithoutCronSecret()` | `$CRON_SECRET` | the bearer job handlers take and the dashboard's check endpoint accepts beside the token. One that is empty or only whitespace, given or read, counts as unset |
 | `WithRetention(d)` | `"30d"` | how long finished runs are kept. Each job's newest run is always kept |
-| `WithDefaults(options...)` | | `Grace`, `Timeout`, `Timezone` and `FailuresBeforeAlert` for every job that does not set its own; any other option is an error |
+| `WithDefaults(options...)` | | `Grace`, `Timeout`, `Timezone`, and `FailuresBeforeAlert` for every job that does not set its own; any other option is an error |
 | `WithRedact(fn)`, `WithoutRedaction()` | secret patterns | see [Redaction](#redaction) |
 | `WithDeliver(mode)` | `DeliverNow` | `DeliverAtCheck` queues alerts for another process's check to send |
 | `WithErrorHandler(fn)` | standard error | `func(err error, where string)` for failures outside jobs: the store, a channel, triage |
 | `WithClock(fn)` | the system clock | a function returning epoch milliseconds; for tests |
 
-`cw.Job(name, options...)` takes `Schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `Timezone` (IANA; the process's zone, `time.Local`, by default), `Grace` (`"10m"`), `Timeout` (`"1h"`), `MaxDuration`, `Budget(metric, ceiling)` (once per metric), `Floor(metric, floor)` (once per metric; any finite number, no higher than the same metric's budget), `Expect(text)` (the output must contain it), `ExpectMatch(re)` (a `*regexp.Regexp` it must match, stored as `matches /source/`), `ExpectFunc(fn)` (a function of the output; a panic in it fails the run), `FailuresBeforeAlert` (1), `Description` and `Tags`, with the rules in the [TypeScript API reference](/docs/api/). `cronwatch.DescribeJob(name, options...)` is the definition options give, without a client.
+`cw.Job(name, options...)` takes `Schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `Timezone` (IANA; the process's zone, `time.Local`, by default), `Grace` (`"10m"`), `Timeout` (`"1h"`), `MaxDuration`, `Budget(metric, ceiling)` (once per metric), `Floor(metric, floor)` (once per metric; any finite number, no higher than the same metric's budget), `Expect(text)` (the output must contain it), `ExpectMatch(re)` (a `*regexp.Regexp` it must match, stored as `matches /source/`), `ExpectFunc(fn)` (a function of the output; a panic in it fails the run), `FailuresBeforeAlert` (1), `Description`, and `Tags`, with the rules in the [TypeScript API reference](/docs/api/). `cronwatch.DescribeJob(name, options...)` is the definition options give, without a client.
 
 `Timeout` and `MaxDuration` both measure a run's length, and are easy to mix up. `Timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure), the job is stuck, and the job's context is cancelled. `MaxDuration` is for a run that finished: one that succeeded but took longer is slow, and stays a success; without it, slow is more than twice the p95 of recent successful runs. So set `Timeout` well above `MaxDuration`: `MaxDuration("10m"), Timeout("1h")` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
 
@@ -410,7 +410,7 @@ The client:
 | `Job(name, options...)`, `MustJob` | declare a job and get its handle |
 | `Run(ctx, name, fn, options...)` | run without keeping a handle |
 | `Check(ctx)` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune |
-| `StartChecking(every)`, `Stop()` | check in a goroutine; the interval is at least five seconds. `Start(every)`, its name before 1.0, still works and is deprecated: a job's `Start` opens a run |
+| `StartChecking(every)`, `Stop()` | check in a goroutine; the interval is at least five seconds. `Start(every)`, its name before 0.11, still works and is deprecated: a job's `Start` opens a run |
 | `Jobs(ctx)`, `JobsWithRuns(ctx, limit)`, `JobSummary(ctx, name)` | summaries, without alerting |
 | `Runs(ctx, name, limit)`, `GetRun(ctx, id)` | newest first; `limit` is 1 to 500 |
 | `Silence(ctx, name, d)`, `Unsilence(ctx, name)` | stop alerts for a while; state keeps updating underneath. The end is a whole millisecond, held at 2^53 - 1 |
@@ -426,9 +426,9 @@ The client:
 
 Every call that can reach the store takes a `context.Context` first and returns an error. Nothing panics for a bad option or a store failure, except the `Must` helpers.
 
-`job.Run(ctx, fn, options...)`, `cronwatch.RunValue` and `job.Start` take run options after the function:
+`job.Run(ctx, fn, options...)`, `cronwatch.RunValue`, and `job.Start` take run options after the function:
 
-- `cronwatch.WithTrigger(t)`: what started the run, shown with it. `"run"` for `Run`, `"start"` for `Start` and `"handler"` for a job's handler by default; the scheduler integrations set their own, and the pg_cron source `pg_cron` (see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)).
+- `cronwatch.WithTrigger(t)`: what started the run, shown with it. `"run"` for `Run`, `"start"` for `Start`, and `"handler"` for a job's handler by default; the scheduler integrations set their own, and the pg_cron source `pg_cron` (see [Triggers, tags, and job names](/docs/dashboard/#triggers-tags-and-job-names)).
 - `cronwatch.WithRunID(id)`: your own stable id, for `Start` only (see [Runs that span calls](#runs-that-span-calls)).
 - `cronwatch.DiscardWhen(fn)`: take the run back rather than judge it when the function returns an error `fn` answers true for, such as a queue's attempt given back without failing: its row is deleted, no alert is sent, the failures in a row are left as they were, and the error is still returned. It needs a store with `DeleteRunIf`. `Run` and `RunValue` only.
 
@@ -451,19 +451,19 @@ h.Finish(ctx) // or h.Fail(ctx, err), or h.FinishWith(ctx, result)
 
 ## Sharing a database with the other languages
 
-The SQL store writes the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the Python, PHP, Rust, Elixir, Java and .NET stores (the MySQL tables are the PHP port's, which the Rust, Elixir, Java and .NET ports share): the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns, byte for byte, keys in the SDK's order. The module's tests share a SQLite file with the built SDK, and have a Node client and a Go client take turns on one job's state. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
+The SQL store writes the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the Python, PHP, Rust, Elixir, Java, and .NET stores (the MySQL tables are the PHP port's, which the Rust, Elixir, Java, and .NET ports share): the same names, columns, and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns, byte for byte, keys in the SDK's order. The module's tests share a SQLite file with the built SDK, and have a Node client and a Go client take turns on one job's state. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses.
 
-A 1.x release keeps what it does not know of what another wrote: a key in a job's definition or state, an open condition, a run's status or trigger. It writes them back as they were, never alerts on or closes an unknown condition, and leaves a run with an unknown status alone. So any 1.x of any language can share a store with any other. The 0.x releases before it are not covered: upgrade every process to 1.0 together.
+A 1.x release keeps what it does not know of what another wrote: a key in a job's definition or state, an open condition, a run's status or trigger. It writes them back as they were, never alerts on or closes an unknown condition, and leaves a run with an unknown status alone. So any 1.x of any language can share a store with any other. Releases before 0.11 are not covered: upgrade every process to 0.11 or newer together.
 
-The public types write the SDK's JSON through their `MarshalJSON`. Call it directly, or use a `json.Encoder` with `SetEscapeHTML(false)`, when the bytes must match: `json.Marshal` passes a type's own JSON through its HTML escaping, which rewrites `<`, `>` and `&`.
+The public types write the SDK's JSON through their `MarshalJSON`. Call it directly, or use a `json.Encoder` with `SetEscapeHTML(false)`, when the bytes must match: `json.Marshal` passes a type's own JSON through its HTML escaping, which rewrites `<`, `>`, and `&`.
 
 The cron reader matches croner, and the SDK, on every expression: a date no month has (`0 0 30 2 *`) never fires, and a one-time date in place of a cron expression is refused, as the [schedules page](/docs/schedules/) says.
 
 ## Deprecated
 
-These still work, each marked `Deprecated:` in its doc comment so editors and `staticcheck` point at it. A rename of documented API keeps its old name as an alias through 1.x and goes in 2.0; a name that was public by accident (a test hook, an internal helper, a name the docs never showed) goes when 1.0 makes it internal. Public means documented on this page, the [Go schedulers](/docs/go-schedulers/) page or the module's README; everything else is internal. `cronwatch.dev/go/bridge` is outside the 1.x promise altogether.
+These still work, each marked `Deprecated:` in its doc comment so editors and `staticcheck` point at it. A rename of documented API keeps its old name as an alias through 1.x and goes in 2.0; a name that was public by accident (a test hook, an internal helper, a name the docs never showed) goes when 1.0 makes it internal. Public means documented on this page, the [Go schedulers](/docs/go-schedulers/) page, or the module's README; everything else is internal. `cronwatch.dev/go/bridge` is outside the 1.x promise altogether.
 
 | Deprecated | Use instead | Goes in |
 |---|---|---|
@@ -471,7 +471,7 @@ These still work, each marked `Deprecated:` in its doc comment so editors and `s
 | `robfigcron.Watch(cw, o)`, `cwgocron.Watch(cw, o)` | `robfigcron.New(cw, o).Option()`, `cwgocron.New(cw, o).Option()` | 2.0 |
 | `cwgocron.Converted` | `robfigcron.Converted`, the same type, which every integration's `Convert` returns | 1.0 |
 | `cwgocron.Panic` | `cwgocron.PanicError`, the same type | 1.0 |
-| `JSValue()` on `Alert`, `CheckResult`, `Definition`, `JobState`, `JobSummary`, `Metrics` and `Run` | `MarshalJSON`, or `encoding/json`, for the same bytes | 1.0 |
+| `JSValue()` on `Alert`, `CheckResult`, `Definition`, `JobState`, `JobSummary`, `Metrics`, and `Run` | `MarshalJSON`, or `encoding/json`, for the same bytes | 1.0 |
 | `cronwatch.Stderr`, `cronwatch.Stdout` | `WithErrorHandler`, and a channel of your own in place of `Console` | 1.0 |
 | `cronwatch.MaxBody`, `cronwatch.ReservedRunIDPrefix` | nothing: the 1 MiB limit and the `pgcron:` prefix are documented and do not change | 1.0 |
 | `pgcron.Hold`, `pgcron.Schedule`, `pgcron.JobName`, `pgcron.RunOf` | nothing: they are the source's internals | 1.0 |
@@ -480,4 +480,4 @@ These still work, each marked `Deprecated:` in its doc comment so editors and `s
 
 ## Kept in step
 
-The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, redaction, each channel's requests, stats and health) into `conformance/` in the repository, and the Go tests replay every one, as the Ruby gem's and the Python, PHP, Rust, Elixir, Java and .NET packages' do; the dashboard is checked against the SDK's pages byte for byte. Cron parsing is also checked against croner itself on thousands of generated expressions. A change of behaviour lands in TypeScript first, the cases are regenerated, and the port is fixed until they pass. Where they disagree, the port is wrong: [open an issue](https://github.com/cronwatchdev/cronwatch/issues).
+The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, redaction, each channel's requests, stats, and health) into `conformance/` in the repository, and the Go tests replay every one, as the Ruby gem's and the Python, PHP, Rust, Elixir, Java, and .NET packages' do; the dashboard is checked against the SDK's pages byte for byte. Cron parsing is also checked against croner itself on thousands of generated expressions. A change of behaviour lands in TypeScript first, the cases are regenerated, and the port is fixed until they pass. Where they disagree, the port is wrong: [open an issue](https://github.com/cronwatchdev/cronwatch/issues).

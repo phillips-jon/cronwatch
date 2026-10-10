@@ -215,7 +215,7 @@ await test("postgres: output and errors with NUL characters are still recorded",
     assert.equal(run!.output, "beforeafter");
     assert.match(run!.error!, /^Error: badbyte/);
     assert.equal((await cw.store.getState("nul"))!.consecutiveFailures, 1, "the state, with its alert, was written too");
-    // So are a trigger, metric names and a definition's text.
+    // So are a trigger, metric names, and a definition's text.
     const nul2 = cw.job("nul2", { description: "a\u0000b", tags: ["t\u0000"], budget: { "c\u0000": 5 } });
     await nul2.run(async (job) => void job.metric("ro\u0000ws", 2), { trigger: "cr\u0000on" });
     const [second] = await cw.runs("nul2");
@@ -301,7 +301,7 @@ await test("postgres: many instances can init at once", { skip: NO_PG }, async (
   }
 });
 
-// Rows a foreign, hand-edited or damaged writer could leave (store.json
+// Rows a foreign, hand-edited, or damaged writer could leave (store.json
 // foreignRows): each is read leniently, and one affects only its own job.
 interface ForeignRows {
   rows: { table: "jobs" | "runs" | "state"; row: Record<string, unknown>; read: unknown; readable?: boolean }[];
@@ -341,7 +341,7 @@ await test("sqlite: each foreign row reads leniently (store.json foreignRows.row
   }
 });
 
-await test("sqlite: a check, a silence and every page over foreign rows (store.json foreignRows.check)", async () => {
+await test("sqlite: a check, a silence, and every page over foreign rows (store.json foreignRows.check)", async () => {
   const c = foreignRows.check;
   const db = new Database(":memory:");
   const store = sqlite({ database: db });

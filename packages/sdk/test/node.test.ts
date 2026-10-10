@@ -200,7 +200,7 @@ test("a parsed body with no rawBody is encoded again for its content type", asyn
   ]);
 });
 
-test("the Request carries the method, headers, URL and a streamed body", async () => {
+test("the Request carries the method, headers, URL, and a streamed body", async () => {
   let seen: Request | null = null;
   let text = "";
   const handler = toNodeHandler(async (request) => {

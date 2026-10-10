@@ -5,7 +5,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A row of {@code cron.job}, as {@link PgCronOptions.Builder#pick}, {@link
- * PgCronOptions.Builder#jobName} and {@link
+ * PgCronOptions.Builder#jobName}, and {@link
  * PgCronOptions.Builder#options(java.util.function.Function)} are given it.
  *
  * @param jobId the job's id

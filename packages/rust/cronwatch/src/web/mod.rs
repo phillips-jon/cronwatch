@@ -2,7 +2,7 @@
 //! [`Handler::handle`](crate::Handler::handle) take a plain [`Request`] and
 //! answer a plain [`Response`], as the SDK's routes take a fetch `Request`.
 //! Everything a framework adds is an adapter over those two functions: the
-//! `tower` feature makes both a `tower::Service` (for hyper, axum, tonic and
+//! `tower` feature makes both a `tower::Service` (for hyper, axum, tonic, and
 //! `lambda_http`), and the `axum` feature finds where they are mounted.
 //!
 //! A framework this crate has no adapter for builds a [`Request`] from its
@@ -38,7 +38,7 @@ pub(crate) use text::{constant_time_eq, latin1};
 pub const MAX_BODY: usize = 1 << 20;
 
 /// A request, as a server hands it over: the method, the request target as
-/// sent (so a `%2F` in a job name stays one), the headers as bytes, the body
+/// sent (so a `%2F` in a job name stays one), the headers as bytes, the body,
 /// and whether it came over TLS.
 ///
 /// ```
@@ -288,7 +288,7 @@ pub struct Response {
 }
 
 impl Response {
-    /// An answer with this status, no headers and no body.
+    /// An answer with this status, no headers, and no body.
     pub fn new(status: u16) -> Response {
         Response { status, headers: Vec::new(), body: Vec::new() }
     }

@@ -201,7 +201,7 @@ internal static class Durations
     }
 
     private static string NotADuration(string label, string value) =>
-        label + " \"" + value + "\" is not a duration like \"15m\", \"1h30m\" or \"90s\"";
+        label + " \"" + value + "\" is not a duration like \"15m\", \"1h30m\", or \"90s\"";
 
     /// <summary>Refuses a value over <see cref="MaxLength"/> characters, quoting its first <see cref="Quoted"/>.</summary>
     private static void TooLong(string value, string label)

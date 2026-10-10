@@ -43,7 +43,7 @@ public final class MemoryStore implements Store {
   public MemoryStore() {}
 
   // Text is held as the SQL store writes it, without U+0000, so every store reads back the same:
-  // a run's trigger, output, error and metric names, and every key and string of a definition and
+  // a run's trigger, output, error, and metric names, and every key and string of a definition and
   // a state. Identifiers are held as given.
 
   private static Definition kept(Definition definition) {

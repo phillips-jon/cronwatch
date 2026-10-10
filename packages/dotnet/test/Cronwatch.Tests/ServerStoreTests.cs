@@ -8,13 +8,15 @@ using System.Transactions;
 using Cronwatch.StoreTesting;
 using Xunit;
 
+#pragma warning disable CS0618 // StoreReplay and FinishOnce, deprecated, still run the port's own replay and finish-once checks
+
 namespace Cronwatch.Tests;
 
 /// <summary>
 /// The SQL store against a real server: the contract, the <c>store.json</c> replay with its
 /// foreign versions and <c>nul</c> steps, rows of another shape, the finish-once scenarios over
 /// several clients, a client end to end, and the app's transactions. Each test works on tables of
-/// a prefix of its own, dropped at the end. Postgres, MySQL and MariaDB each run it when their
+/// a prefix of its own, dropped at the end. Postgres, MySQL, and MariaDB each run it when their
 /// <c>CRONWATCH_TEST_*</c> variable is set.
 /// </summary>
 public abstract class ServerStoreTests
@@ -36,7 +38,7 @@ public abstract class ServerStoreTests
     /// <summary>A statement writing a raw state row for job <c>v</c> with the text bound as its one parameter.</summary>
     private protected abstract string RawStateInsert(string prefix);
 
-    /// <summary>A server, its data source and the prefixes a test used, dropped when it is disposed.</summary>
+    /// <summary>A server, its data source, and the prefixes a test used, dropped when it is disposed.</summary>
     private protected sealed class Server : IAsyncDisposable
     {
         private readonly List<string> _prefixes = [];

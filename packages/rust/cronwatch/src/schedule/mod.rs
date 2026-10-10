@@ -1,9 +1,9 @@
 //! The SDK's `duration.ts` and `schedule.ts`: durations ("15m", "1h30m", a
 //! number of milliseconds) parsed and written as the SDK does, and
 //! schedules ("0 2 * * *", "@hourly", "every 5m") with their fire times, due
-//! times, deadlines and what a run covers. Cron fire times come from the
+//! times, deadlines, and what a run covers. Cron fire times come from the
 //! port of croner in the `cron` module, so a Rust process and a Node, Ruby,
-//! Python, PHP or Go process sharing one store agree on every due time.
+//! Python, PHP, or Go process sharing one store agree on every due time.
 //!
 //! As in the SDK, a date no month has never fires and croner's one-time
 //! dates are refused (see the `cron` module).

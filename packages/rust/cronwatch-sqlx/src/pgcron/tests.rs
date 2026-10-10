@@ -50,7 +50,7 @@ struct Tables {
     opened: Vec<Vec<i64>>,
 }
 
-/// `cron.job`, `cron.job_run_details` and the settings a role can read, in
+/// `cron.job`, `cron.job_run_details`, and the settings a role can read, in
 /// memory, answering the source's queries with ids as text, as the SDK's
 /// fake gives them.
 #[derive(Clone)]

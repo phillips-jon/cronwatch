@@ -11,7 +11,7 @@ defmodule Cronwatch.Alerts.NewRelic do
   an integer or text), `:api_key` (required, a license key), `:region`
   (`"eu"` for an account in the EU data center), `:event_type` (the event
   type queried with NRQL, default `"CronWatchAlert"`), `:link` (sent as an
-  attribute) and `:transport`.
+  attribute), and `:transport`.
   """
   @behaviour Cronwatch.Channel
 

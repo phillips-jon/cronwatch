@@ -1,4 +1,4 @@
-"""Where jobs, runs and state live.
+"""Where jobs, runs, and state live.
 
 Every store answers the same methods, the SDK's Store in snake_case:
 ``init`` (optional), ``upsert_job``, ``get_job``, ``list_jobs``,
@@ -6,7 +6,7 @@ Every store answers the same methods, the SDK's Store in snake_case:
 (optional: without it the client reads the run, then writes it), ``get_run``,
 ``list_runs``, ``last_run``, ``running_runs``, ``get_state``, ``set_state``,
 ``compare_and_set_state`` (optional: without it the client falls back to
-``set_state``), ``prune`` and ``close`` (optional). They take and return the
+``set_state``), ``prune``, and ``close`` (optional). They take and return the
 types in ``cronwatch.types``.
 """
 

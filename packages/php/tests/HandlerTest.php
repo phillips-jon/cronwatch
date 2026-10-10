@@ -216,7 +216,7 @@ final class HandlerTest extends TestCase
     }
 
     /**
-     * The words Laravel's env() reads as null, true, false or empty count as
+     * The words Laravel's env() reads as null, true, false, or empty count as
      * unset in CRON_SECRET, so `CRON_SECRET=null` does not let `Bearer null`
      * run every handler (Laravel hands the config null, and the variable
      * keeps the word).
@@ -237,7 +237,7 @@ final class HandlerTest extends TestCase
         $this->assertSame('null', $this->quiet(['cronSecret' => 'null'])->cronSecret, 'given in code, the word is the secret');
     }
 
-    /** A cronSecret or handler secret that is not a string, null or false throws (client-hardening.test.ts). */
+    /** A cronSecret or handler secret that is not a string, null, or false throws (client-hardening.test.ts). */
     public function testACronSecretOrHandlerSecretThatIsNotAStringOrNullThrows(): void
     {
         $job = $this->make()->job('j');
@@ -257,7 +257,7 @@ final class HandlerTest extends TestCase
         }
     }
 
-    /** secret: FromEnv::Read, which the 1.0 migration notes give, means the client's secret. */
+    /** secret: FromEnv::Read, which the 0.11 migration notes give, means the client's secret. */
     public function testAHandlersSecretOfFromEnvReadIsTheClientsSecret(): void
     {
         $cw = $this->make(['cronSecret' => 's3cret']);

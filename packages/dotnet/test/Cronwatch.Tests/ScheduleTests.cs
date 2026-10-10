@@ -264,7 +264,7 @@ public class ScheduleTests
     {
         Assert.Equal(900_000.0, Durations.ParseValue("15m", "grace"));
         Assert.Equal(1.5, Durations.ParseValue(1.5, "grace"));
-        string like = " is not a duration like \"15m\", \"1h30m\" or \"90s\"";
+        string like = " is not a duration like \"15m\", \"1h30m\", or \"90s\"";
         Assert.Equal("grace \"true\"" + like, Error(() => Durations.ParseValue(true, "grace")));
         Assert.Equal("duration \"null\"" + like, Error(() => Durations.ParseValue(null, "")));
         Assert.Equal("grace \"[object Object]\"" + like, Error(() => Durations.ParseValue(new JsObject(), "grace")));
@@ -281,7 +281,7 @@ public class ScheduleTests
         // Characters are code points: forty emoji are eighty UTF-16 units but under the cap.
         string emoji = "😀";
         string forty = string.Concat(Enumerable.Repeat(emoji, 40));
-        Assert.Equal("duration \"" + forty + "\" is not a duration like \"15m\", \"1h30m\" or \"90s\"", Error(() => Durations.Parse(forty, "")));
+        Assert.Equal("duration \"" + forty + "\" is not a duration like \"15m\", \"1h30m\", or \"90s\"", Error(() => Durations.Parse(forty, "")));
         Assert.Equal("duration \"" + string.Concat(Enumerable.Repeat(emoji, 32)) + "...\" " + tooLong, Error(() => Durations.Parse(string.Concat(Enumerable.Repeat(emoji, 65)), "")));
         Assert.Equal("silence duration \"" + new string('1', 32) + "...\" " + tooLong, Error(() => Durations.Parse(new string('1', 1 << 20), "silence duration")));
     }

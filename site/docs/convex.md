@@ -9,7 +9,7 @@ group: More JavaScript platforms
 
 Convex crons are declared in `convex/crons.ts` and call a mutation or an action on a schedule. CronWatch can watch them, with two conditions that come from how Convex runs code.
 
-- **The store needs the Node runtime.** Queries, mutations and default-runtime actions run in Convex's own JavaScript runtime, which has no Node built-ins. The SDK itself uses only web APIs, but its Postgres store uses the `pg` driver, which needs Node. Actions in a file that starts with `"use node"` run on Node, so the wrapped work lives in such an action.
+- **The store needs the Node runtime.** Queries, mutations, and default-runtime actions run in Convex's own JavaScript runtime, which has no Node built-ins. The SDK itself uses only web APIs, but its Postgres store uses the `pg` driver, which needs Node. Actions in a file that starts with `"use node"` run on Node, so the wrapped work lives in such an action.
 - **The store is outside Convex.** Convex functions cannot keep a SQLite file, and there is no store that writes to Convex's own database. Use Postgres anywhere a Node action can reach over the network (Neon, Supabase, RDS).
 
 If the job's work already lives in another app that has CronWatch, the simplest setup is a Convex cron whose action calls that app's `handler()` endpoint with `fetch`, and the run is recorded there. The rest of this page runs the job in Convex.

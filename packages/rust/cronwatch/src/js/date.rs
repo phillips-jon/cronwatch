@@ -11,7 +11,7 @@ pub(crate) fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     era * 146_097 + doe - 719_468
 }
 
-/// The date of a day counted from 1970-01-01: year, month (1 to 12) and day.
+/// The date of a day counted from 1970-01-01: year, month (1 to 12), and day.
 pub(crate) fn civil_from_days(z: i64) -> (i64, i64, i64) {
     let z = z + 719_468;
     let era = floor_div(z, 146_097);

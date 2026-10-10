@@ -30,7 +30,7 @@ final class Settings extends Model
     public string $webhookSecret = '';
 
     /*
-     * Discord, the email providers, Twilio and the error trackers: each
+     * Discord, the email providers, Twilio, and the error trackers: each
      * setting of ChannelSettings in camel case (discord_webhook_url is
      * discordWebhookUrl). A provider sends once its required fields are set.
      */

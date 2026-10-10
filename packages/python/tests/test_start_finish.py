@@ -1,5 +1,5 @@
 """Runs that span calls, ported from the SDK's test/start-finish.test.ts and
-test/finish-once.test.ts: start(), resume(), flush() and finish(), and a run
+test/finish-once.test.ts: start(), resume(), flush(), and finish(), and a run
 judged once however many processes finish it. Several clients over one
 store stand in for several processes; for SQLite each has its own
 connection to one file."""

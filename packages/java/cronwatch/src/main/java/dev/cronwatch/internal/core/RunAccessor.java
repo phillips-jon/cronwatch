@@ -7,7 +7,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * The current run for Micrometer's context propagation, which every Spring Boot app with Reactor or
  * Micrometer has: registered through {@code META-INF/services}, it lets Spring's {@code
- * ContextPropagatingTaskDecorator}, Reactor's automatic context propagation and {@code
+ * ContextPropagatingTaskDecorator}, Reactor's automatic context propagation, and {@code
  * ContextSnapshot} carry the run to other threads with no code. Loaded only by that library, so the
  * core needs it only when the app has it.
  */

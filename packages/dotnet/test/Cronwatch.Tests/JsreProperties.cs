@@ -11,7 +11,7 @@ namespace Cronwatch.Tests;
 /// A stored expect pattern is a door untrusted input comes through: any process sharing the store
 /// writes one, and every other reads it back. Whatever the pattern and the output, compiling
 /// refuses with an <see cref="ArgumentException"/> or succeeds, and a test or a replacement within
-/// the budget answers or gives up, never throws and never runs on. Redaction takes any text.
+/// the budget answers or gives up, never throws, and never runs on. Redaction takes any text.
 /// </summary>
 public class JsreProperties
 {

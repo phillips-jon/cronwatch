@@ -11,7 +11,7 @@ namespace Cronwatch.Bridge;
 
 /// <summary>
 /// What the scheduler integrations share (<c>Cronwatch.Hangfire</c>, <c>Cronwatch.Quartz</c>),
-/// carried over from the Go, Rust, Elixir and Java ports' bridge. An app does not need it; a
+/// carried over from the Go, Rust, Elixir, and Java ports' bridge. An app does not need it; a
 /// scheduler integration of the app's own can. For integration authors, outside the 1.x promise: the bridge changes as the integrations need, in any minor release. Every type in
 /// <c>Cronwatch.Bridge</c> is.
 /// </summary>
@@ -58,7 +58,7 @@ public static class SchedulerBridge
 
     /// <summary>
     /// The tag that names the app under an integration's tag: <c>&lt;tag&gt;:&lt;app&gt;</c>, the
-    /// app's name lowercased, with anything but letters, digits, <c>.</c>, <c>_</c> and <c>-</c>
+    /// app's name lowercased, with anything but letters, digits, <c>.</c>, <c>_</c>, and <c>-</c>
     /// made <c>-</c>. A name that is empty once cleaned, or longer than 48 characters, is cut and
     /// given 8 hex characters of its MD5, so two names never share a tag. The PHP port's
     /// <c>appTag()</c>, character for character.
@@ -98,7 +98,7 @@ public static class SchedulerBridge
         return tag + ":" + s;
     }
 
-    /// <summary>PHP's <c>trim()</c>: spaces, tabs, newlines, returns, NULs and vertical tabs.</summary>
+    /// <summary>PHP's <c>trim()</c>: spaces, tabs, newlines, returns, NULs, and vertical tabs.</summary>
     private static string TrimPhp(string s) => s.Trim(' ', '\t', '\n', '\r', '\0', '\u000b');
 
     [SuppressMessage("Security", "CA5351", Justification = "A short, stable name for a tag, as the PHP port's appTag writes it; not a security use.")]
@@ -106,7 +106,7 @@ public static class SchedulerBridge
 
     /// <summary>
     /// Whether <paramref name="name"/> is a CronWatch job name: 1 to 120 letters, digits,
-    /// <c>.</c>, <c>_</c>, <c>:</c> or <c>-</c>, starting with a letter or digit.
+    /// <c>.</c>, <c>_</c>, <c>:</c>, or <c>-</c>, starting with a letter or digit.
     /// </summary>
     public static bool ValidName(string name)
     {
@@ -163,7 +163,7 @@ public static class SchedulerBridge
     /// <summary>
     /// The options that declare a job again without its schedule: its description followed by
     /// <c>(no longer scheduled)</c> (<c>A scheduled task</c> when it had none), its tags, grace,
-    /// timeout, maxDuration, budget, floor and failuresBeforeAlert, as stored.
+    /// timeout, maxDuration, budget, floor, and failuresBeforeAlert, as stored.
     /// </summary>
     public static JobOptions Unscheduled(Definition def)
     {
@@ -344,12 +344,12 @@ public static class SchedulerBridge
     }
 
     /// <summary>
-    /// Runs <paramref name="sync"/> (an integration's declarations, <see cref="Watch.SettleAsync"/>
-    /// and <see cref="Watch.UnscheduleAsync"/>) as a task of its own and waits at most
-    /// <paramref name="limit"/> for it, so a store that hangs never holds the caller (a scheduler's
-    /// thread) for good. A throw in it, or running past the limit (<c>the sync took longer than 30
-    /// seconds; gave up</c>), is reported to the client's error handler as <paramref name="where"/>.
-    /// Says whether it finished without a throw.
+    /// Runs <paramref name="sync"/> (an integration's declarations,
+    /// <see cref="Watch.SettleAsync"/>, and <see cref="Watch.UnscheduleAsync"/>) as a task of its
+    /// own and waits at most <paramref name="limit"/> for it, so a store that hangs never holds the
+    /// caller (a scheduler's thread) for good. A throw in it, or running past the limit (<c>the
+    /// sync took longer than 30 seconds; gave up</c>), is reported to the client's error handler as
+    /// <paramref name="where"/>. Says whether it finished without a throw.
     /// </summary>
     public static async Task<bool> SyncWithinAsync(CronwatchClient cw, TimeSpan limit, string where, Func<Task> sync)
     {

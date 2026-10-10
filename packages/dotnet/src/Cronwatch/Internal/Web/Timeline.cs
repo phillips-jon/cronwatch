@@ -410,7 +410,7 @@ internal static class Timeline
             var over = OverCeilings(job);
             if (over.Count > 0)
             {
-                text += " on " + string.Join(" and ", over);
+                text += " on " + AlertFormat.AndList(over);
             }
             return text + " at " + When(last.StartedAt, now);
         }
@@ -420,7 +420,7 @@ internal static class Timeline
             var under = UnderFloors(job);
             if (under.Count > 0)
             {
-                text += " on " + string.Join(" and ", under);
+                text += " on " + AlertFormat.AndList(under);
             }
             return text + " at " + When(last.StartedAt, now);
         }
@@ -718,7 +718,7 @@ internal static class Timeline
             (Boxed("run ok"), "ran"),
             (Boxed("run bad"), "failed"),
             (Boxed("run timeout"), "timed out"),
-            (Boxed("run warn"), "over budget, under floor or slow"),
+            (Boxed("run warn"), "over budget, under floor, or slow"),
             (Boxed("run running"), "running"),
             (Boxed("missed"), "missed"),
         ];

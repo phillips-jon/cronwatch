@@ -20,7 +20,7 @@ namespace Cronwatch.Internal;
 /// <remarks>
 /// The deadline is one linked <see cref="CancellationTokenSource"/> spanning the transport's call
 /// and every read of the body, and each await is bounded by it too (<c>WaitAsync</c>), so the
-/// deadline holds whatever the transport does, while connecting, sending or reading the answer.
+/// deadline holds whatever the transport does, while connecting, sending, or reading the answer.
 /// </remarks>
 internal static class Post
 {
@@ -95,7 +95,7 @@ internal static class Post
     }
 
     /// <summary>
-    /// <c>new URL(url).origin</c>: the scheme, host and port only; <c>"null"</c> for a URL of a
+    /// <c>new URL(url).origin</c>: the scheme, host, and port only; <c>"null"</c> for a URL of a
     /// scheme that has no origin and <c>"(invalid URL)"</c> for text that is no URL. A URL's path
     /// or query can hold a credential, so an error names only this.
     /// </summary>
@@ -130,7 +130,7 @@ internal static class Post
 
     /// <summary>
     /// The headers as a request sends them: each name a token, each value without the spaces,
-    /// tabs and line breaks around it, as fetch sends it. A name that is not a token, or a value
+    /// tabs, and line breaks around it, as fetch sends it. A name that is not a token, or a value
     /// with a line break or NUL inside, is refused, as fetch refuses them, so no header can add
     /// another; the error names the header, never its value, which may be a credential.
     /// </summary>
@@ -142,7 +142,7 @@ internal static class Post
             string name = h.Key;
             if (!IsToken(name))
             {
-                throw Fail("a header name must be a token (letters, digits and !#$%&'*+.^_`|~-)");
+                throw Fail("a header name must be a token (letters, digits, and !#$%&'*+.^_`|~-)");
             }
             string value = TrimHttp(h.Value ?? "");
             if (value.Contains('\r', StringComparison.Ordinal) || value.Contains('\n', StringComparison.Ordinal) || value.Contains('\0', StringComparison.Ordinal))
@@ -181,10 +181,10 @@ internal static class Post
     /// <summary>
     /// Posts <paramref name="body"/> to <paramref name="rawUrl"/> through
     /// <paramref name="transport"/> within <paramref name="within"/>, and answers whatever the
-    /// status. A refused URL or header, a request past the deadline (<see cref="TimedOut"/>) or the
-    /// transport's own error is a <see cref="CronwatchException"/> naming no more of the URL than
-    /// its origin. A body the deadline cut short, or one that could not be read, is <c>""</c>. The
-    /// caller's own token cancelled is an <see cref="OperationCanceledException"/>.
+    /// status. A refused URL or header, a request past the deadline (<see cref="TimedOut"/>), or
+    /// the transport's own error is a <see cref="CronwatchException"/> naming no more of the URL
+    /// than its origin. A body the deadline cut short, or one that could not be read, is <c>""</c>.
+    /// The caller's own token cancelled is an <see cref="OperationCanceledException"/>.
     /// </summary>
     public static async Task<Answer> FetchAsync(
         ITransport transport,

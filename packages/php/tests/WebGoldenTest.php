@@ -20,7 +20,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Replays packages/ruby/test/web/golden.json, the SDK routes' answers to a
  * fixed seed (written by golden.mjs), against Cronwatch\Web\Dashboard seeded
- * the same way, and compares status, headers and body byte for byte. Run ids
+ * the same way, and compares status, headers, and body byte for byte. Run ids
  * are random on both sides, so each becomes <id:N> in order of first
  * appearance. The gem's test/web_golden_test.rb and the Python package's
  * tests/test_web_golden.py replay the same file.

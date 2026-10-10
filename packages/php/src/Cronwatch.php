@@ -117,7 +117,7 @@ final class Cronwatch
     private array $synced = [];
     private bool $ready = false;
     private bool $checking = false;
-    /** close() was called during a check, from a channel, a source or triage: the store closes once the check ends. */
+    /** close() was called during a check, from a channel, a source, or triage: the store closes once the check ends. */
     private bool $closeAfterCheck = false;
     private int|float $lastPruneAt = 0;
     /** @var array<int, array{JobDefinition, Run, RunRecorder, bool, bool}> Runs of execute() in progress (recorded, and whether the start's state change waits for the finish), for the shutdown hook. */
@@ -132,18 +132,18 @@ final class Cronwatch
     private static ?string $reserve = null;
 
     /**
-     * @param Store|null $store where jobs, runs and state live; default an in-memory store that forgets when the process ends
+     * @param Store|null $store where jobs, runs, and state live; default an in-memory store that forgets when the process ends
      * @param list<AlertChannel|callable>|null $alerts where alerts go; default the console. A callable is a Custom channel named "custom".
      * @param callable(TriageContext): ?string|null $triage adds a short diagnosis to every alert but recoveries
      * @param list<Source> $sources where runs this process does not wrap come from; each is synced at the start of every check
      * @param string|FromEnv|false|null $cronSecret the secret the dashboard's check endpoint (routes()) also accepts, and a
      *        job's handler() requires; the default (FromEnv::Read) reads CRON_SECRET, a value of "" or only whitespace
      *        (given or read) counts as unset, and null lets both run without one. Anything else (true, a number) throws a
-     *        TypeError. false is the same as null, deprecated since 1.0 and removed in 2.0 (in 0.x, null read
+     *        TypeError. false is the same as null, deprecated since 0.11 and removed in 2.0 (before 0.11, null read
      *        CRON_SECRET and false turned it off; null now means what it means in every other language).
      * @param mixed $retention how long finished runs are kept; default "30d"
-     * @param array<string, mixed> $defaults grace, timeout, timezone and failuresBeforeAlert for every job that does not set its own
-     * @param callable(string): string|false|null $redact applied to every run's output and error before it is stored, shown or
+     * @param array<string, mixed> $defaults grace, timeout, timezone, and failuresBeforeAlert for every job that does not set its own
+     * @param callable(string): string|false|null $redact applied to every run's output and error before it is stored, shown, or
      *        sent. The default (Output::redactSecrets) blanks values that look like secrets. Pass your own function, or false to
      *        keep output as logged. One that throws or returns something other than a string is reported and the default is used.
      * @param string $deliver "now" sends alerts from this process; "check" queues them in the store for the next check in a
@@ -245,7 +245,7 @@ final class Cronwatch
     public function job(string $name, array $options = []): JobHandle
     {
         if (preg_match(self::NAME_PATTERN, $name) !== 1) {
-            throw new \InvalidArgumentException("job name \"{$name}\" must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\" or \"-\"");
+            throw new \InvalidArgumentException("job name \"{$name}\" must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\", or \"-\"");
         }
         $definition = $this->buildDefinition($name, $options);
         self::validateDefinition($definition);
@@ -378,12 +378,12 @@ final class Cronwatch
     /**
      * Look for missed and stuck runs across every job, send alerts, retry
      * alerts no channel accepted, and prune old runs. Call it from a crontab
-     * line, the framework's scheduler or by hand, every few minutes.
+     * line, the framework's scheduler, or by hand, every few minutes.
      */
     public function check(): CheckResult
     {
         if ($this->checking) {
-            throw new \LogicException('check() was called from inside a check (by a channel, a source or triage)');
+            throw new \LogicException('check() was called from inside a check (by a channel, a source, or triage)');
         }
         $this->checking = true;
         try {
@@ -481,7 +481,7 @@ final class Cronwatch
     }
 
     /**
-     * Close the store. Called during a check (by a channel, a source or
+     * Close the store. Called during a check (by a channel, a source, or
      * triage), it waits for the check: the store closes once the check ends,
      * so the check can still record what it sent.
      */
@@ -501,7 +501,7 @@ final class Cronwatch
      *
      * @param string|FromEnv|false|null $token the default (FromEnv::Read) reads CRONWATCH_TOKEN, as "" or only whitespace
      *        does, and null serves the dashboard open; anything else (true, a number) throws a TypeError. false is the
-     *        same as null, deprecated since 1.0 and removed in 2.0
+     *        same as null, deprecated since 0.11 and removed in 2.0
      * @param string|null $basePath where the dashboard is mounted; default the script of a path-info URL, else "/cronwatch"
      * @param string|null $origin the public origin, for an app behind a proxy
      * @param bool $trustProxy take the public origin from X-Forwarded-Proto and X-Forwarded-Host
@@ -623,7 +623,7 @@ final class Cronwatch
         }
         $expect = $def->get('expect');
         if ($expect !== null && !is_string($expect) && !$expect instanceof Pattern && !is_callable($expect)) {
-            throw new \InvalidArgumentException("job \"{$name}\": expect must be a string, a Pattern or a callable");
+            throw new \InvalidArgumentException("job \"{$name}\": expect must be a string, a Pattern, or a callable");
         }
     }
 
@@ -763,7 +763,7 @@ final class Cronwatch
     }
 
     /**
-     * Read, change and write one job's state, in turn with every other update to it.
+     * Read, change, and write one job's state, in turn with every other update to it.
      *
      * @param \Closure(JobState): void $change
      */
@@ -859,7 +859,7 @@ final class Cronwatch
     }
 
     /**
-     * The second half: the run finished, judged and recorded, as execute()
+     * The second half: the run finished, judged, and recorded, as execute()
      * records one that returned `result` or, with `threw`, threw `error` (a
      * Throwable, or a string written as it is). `output` is text the run
      * wrote elsewhere (a command's output file), added to what it logged.
@@ -923,7 +923,7 @@ final class Cronwatch
         }
     }
 
-    /** The end of one execute(): the run finished, judged and recorded. */
+    /** The end of one execute(): the run finished, judged, and recorded. */
     private function endExecution(int $key, mixed $result, mixed $error, bool $threw): Run
     {
         [$definition, $run, $recorder, $recorded, $startPending] = $this->inProgress[$key];

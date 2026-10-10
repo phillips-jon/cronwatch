@@ -8,14 +8,14 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * {@code JSON.stringify} and {@code JSON.parse}, byte for byte, for everything CronWatch writes to
- * a store or reads from one, so a Java process and a Node, Ruby, Python, PHP, Go, Rust or Elixir
+ * a store or reads from one, so a Java process and a Node, Ruby, Python, PHP, Go, Rust, or Elixir
  * process can share one database.
  *
  * <p>Numbers are written as JavaScript prints them ({@code 2}, not {@code 2.0}; {@code 1e-7};
  * {@code 1e+21}), a number that is not finite as {@code null}, and a {@code long} beyond 2^53 as
- * the double JavaScript would hold. Strings escape only control characters, quotes and backslashes,
- * and a lone surrogate as {@code \ud83d}, as a well-formed {@code JSON.stringify} does. Objects
- * keep JavaScript's key order (see {@link JsObject}).
+ * the double JavaScript would hold. Strings escape only control characters, quotes, and
+ * backslashes, and a lone surrogate as {@code \ud83d}, as a well-formed {@code JSON.stringify}
+ * does. Objects keep JavaScript's key order (see {@link JsObject}).
  */
 public final class Json {
   /**
@@ -39,7 +39,7 @@ public final class Json {
 
   /**
    * {@code JSON.stringify} of a value: {@code null}, a {@link Boolean}, a {@link Number}, a {@link
-   * CharSequence}, a {@link List}, a {@link JsObject} or a {@link Map} (written in its iteration
+   * CharSequence}, a {@link List}, a {@link JsObject}, or a {@link Map} (written in its iteration
    * order, as an object literal would be; array-index keys first, as JavaScript orders them).
    *
    * @throws IllegalArgumentException for a value of any other type

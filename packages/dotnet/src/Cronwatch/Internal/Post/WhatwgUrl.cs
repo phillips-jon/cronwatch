@@ -21,11 +21,11 @@ internal enum UrlKind
 
 /// <summary>
 /// A URL read as the WHATWG URL parser (and so fetch) reads an http or https URL, the Java port's
-/// <c>WhatwgUrl</c> (itself the Go, Rust and Elixir ports'): characters up to U+0020 around it
-/// dropped and every tab, CR and LF inside it removed; the slashes after the scheme, and
-/// backslashes, read as fetch reads them; the host lowercased, IPv4 in its dotted form (hex, octal
+/// <c>WhatwgUrl</c> (itself the Go, Rust, and Elixir ports'): characters up to U+0020 around it
+/// dropped and every tab, CR, and LF inside it removed; the slashes after the scheme, and
+/// backslashes, read as fetch reads them; the host lowercased, IPv4 in its dotted form (hex, octal,
 /// and short forms read) and IPv6 compressed; the scheme's own port left out; dot segments
-/// resolved; and a space or other character a URL cannot hold percent-encoded in the path, query
+/// resolved; and a space or other character a URL cannot hold percent-encoded in the path, query,
 /// and fragment. A host outside ASCII is refused rather than converted to punycode (.NET's IDN
 /// mapping is the platform's, WHATWG's is UTS 46), and so is an IPv6 host with a zone, which
 /// WHATWG's IPv6 parser does not read.
@@ -80,7 +80,7 @@ internal sealed class WhatwgUrl
     /// <summary>Whether the URL has a user name or a password, which fetch refuses to send.</summary>
     public bool HasCredentials => Username.Length > 0 || Password.Length > 0;
 
-    /// <summary><c>url.origin</c>: the scheme, host and port.</summary>
+    /// <summary><c>url.origin</c>: the scheme, host, and port.</summary>
     public string Origin => Scheme + "://" + Host + (Port < 0 ? "" : ":" + Port.ToString(CultureInfo.InvariantCulture));
 
     /// <summary>The path and query, as a request's target.</summary>
@@ -672,7 +672,7 @@ internal sealed class WhatwgUrl
         return b.ToString();
     }
 
-    // ---- the path, query and fragment
+    // ---- the path, query, and fragment
 
     private static string ReadPath(string text)
     {

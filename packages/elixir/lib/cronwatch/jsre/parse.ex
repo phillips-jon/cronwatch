@@ -9,7 +9,7 @@ defmodule Cronwatch.JSRE.Parse do
   #
   # A character set is built as an integer bitmap of every UTF-16 code unit
   # (bit c for unit c) with flags for JavaScript's `\s`, "everything but
-  # `\s`" and negation, and frozen into a 65,536 bit binary once the tree node
+  # `\s`", and negation, and frozen into a 65,536 bit binary once the tree node
   # is made, so a test at match time is one bit lookup.
 
   import Bitwise
@@ -446,7 +446,7 @@ defmodule Cronwatch.JSRE.Parse do
 
       c when c in ?1..?9 or c in [?c, ?k, ?p, ?P] ->
         # JavaScript reads these as a backreference, a control character, a
-        # named backreference or a property; read as the plain letter they
+        # named backreference, or a property; read as the plain letter they
         # would match something else, so they are refused.
         throw({:jsre, "jsre: \\#{<<c::utf8>>} is not supported"})
 
@@ -503,7 +503,7 @@ defmodule Cronwatch.JSRE.Parse do
   defp bit_index(bits, n), do: bit_index(bits >>> 1, n + 1)
 
   @doc false
-  # The final membership, `\s`, "everything but `\s`" and negation folded
+  # The final membership, `\s`, "everything but `\s`", and negation folded
   # in, as an integer bitmap and as a binary whose bit at offset c is unit c.
   def freeze(%{bits: bits} = s) do
     f = if s.space, do: bits ||| @space_bits, else: bits

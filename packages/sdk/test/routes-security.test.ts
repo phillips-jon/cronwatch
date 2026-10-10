@@ -184,7 +184,7 @@ test("pages carry a strict CSP and security headers, and need no script of their
   assert.equal(api.headers.get("cache-control"), "no-store");
 });
 
-test("markup in definitions, output and metrics stays escaped on every page", async () => {
+test("markup in definitions, output, and metrics stays escaped on every page", async () => {
   const { cw, send, bearer } = app();
   const job = cw.job("m", { schedule: "0 2 * * *", description: "<img src=x>", tags: ["<t>"], expect: "<e>" });
   await job.run(async (j) => { j.log("<o>"); j.metric("<k>", 1); });

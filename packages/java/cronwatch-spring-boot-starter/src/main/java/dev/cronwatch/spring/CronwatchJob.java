@@ -22,7 +22,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 public @interface CronwatchJob {
-  /** The job's name: 1 to 120 letters, digits, {@code .}, {@code _}, {@code :} or {@code -}. */
+  /** The job's name: 1 to 120 letters, digits, {@code .}, {@code _}, {@code :}, or {@code -}. */
   String name() default "";
 
   /** Describes the job on the dashboard. */

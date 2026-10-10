@@ -124,7 +124,7 @@ pub(crate) fn value_message(value: &js::Value) -> String {
 /// The name an error goes by in `Name: message`, from its type's name
 /// (`std::any::type_name`): the last path segment without generics, so
 /// `std::io::error::Error` is `Error` and `my_app::ReportError` is
-/// `ReportError`. A boxed trait object, `anyhow::Error`, `String` and `&str`
+/// `ReportError`. A boxed trait object, `anyhow::Error`, `String`, and `&str`
 /// are `Error`, as a plain JavaScript `Error` is, since their type names say
 /// nothing to a reader.
 pub(crate) fn error_name(type_name: &str) -> &str {
@@ -157,7 +157,7 @@ enum Replacement {
     /// as code units, so a surrogate pair is never split and put back
     /// together.
     Template(Vec<Vec<u16>>),
-    /// The name, the value's quote (double or single, if any), the marker
+    /// The name, the value's quote (double or single, if any), the marker,
     /// and the quote again: the key=value pattern's function.
     Assignment,
 }
@@ -262,7 +262,7 @@ fn patterns() -> &'static [Pattern] {
                 &redacted_after,
             ),
             // Well-known token shapes: AWS, GitHub, Slack, Stripe,
-            // Anthropic, OpenAI and Google style keys.
+            // Anthropic, OpenAI, and Google style keys.
             Pattern::template(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b", "g", REDACTED),
             Pattern::template(r"\b(?:gh[pousr]_[A-Za-z0-9]{30,255}|github_pat_[A-Za-z0-9_]{20,255})\b", "g", REDACTED),
             Pattern::template(r"\bxox[abposr]-[A-Za-z0-9-]{10,255}", "g", REDACTED),
@@ -276,8 +276,8 @@ fn patterns() -> &'static [Pattern] {
 
 /// The default redact: blanks values that look like secrets (key=value
 /// pairs with secret-ish names, Authorization headers, URL credentials,
-/// bearer tokens, JWTs, PEM private keys, webhook URLs and well-known token
-/// formats) before output or an error is stored, shown or sent anywhere.
+/// bearer tokens, JWTs, PEM private keys, webhook URLs, and well-known token
+/// formats) before output or an error is stored, shown, or sent anywhere.
 /// The text is matched as UTF-16 code units, as JavaScript holds it, and
 /// turned back into UTF-8 once at the end, so a match that cut a character
 /// outside the BMP in two leaves U+FFFD where JavaScript leaves the lone

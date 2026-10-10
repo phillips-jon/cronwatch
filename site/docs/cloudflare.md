@@ -148,7 +148,7 @@ npx wrangler secret put ANTHROPIC_API_KEY     # only with triage
 
 For `wrangler dev`, put the same names in `.dev.vars` (and keep it out of git).
 
-On Workers, pass every value from `env` yourself, as above. The defaults that read `process.env` (`CRONWATCH_TOKEN` for the routes, `CRON_SECRET` for `cronSecret`, `CRONWATCH_ENV`, `APP_ENV` and `NODE_ENV` for the development token) find nothing without `nodejs_compat`, so the routes answer 503 until a token is passed, and there is no development token: set `CRONWATCH_TOKEN` in `.dev.vars` for local work too. `CRON_SECRET` matters only if you also run jobs over HTTP with `job.handler()`; then pass `cronSecret: env.CRON_SECRET`.
+On Workers, pass every value from `env` yourself, as above. The defaults that read `process.env` (`CRONWATCH_TOKEN` for the routes, `CRON_SECRET` for `cronSecret`, `CRONWATCH_ENV`, `APP_ENV`, and `NODE_ENV` for the development token) find nothing without `nodejs_compat`, so the routes answer 503 until a token is passed, and there is no development token: set `CRONWATCH_TOKEN` in `.dev.vars` for local work too. `CRON_SECRET` matters only if you also run jobs over HTTP with `job.handler()`; then pass `cronSecret: env.CRON_SECRET`.
 
 With `nodejs_compat` on, the Worker has a `process.env`, and Cloudflare fills it with the Worker's vars and secrets when the `nodejs_compat_populate_process_env` flag is set, which it is by default for a compatibility date of 2025-04-01 or later (see [Cloudflare's notes on `process`](https://developers.cloudflare.com/workers/runtime-apis/nodejs/process/)). Then those defaults find `CRONWATCH_TOKEN` and `CRON_SECRET` on their own, and a `CRONWATCH_ENV` or `NODE_ENV` var of `development` turns on the development token. Passing the values from `env`, as above, works either way, so the Worker does not depend on the flag.
 
@@ -164,10 +164,10 @@ Then open `http://localhost:8787/cronwatch/?token=<the token in .dev.vars>`.
 
 ## What differs on Workers
 
-**Durations.** Inside a Worker the clock only moves while the Worker waits on I/O, so a job that is all CPU records a duration near zero. Durations of jobs that fetch, query or call APIs are what you would expect. Slow alerts are only as good as the durations they are measured from.
+**Durations.** Inside a Worker the clock only moves while the Worker waits on I/O, so a job that is all CPU records a duration near zero. Durations of jobs that fetch, query, or call APIs are what you would expect. Slow alerts are only as good as the durations they are measured from.
 
 **Killed runs.** A run cut off by a Worker limit cannot report back. It stays `running` until a check finds it past the job's `timeout` and sends a stuck alert, the same as a serverless function killed mid-run. Set `timeout` a little above the longest the job may take.
 
-**Channels.** Every channel uses only `fetch` and Web Crypto, so Slack, Discord, the signed webhook, the email, SMS and error tracker channels, and custom channels all run without `nodejs_compat`; put their keys in secrets. For triage, pass the key: `anthropic({ apiKey: env.ANTHROPIC_API_KEY })`.
+**Channels.** Every channel uses only `fetch` and Web Crypto, so Slack, Discord, the signed webhook, the email, SMS, and error tracker channels, and custom channels all run without `nodejs_compat`; put their keys in secrets. For triage, pass the key: `anthropic({ apiKey: env.ANTHROPIC_API_KEY })`.
 
 **Stores.** The SQLite and Postgres stores are Node drivers; use D1. Pass `env.DB` itself, not a session from `withSession()`, so every read sees the last write: the store's conditional state writes depend on it. See [Stores](/docs/stores/#d1) for how the D1 store works.

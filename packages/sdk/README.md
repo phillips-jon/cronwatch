@@ -1,6 +1,6 @@
 # @cronwatch/sdk
 
-Cron and scheduled-job monitoring that lives inside your app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make.
+Cron and scheduled-job monitoring that lives inside your app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget, or quietly does nothing. No server to run, no account to make.
 
 Docs: [cronwatch.dev/docs](https://cronwatch.dev/docs/)
 
@@ -85,11 +85,11 @@ An `expect` RegExp runs in your process on the runtime's own engine and, like an
 | `@cronwatch/sdk/postgres` | `postgres({ connectionString })`, needs `pg` (and `@types/pg` in TypeScript) |
 | `@cronwatch/sdk/d1` | `d1(env.DB)`, the Cloudflare D1 store; needs nothing |
 | `@cronwatch/sdk/pg-cron` | `pgCron(pool)`, a source that reads pg_cron jobs (Supabase Cron included) from Postgres on every check; pass it in `sources` |
-| `@cronwatch/sdk/node` | `toNodeHandler`, `toKoaMiddleware`, `toRequest`, `writeResponse`: fetch handlers on `http.createServer`, Express, Connect, NestJS and Koa |
+| `@cronwatch/sdk/node` | `toNodeHandler`, `toKoaMiddleware`, `toRequest`, `writeResponse`: fetch handlers on `http.createServer`, Express, Connect, NestJS, and Koa |
 | `@cronwatch/sdk/slack`, `/discord`, `/webhook` | chat and signed webhook alert channels; `/webhook` also has `signature(secret, body)` for a receiver |
 | `@cronwatch/sdk/resend`, `/postmark`, `/sendgrid`, `/mailgun`, `/ses` | email alert channels |
 | `@cronwatch/sdk/twilio` | SMS alerts |
 | `@cronwatch/sdk/sentry`, `/honeybadger`, `/datadog`, `/rollbar`, `/bugsnag`, `/newrelic` | alerts as events in an error tracker |
 | `@cronwatch/sdk/anthropic` | `anthropic()` triage: a short diagnosis on every alert except recoveries, needs `@anthropic-ai/sdk` |
 
-The core, `/d1`, `/pg-cron` and every channel use only `fetch` and Web Crypto, so they run on Node 22 or newer, Cloudflare Workers, Deno and Bun. The SQLite and Postgres stores and `/node` need Node 22 or newer. MIT.
+The core, `/d1`, `/pg-cron`, and every channel use only `fetch` and Web Crypto, so they run on Node 22 or newer, Cloudflare Workers, Deno, and Bun. The SQLite and Postgres stores and `/node` need Node 22 or newer. MIT.

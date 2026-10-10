@@ -186,7 +186,7 @@ final class Output
      * JavaScript's match. JavaScript's \s is spelled out, \b is spelled with
      * ASCII word characters, and case-insensitive words are spelled
      * [Ss][Ee]... (ASCII-only folding, as JavaScript's /i has it here), since
-     * PHP's /u makes \s, \b and /i Unicode-aware.
+     * PHP's /u makes \s, \b, and /i Unicode-aware.
      *
      * @return list<array{string, \Closure(array<int, string>): string}>
      */
@@ -258,7 +258,7 @@ final class Output
                 "/({$bw}" . $ci('discord') . '(?:' . $ci('app') . ')?' . $ci('.com') . '\\/' . $ci('api') . '\\/(?:[Vv][0-9]{1,2}\\/)?' . $ci('webhooks') . '\\/)[A-Za-z0-9\\/_-]{1,255}/u',
                 $keepFirst,
             ],
-            // Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI and Google style keys.
+            // Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI, and Google style keys.
             ["/{$bw}(?:AKIA|ASIA)[0-9A-Z]{16}(?![{$word}])/u", $whole],
             ["/{$bw}(?:gh[pousr]_[A-Za-z0-9]{30,255}|github_pat_[A-Za-z0-9_]{20,255})(?![{$word}])/u", $whole],
             ["/{$bw}xox[abposr]-[A-Za-z0-9-]{10,255}/u", $whole],
@@ -272,8 +272,8 @@ final class Output
     /**
      * The default `redact`: blanks values that look like secrets (key=value
      * pairs with secret-ish names, Authorization headers, URL credentials,
-     * bearer tokens, JWTs, PEM private keys, webhook URLs and well-known token
-     * formats) before output or an error is stored, shown or sent anywhere.
+     * bearer tokens, JWTs, PEM private keys, webhook URLs, and well-known token
+     * formats) before output or an error is stored, shown, or sent anywhere.
      * Matches exactly what the SDK's redactSecrets matches.
      */
     public static function redactSecrets(string $text): string

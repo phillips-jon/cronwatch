@@ -328,10 +328,10 @@ public class HardeningTests
             Assert.Contains("failuresBeforeAlert", Assert.Throws<CronwatchException>(() => withDefaults.Job("a")).Message, StringComparison.Ordinal);
         }
         Assert.Equal(
-            "defaults takes grace, timeout, timezone and failuresBeforeAlert, not schedule",
+            "defaults takes grace, timeout, timezone, and failuresBeforeAlert, not schedule",
             Assert.Throws<CronwatchException>(() => new CronwatchClient(new CronwatchOptions { Defaults = new JobOptions { Schedule = "@hourly" } })).Message);
         Assert.Equal(
-            "defaults takes grace, timeout, timezone and failuresBeforeAlert, not schedule",
+            "defaults takes grace, timeout, timezone, and failuresBeforeAlert, not schedule",
             Assert.Throws<CronwatchException>(() => new CronwatchClient(new CronwatchOptions { Defaults = new JobOptions().Field("schedule", "@hourly") })).Message);
         cw.Job("a", new JobOptions { Budget = { ["errors"] = 0 }, FailuresBeforeAlert = 2, Timeout = "5m" });
     }

@@ -286,7 +286,7 @@ public class PostHardeningTests
         var seen = server.SeenRequests[0];
         // HttpClient writes Host first, then the request's headers in the order given, then the
         // content's, then Content-Length. A header it knows (authorization, content-type) is
-        // written in its own casing, any other as given; host, content-length and connection
+        // written in its own casing, any other as given; host, content-length, and connection
         // given by the request are dropped, and nothing is added (no User-Agent, no
         // Accept-Encoding).
         Assert.Equal(

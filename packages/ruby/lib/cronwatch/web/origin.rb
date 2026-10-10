@@ -42,7 +42,7 @@ module Cronwatch
       end
 
       # scheme://host[:port] for text that is a scheme and a bare host, or nil
-      # when it carries credentials, a path, a query or a fragment, or is not
+      # when it carries credentials, a path, a query, or a fragment, or is not
       # an http or https URL.
       def bare(value)
         return nil unless value.is_a?(String)
@@ -61,7 +61,7 @@ module Cronwatch
       end
 
       # Whether what follows the host would show in the URL: a path other
-      # than "/", a query or a fragment.
+      # than "/", a query, or a fragment.
       def past_host?(after)
         path, hash, fragment = after.partition("#")
         path, _, query = path.partition("?")

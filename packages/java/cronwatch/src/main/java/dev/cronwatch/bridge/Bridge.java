@@ -7,12 +7,12 @@ import java.time.Duration;
 import org.jspecify.annotations.Nullable;
 
 /**
- * {@link SchedulerBridge} under its name before 1.0: every method and constant is the same one.
+ * {@link SchedulerBridge} under its name before 0.11: every method and constant is the same one.
  * Like the rest of the package, it is outside the 1.x promise.
  *
  * @deprecated use {@link SchedulerBridge}, the name the .NET port shares; removed in 2.0
  */
-@Deprecated(since = "1.0", forRemoval = true)
+@Deprecated(since = "0.11", forRemoval = true)
 public final class Bridge {
   private Bridge() {}
 

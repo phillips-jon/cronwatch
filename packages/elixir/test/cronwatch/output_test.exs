@@ -1,6 +1,6 @@
 defmodule Cronwatch.OutputTest do
   # Replays conformance/output.json, written by scripts/conformance.mjs from
-  # the TypeScript SDK (the cap, every redaction case, error text and what an
+  # the TypeScript SDK (the cap, every redaction case, error text, and what an
   # expect rule sees), and the SDK's redaction tests that exercise
   # redactSecrets and the cap directly. Fake keys are built from pieces, so no
   # string here looks like a real credential to a scanner.
@@ -279,7 +279,7 @@ defmodule Cronwatch.OutputTest do
     defexception message: "no rows"
   end
 
-  test "exceptions, throws, exits and returned errors read as a JavaScript stack does" do
+  test "exceptions, throws, exits, and returned errors read as a JavaScript stack does" do
     {kind, reason, stack} =
       try do
         raise "boom"

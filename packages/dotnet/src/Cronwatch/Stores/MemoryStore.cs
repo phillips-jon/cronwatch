@@ -28,7 +28,7 @@ public sealed class MemoryStore : IStore, IUpdateRunIfStore, ICompareAndSetState
     private long _seq;
 
     // Text is held as the SQL store writes it, without U+0000, so every store reads back the
-    // same: a run's trigger, output, error and metric names, and every key and string of a
+    // same: a run's trigger, output, error, and metric names, and every key and string of a
     // definition and a state. Identifiers are held as given.
 
     private static Definition Kept(Definition definition)

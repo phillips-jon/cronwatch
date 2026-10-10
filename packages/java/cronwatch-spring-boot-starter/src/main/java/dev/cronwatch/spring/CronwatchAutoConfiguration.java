@@ -27,7 +27,7 @@ import org.springframework.core.env.Environment;
 /**
  * The client as a bean, from {@code cronwatch.*} properties and the app's own beans: a {@link
  * Store} bean is the store (else {@code cronwatch.store}), every {@link Channel} bean is a channel
- * (else the console), and a {@link Triage}, {@link Source} beans and an {@link ErrorHandler} are
+ * (else the console), and a {@link Triage}, {@link Source} beans, and an {@link ErrorHandler} are
  * used when the app has them. When neither {@code CRONWATCH_ENV} nor {@code APP_ENV} is set, the
  * environment is the app's active Spring profile ({@code dev} and {@code local} are development,
  * {@code prod} production). The client is closed when the context closes. An app's own {@link
@@ -122,7 +122,7 @@ public class CronwatchAutoConfiguration {
 
   /**
    * Whether {@code s} is empty or only whitespace as JavaScript's {@code trim} sees it (U+0009 to
-   * U+000D, U+0020, U+00A0, U+1680, U+2000 to U+200A, U+2028, U+2029, U+202F, U+205F, U+3000 and
+   * U+000D, U+0020, U+00A0, U+1680, U+2000 to U+200A, U+2028, U+2029, U+202F, U+205F, U+3000, and
    * U+FEFF), the core's rule for a blank token or secret.
    */
   static boolean blank(String s) {

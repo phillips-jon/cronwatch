@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * {@code job.handler()}: the SDK's handler tests ({@code client.test.ts} and {@code
- * client-hardening.test.ts}), as the Go, Rust and Elixir ports have them, and the Java answers: a
+ * client-hardening.test.ts}), as the Go, Rust, and Elixir ports have them, and the Java answers: a
  * {@link Response} the function returns, a throw answered 500, an {@link Error} recorded and thrown
  * again, and the JDK's server in front. Without a secret, and in development, it is tested in
  * {@link RoutesEnvTest}.

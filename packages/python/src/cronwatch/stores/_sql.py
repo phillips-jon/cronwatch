@@ -1,5 +1,5 @@
-"""The schema, statements and row mapping of the SDK's SQL stores
-(stores/sql.ts), text for text, so a Node, a Ruby and a Python process can
+"""The schema, statements, and row mapping of the SDK's SQL stores
+(stores/sql.ts), text for text, so a Node, a Ruby, and a Python process can
 share one database. Statements are written with ``?`` placeholders; a
 Postgres store (a later release) numbers them."""
 
@@ -47,7 +47,7 @@ def table_prefix(prefix: str = DEFAULT_PREFIX) -> str:
     if not isinstance(prefix, str) or not re.fullmatch(r"[a-z_][a-z0-9_]*", prefix) or len(prefix) > MAX_PREFIX:
         shown = _js.quote(prefix) if isinstance(prefix, str) else repr(prefix)
         raise ValueError(
-            f"cronwatch: invalid table prefix {shown}. Use lowercase letters, digits and underscores, "
+            f"cronwatch: invalid table prefix {shown}. Use lowercase letters, digits, and underscores, "
             f"not starting with a digit, at most {MAX_PREFIX} characters."
         )
     return prefix
@@ -167,7 +167,7 @@ def update_run_if_sql(dialect: str, p: str, count: int) -> str:
 
 # Postgres refuses U+0000 in TEXT and JSONB, and a refused write loses the
 # whole row, so every dialect writes text without it: a run's trigger,
-# output, error and metric names, and every key and string of a definition
+# output, error, and metric names, and every key and string of a definition
 # and a state. Identifiers (a job's name, a run's id) are written as given;
 # the client refuses one with a NUL before it gets here.
 def _text(value: str | None) -> str | None:
@@ -215,7 +215,7 @@ def cas_update_params(state: JobState, expected_version: int) -> list[Any]:
     return [_json_text(state.to_dict()), state.job, expected_version]
 
 
-# Rows are read leniently: a foreign, hand-edited or damaged row (SQLite
+# Rows are read leniently: a foreign, hand-edited, or damaged row (SQLite
 # keeps whatever type it is given, in any column) must affect only its own
 # job, never every read. JSON text that does not parse reads as None, which
 # the client takes as no state, or as an unreadable definition it reports.
@@ -236,7 +236,7 @@ def _json(value: Any) -> Any:
         return None
 
 
-# What Number() reads from text, once trimmed: a decimal, or a 0x, 0o or 0b integer.
+# What Number() reads from text, once trimmed: a decimal, or a 0x, 0o, or 0b integer.
 _DECIMAL = re.compile(r"[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
 _RADIX = re.compile(r"0([xX][0-9a-fA-F]+|[oO][0-7]+|[bB][01]+)")
 

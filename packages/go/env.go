@@ -14,7 +14,7 @@ import (
 var envVariables = []string{"CRONWATCH_ENV", "APP_ENV", "GO_ENV"}
 
 // environment is the environment's name, lowercased, or "" when no
-// variable names one. "development", "dev", "local", "test" and "testing"
+// variable names one. "development", "dev", "local", "test", and "testing"
 // count as development and "prod" as "production", as in the PHP port.
 func environment() string {
 	for _, name := range envVariables {
@@ -37,7 +37,7 @@ func environment() string {
 func blank(s string) bool { return js.Trim(s) == "" }
 
 // secretEnv is a secret from the environment (CRONWATCH_TOKEN,
-// CRON_SECRET): "" when the variable is unset, empty or blank, else its
+// CRON_SECRET): "" when the variable is unset, empty, or blank, else its
 // value as it is, untrimmed.
 func secretEnv(name string) string {
 	if v := os.Getenv(name); !blank(v) {

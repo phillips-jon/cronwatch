@@ -27,9 +27,9 @@ import org.junit.jupiter.api.io.TempDir;
 import org.sqlite.SQLiteDataSource;
 
 /**
- * {@code conformance/store.json}'s {@code foreignRows}: rows a foreign, hand-edited or damaged
- * writer could leave in SQLite, each read leniently, and a check, a silence and every page over all
- * of them at once, where one affects only its own job.
+ * {@code conformance/store.json}'s {@code foreignRows}: rows a foreign, hand-edited, or damaged
+ * writer could leave in SQLite, each read leniently, and a check, a silence, and every page over
+ * all of them at once, where one affects only its own job.
  */
 class ForeignRowsConformanceTest {
   @TempDir Path dir;
@@ -42,7 +42,7 @@ class ForeignRowsConformanceTest {
     return ds;
   }
 
-  /** Inserts one row with each value as SQLite holds it: text, an integer, a real or NULL. */
+  /** Inserts one row with each value as SQLite holds it: text, an integer, a real, or NULL. */
   private static void insert(Path file, String table, JsObject row) throws Exception {
     List<String> keys = row.keys();
     String sql =
@@ -70,7 +70,7 @@ class ForeignRowsConformanceTest {
     }
   }
 
-  /** The state column as stored, parsed (5, [] and a foreign object read back as they are). */
+  /** The state column as stored, parsed (5, [], and a foreign object read back as they are). */
   private static @Nullable Object rawState(Path file, String job) throws Exception {
     try (Connection c = source(file).getConnection();
         PreparedStatement ps =

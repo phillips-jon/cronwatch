@@ -243,7 +243,7 @@ func TestASecretSplitByTheCutIsRedactedWhole(t *testing.T) {
 		t.Errorf("bearer: %q", out[:80])
 	}
 
-	// Errors, recorded runs and flushed lines the same way.
+	// Errors, recorded runs, and flushed lines the same way.
 	_ = k.cw.Run(bg, "thrown", func(context.Context, *cronwatch.JobContext) error {
 		return errors.New(strings.Repeat("e", cap) + " " + bearer + " " + strings.Repeat("z", cap-40))
 	})
@@ -300,7 +300,7 @@ func TestPrintingAClientOrRoutesShowsNoSecret(t *testing.T) {
 }
 
 func TestNewAndWithStoreValidate(t *testing.T) {
-	if _, err := cronwatch.New(cronwatch.WithRetention("soon")); err == nil || err.Error() != `retention "soon" is not a duration like "15m", "1h30m" or "90s"` {
+	if _, err := cronwatch.New(cronwatch.WithRetention("soon")); err == nil || err.Error() != `retention "soon" is not a duration like "15m", "1h30m", or "90s"` {
 		t.Error(err)
 	}
 	if _, err := cronwatch.New(cronwatch.WithStore(nil)); err == nil {

@@ -3,7 +3,7 @@
 //
 //   node site/scripts/demo.mjs            serve it on http://localhost:4399/cronwatch/
 //   node site/scripts/demo.mjs --capture  write src/demo/alerts.txt, mcp.json,
-//                                         jobs.json and dashboard.html, which
+//                                         jobs.json, and dashboard.html, which
 //                                         the landing page quotes (run with TZ=UTC)
 import { createServer } from "node:http";
 import { mkdirSync, writeFileSync } from "node:fs";

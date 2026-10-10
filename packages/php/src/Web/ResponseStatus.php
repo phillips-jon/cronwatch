@@ -16,7 +16,7 @@ namespace Cronwatch\Web;
  *   Laravel's HttpFoundation responses, Symfony's HttpClient responses;
  * - Laravel's HTTP client response (status() and reason());
  * - a plain array with a whole-number "status" from 100 to 599 and no key
- *   but "status", "headers" and "body" (what a handler may answer with).
+ *   but "status", "headers", and "body" (what a handler may answer with).
  *
  * The reason is the one the response carries (a PSR-7 reason phrase,
  * HttpFoundation's status text), else "", as a fetch Response made without

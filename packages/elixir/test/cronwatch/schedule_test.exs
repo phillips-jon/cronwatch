@@ -24,7 +24,7 @@ defmodule Cronwatch.ScheduleTest do
     due
   end
 
-  test "parse accepts cron, nicknames and intervals" do
+  test "parse accepts cron, nicknames, and intervals" do
     for s <- ["0 2 * * *", "@hourly", "*/5 * * * *"], do: assert(must(s).kind == "cron", s)
     every = must("every 5m")
     assert every.kind == "interval"
@@ -256,14 +256,14 @@ defmodule Cronwatch.ScheduleTest do
 
     assert Duration.parse(-5, "grace") == {:error, "grace must be a non-negative number of milliseconds"}
     assert Duration.parse(:infinity, "grace") == {:error, "grace must be a non-negative number of milliseconds"}
-    assert Duration.parse(true, "grace") == {:error, ~s(grace "true" is not a duration like "15m", "1h30m" or "90s")}
-    assert Duration.parse(nil, "grace") == {:error, ~s(grace "null" is not a duration like "15m", "1h30m" or "90s")}
+    assert Duration.parse(true, "grace") == {:error, ~s(grace "true" is not a duration like "15m", "1h30m", or "90s")}
+    assert Duration.parse(nil, "grace") == {:error, ~s(grace "null" is not a duration like "15m", "1h30m", or "90s")}
 
     assert Duration.parse(Object.new(), "grace") ==
-             {:error, ~s(grace "[object Object]" is not a duration like "15m", "1h30m" or "90s")}
+             {:error, ~s(grace "[object Object]" is not a duration like "15m", "1h30m", or "90s")}
 
     assert Duration.parse([1, nil, "a"], "grace") ==
-             {:error, ~s(grace "1,,a" is not a duration like "15m", "1h30m" or "90s")}
+             {:error, ~s(grace "1,,a" is not a duration like "15m", "1h30m", or "90s")}
   end
 
   test "a duration over 64 characters is refused, quoting its first 32" do
@@ -275,7 +275,7 @@ defmodule Cronwatch.ScheduleTest do
     forty = String.duplicate("😀", 40)
 
     assert Duration.parse(forty) ==
-             {:error, ~s(duration "#{forty}" is not a duration like "15m", "1h30m" or "90s")}
+             {:error, ~s(duration "#{forty}" is not a duration like "15m", "1h30m", or "90s")}
 
     assert Duration.parse(String.duplicate("😀", 65)) ==
              {:error, ~s(duration "#{String.duplicate("😀", 32)}..." #{too_long})}

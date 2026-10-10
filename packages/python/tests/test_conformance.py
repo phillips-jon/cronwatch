@@ -985,7 +985,7 @@ CLIENT = fixture("client.json")
 
 
 def test_client_run_ids() -> None:
-    """start, resume and record_run hold run ids to 1 to 200 UTF-16 units, each with its own error."""
+    """start, resume, and record_run hold run ids to 1 to 200 UTF-16 units, each with its own error."""
 
     def check(c: dict[str, Any]) -> str | None:
         cw = Cronwatch(store=MemoryStore(), alerts=[], cron_secret=None, now=lambda: T0)
@@ -1021,7 +1021,7 @@ def canonical(value: Any) -> str:
 def test_client_unknown_fields(kind: str, tmp_path: Path) -> None:
     """What a newer release wrote (a state or definition key, a run status, a
     trigger, an open condition) survives a check, a silence, an unsilence, a
-    summary and a run, over each store."""
+    summary, and a run, over each store."""
     unknown = CLIENT["unknownFields"]
     seed = unknown["seed"]
     store = make_store(kind, tmp_path)

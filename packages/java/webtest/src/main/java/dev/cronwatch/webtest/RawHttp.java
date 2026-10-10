@@ -20,7 +20,7 @@ import org.jspecify.annotations.Nullable;
 public final class RawHttp {
   private RawHttp() {}
 
-  /** An answer: the status, the headers in order and the body. */
+  /** An answer: the status, the headers in order, and the body. */
   @SuppressWarnings("ArrayRecordComponent") // a test's answer, read once
   public record Answer(int status, List<Map.Entry<String, String>> headers, byte[] body) {
     /** The first value of a header, or null. */

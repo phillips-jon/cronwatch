@@ -2,7 +2,7 @@
 //! async runtime of its own (diesel, a command-line tool).
 //!
 //! It owns a single-threaded tokio runtime on a thread of its own, as
-//! `reqwest::blocking` does: store calls, alerts and the checks' tasks run
+//! `reqwest::blocking` does: store calls, alerts, and the checks' tasks run
 //! there, while a job's function is a plain closure that runs on the calling
 //! thread. Every call blocks the calling thread until it is done, so it works
 //! anywhere, inside another runtime too; there it blocks one of that
@@ -151,7 +151,7 @@ impl Client {
     }
 
     /// The async client this wraps, for what the blocking client does not
-    /// carry: the dashboard (`routes`), `defined_jobs`, `store` and the rest,
+    /// carry: the dashboard (`routes`), `defined_jobs`, `store`, and the rest,
     /// or async code that shares the client.
     pub fn as_async(&self) -> &crate::Client {
         &self.inner

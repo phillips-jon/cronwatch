@@ -787,7 +787,7 @@ def test_a_job_forgotten_by_another_process_comes_back_in_a_long_lived_one_that_
     assert store.get_job("nightly").definition.schedule == "every 5m"
     assert len(web.runs("nightly")) == 1
 
-    # So does a started run, a check, the board and the job's page in the process that declares it.
+    # So does a started run, a check, the board, and the job's page in the process that declares it.
     forgotten()
     handle = nightly.start()
     assert store.get_job("nightly") is not None
@@ -832,7 +832,7 @@ def test_a_secret_split_by_the_16_kb_cut_is_redacted_whole_redaction_comes_befor
     assert "opaqueTOKEN" not in bearer_output
     assert len(bearer_output) <= OUTPUT_CAP + len("[earlier output trimmed]\n")
 
-    # Errors, recorded runs and flushed lines the same way.
+    # Errors, recorded runs, and flushed lines the same way.
     with pytest.raises(RuntimeError):
         cw.run("thrown", boom(f"{'e' * OUTPUT_CAP} {BEARER} {'z' * (OUTPUT_CAP - 40)}"))
     assert "opaqueTOKEN" not in cw.runs("thrown")[0].error

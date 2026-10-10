@@ -45,7 +45,7 @@ internal sealed record EmailSettings(string From, IReadOnlyList<string> To, stri
 internal sealed record EmailMail(string From, IReadOnlyList<string> To, string Subject, string Text, string Html);
 
 /// <summary>
-/// What every email channel sends (<c>alerts/email.ts</c>): one subject, a plain text body and a
+/// What every email channel sends (<c>alerts/email.ts</c>): one subject, a plain text body, and a
 /// small HTML body, so an alert reads the same whichever provider carries it.
 /// </summary>
 internal static class EmailText

@@ -2,12 +2,12 @@ defmodule Cronwatch.Alerts.URL do
   @moduledoc false
   # A URL read as the WHATWG URL parser (and so fetch) reads an http or
   # https URL, the Go and Rust ports' rules: characters up to U+0020 around
-  # it dropped and every tab, CR and LF inside it removed; the slashes after
+  # it dropped and every tab, CR, and LF inside it removed; the slashes after
   # the scheme, and backslashes, read as fetch reads them; the host
-  # lowercased, IPv4 in its dotted form (hex, octal and short forms read)
+  # lowercased, IPv4 in its dotted form (hex, octal, and short forms read),
   # and IPv6 compressed; the scheme's own port left out; dot segments
   # resolved; and a space or other character a URL cannot hold
-  # percent-encoded in the path, query and fragment. URI.parse/1 is RFC
+  # percent-encoded in the path, query, and fragment. URI.parse/1 is RFC
   # 3986, which reads several of these differently. A host outside ASCII is
   # refused rather than converted to punycode.
 
@@ -327,7 +327,7 @@ defmodule Cronwatch.Alerts.URL do
       if(u.fragment, do: "#" <> u.fragment, else: "")
   end
 
-  @doc "`url.origin`: the scheme, host and port."
+  @doc "`url.origin`: the scheme, host, and port."
   @spec origin(t()) :: String.t()
   def origin(%__MODULE__{} = u) do
     u.scheme <> "://" <> u.host <> if(u.port, do: ":#{u.port}", else: "")

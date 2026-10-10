@@ -4,7 +4,7 @@ defmodule Cronwatch.Run do
   `status` is the SDK's string (see `Cronwatch.RunStatus`); `output` is the
   lines logged or the text the job returned, capped at 16 KB; `metrics` is a
   `Cronwatch.JS.Object` of numbers; `trigger` is what started the run (`run`,
-  `handler`, `start` or a value of the app's). `extra` holds the fields after
+  `handler`, `start`, or a value of the app's). `extra` holds the fields after
   the known ones that a newer release added to the run of a queued alert
   (`Cronwatch.Alert`), in stored order, written back with it; it is empty for
   every other run.

@@ -67,7 +67,7 @@ public final class Origins {
 
   /**
    * {@code scheme://host[:port]} for text that is a scheme and a bare host, or null when it carries
-   * a path, credentials, a query or a fragment, or is not an http or https URL.
+   * a path, credentials, a query, or a fragment, or is not an http or https URL.
    */
   public static @Nullable String bare(String value) {
     try {

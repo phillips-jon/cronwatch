@@ -13,7 +13,7 @@ namespace Cronwatch.Web;
 /// The dashboard and its small JSON API, the SDK's <c>cw.routes()</c> (<c>routes/index.ts</c>),
 /// framework-free: <see cref="HandleAsync"/> takes a <see cref="CronwatchRequest"/> and answers a
 /// <see cref="CronwatchResponse"/>, with the same URLs, JSON, status codes, headers, cookie, redirects,
-/// cross-site rule and token rules as the SDK's routes, so <c>@cronwatch/mcp</c> works against a
+/// cross-site rule, and token rules as the SDK's routes, so <c>@cronwatch/mcp</c> works against a
 /// .NET app as it does against a Node one. <c>Cronwatch.AspNetCore</c>'s <c>MapCronwatch</c> and
 /// <c>UseCronwatch</c> are adapters over it, and so can any other server be. Made by
 /// <see cref="CronwatchClient.Routes"/>. Safe to share between threads.
@@ -42,8 +42,8 @@ public sealed class Routes
     private const int ApiVersion = 1;
 
     // 'self' only for what the app shell needs: app.js (which registers the service worker and
-    // the theme toggle), the manifest, the worker and the icons. No inline script, and the pages work
-    // without any.
+    // the theme toggle), the manifest, the worker, and the icons. No inline script, and the pages
+    // work without any.
     private const string PageCsp =
         "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 
@@ -84,7 +84,7 @@ public sealed class Routes
             // A token of only whitespace, given or read, counts as unset, so the routes stay locked.
             configured = Js.Secret(options.Token?.Value) ?? Js.Secret(Env.Read("CRONWATCH_TOKEN")) ?? "";
         }
-        // A handler cannot tell a local caller from a remote one (proxies, tunnels and a server
+        // A handler cannot tell a local caller from a remote one (proxies, tunnels, and a server
         // listening on every interface all look alike), so development gets a token too: made
         // here, and shown only in the log.
         bool generate = configured.Length == 0 && !_optedOut && cw.EnvironmentName == "development";
@@ -546,7 +546,7 @@ public sealed class Routes
         string method = said.Method;
         Announce(said, basePath);
 
-        // The app shell: the manifest, icons, service worker, app.js and the offline page. Served
+        // The app shell: the manifest, icons, service worker, app.js, and the offline page. Served
         // to anyone, since a browser fetches some of it without cookies and none of it says
         // anything about the jobs.
         if (method is "GET" or "HEAD")

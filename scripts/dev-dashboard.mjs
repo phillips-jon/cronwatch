@@ -104,7 +104,7 @@ for (let d = 7; d >= 0; d--) {
   if (past(day + 7 * HOUR)) seeded.push([day + 7 * HOUR, "App.Jobs.SendNewsletterDigest", 50_000 * wobble(0.2)]);
   if (past(day + 90 * MIN)) seeded.push([day + 90 * MIN, "cleanup-sessions", 4 * MIN * wobble(0.3), (j) => { j.log("Deleted 48,112 sessions in 10 batches"); j.metric("deleted", 48_112); }]);
 }
-// Hourly, four-hourly and six-hourly jobs over three days.
+// Hourly, four-hourly, and six-hourly jobs over three days.
 for (const t of slots(HOUR, now - 3 * DAY, now - MIN)) seeded.push([t, "cache-warm", 40_000 * wobble(0.2), (j) => j.metric("keys", 3_200)]);
 for (const t of slots(HOUR, now - 3 * DAY, now - MIN)) seeded.push([t, "wp:store_sync_inventory", 12_000 * wobble(0.3), (j) => j.metric("products", 840)]);
 for (const t of slots(4 * HOUR, now - 7 * DAY, now - MIN)) seeded.push([t, "exchange-rates", 2_500 * wobble(0.3), (j) => { j.metrics({ currencies: 32 }); j.log("Fetched 32 rates from ECB"); }]);

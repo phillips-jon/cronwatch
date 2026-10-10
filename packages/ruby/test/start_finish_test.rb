@@ -3,7 +3,7 @@
 require_relative "test_helper"
 require_relative "support/resume_across_clients"
 
-# Runs that span calls: JobHandle#start, #resume and the RunHandle.
+# Runs that span calls: JobHandle#start, #resume, and the RunHandle.
 # packages/sdk/test/start-finish.test.ts; the SQL stores' resume test is in
 # test/active_record/start_finish_test.rb.
 class StartFinishTest < Minitest::Test

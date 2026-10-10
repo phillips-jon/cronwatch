@@ -23,7 +23,7 @@ internal sealed class PwaAsset(string contentType, byte[] body, string cache, bo
 
 /// <summary>
 /// What makes the dashboard an installable web app (<c>routes/pwa.ts</c>): a manifest, icons, a
-/// service worker, the script that registers it and a page to show offline. None of it says
+/// service worker, the script that registers it, and a page to show offline. None of it says
 /// anything about the jobs, so it is served without the token. The files are the SDK's, byte for
 /// byte, embedded resources in the assembly: <c>scripts/make-dashboard-icons.mjs</c> writes the
 /// icons and <c>packages/ruby/test/web/golden.mjs</c> the style sheet and scripts, and both fail
@@ -75,7 +75,7 @@ internal static class Pwa
         .Set("id", basePath + "/")
         .Set("name", "CronWatch")
         .Set("short_name", "CronWatch")
-        .Set("description", "The scheduled jobs of this app: their health, their last day and their runs.")
+        .Set("description", "The scheduled jobs of this app: their health, their last day, and their runs.")
         .Set("start_url", basePath + "/")
         .Set("scope", basePath + "/")
         .Set("display", "standalone")

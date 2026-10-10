@@ -1,5 +1,5 @@
 # A release tag -> the five .NET packages in packages/dotnet (Cronwatch,
-# Cronwatch.Hosting, Cronwatch.AspNetCore, Cronwatch.Hangfire and
+# Cronwatch.Hosting, Cronwatch.AspNetCore, Cronwatch.Hangfire, and
 # Cronwatch.Quartz) packed and published to nuget.org, with nuget.org's
 # trusted publishing: nuget.org trusts this workflow's OIDC token and hands
 # back an API key that lives one hour, so no API key is stored anywhere. Can
@@ -14,7 +14,7 @@
 # Stays off until the repository variable NUGET_ENABLED is "true". Before
 # that, on nuget.org (the account menu, Trusted Publishing): add a policy
 # with repository owner cronwatchdev, repository cronwatch, workflow file
-# nuget.yml (the file name only) and environment nuget, whose scope allows
+# nuget.yml (the file name only), and environment nuget, whose scope allows
 # pushing new packages and new versions of packages matching Cronwatch and
 # Cronwatch.*; and here, create the environment "nuget" (Settings,
 # Environments) with required reviewers, and give it the environment variable
@@ -83,7 +83,7 @@ jobs:
         run: dotnet pack -c Release -o artifacts/packages
       # The checks ci.yml runs on every push, by the same script: exactly
       # the five packages, each with its assembly, XML documentation, README,
-      # license and icon and nothing from the tests, and no dependency in
+      # license, and icon, and nothing from the tests, and no dependency in
       # the core's .nuspec.
       - name: The packages' files
         working-directory: packages/dotnet

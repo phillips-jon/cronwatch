@@ -2,6 +2,14 @@
 
 Every notable change to CronWatch, newest first. All the packages, in every language, share one version, so each release is one section here, with a line per language where it matters. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and from 1.0 the versions follow [Semantic Versioning](https://semver.org) as the [Stability](https://cronwatch.dev/docs/stability/) page describes. The WordPress plugin, the Drupal module and the Craft CMS plugin keep their own changelogs too, for their stores.
 
+## Unreleased
+
+### Changed
+
+Every language:
+
+- Alert text, the dashboard, and error and log messages use the serial (Oxford) comma in lists of three or more, and a recovery names what closed as a list ("succeeded after: failed and slow", "after: missed, failed, and over budget"), so a filter that matches alert text word for word may need updating.
+
 ## 0.12.4 - 2026-10-10
 
 ### Changed

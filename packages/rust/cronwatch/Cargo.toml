@@ -1,6 +1,6 @@
 [package]
 name = "cronwatch"
-description = "Know when your cron jobs fail, run late or never run: the library behind cronwatch.dev, for Rust"
+description = "Know when your cron jobs fail, run late, or never run: the library behind cronwatch.dev, for Rust"
 readme = "../README.md"
 version.workspace = true
 edition.workspace = true
@@ -16,16 +16,16 @@ include = ["src/**/*", "!src/conformance/**", "!src/**/tests.rs", "!src/**/*_tes
 [features]
 # A blocking client for programs with no runtime of their own.
 blocking = ["tokio/net"]
-# The store contract test, the store.json replay and the finish-once
+# The store contract test, the store.json replay, and the finish-once
 # scenarios, for stores of the app's own.
 storetest = []
 # The alert channels (Slack, Discord, the webhook, the email providers,
-# Twilio and the error trackers) and the default transport they post with.
+# Twilio, and the error trackers) and the default transport they post with.
 alerts = ["__transport", "dep:hmac"]
 # Claude triage over plain HTTP, on the same transport (not the channels).
 triage = ["__transport"]
 # The dashboard and a job's handler as tower services, for hyper, axum,
-# tonic's HTTP stack and lambda_http.
+# tonic's HTTP stack, and lambda_http.
 tower = ["dep:http", "dep:http-body", "dep:http-body-util", "dep:bytes", "dep:tower-service"]
 # tower, and the mount axum records when the dashboard is nested
 # (NestedPath and OriginalUri); Routes::into_router(), deprecated.
@@ -54,7 +54,7 @@ url = { version = "2.5.4", optional = true }
 # 1.85 build working with it; this backend is also some fifteen crates
 # lighter.
 idna_adapter = { version = "~1.1", optional = true }
-# The dashboard's cookie, the alert ids and SigV4.
+# The dashboard's cookie, the alert ids, and SigV4.
 sha2 = "0.11"
 hmac = { version = "0.13", optional = true }
 http = { version = "1.1", optional = true }

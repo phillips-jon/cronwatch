@@ -503,7 +503,7 @@ class ChannelsConformanceTest {
     assertEquals(true, cases.size() > 700);
   }
 
-  /** The alert with another title, message and triage. */
+  /** The alert with another title, message, and triage. */
   static Alert withText(Alert a, String title, String message, @Nullable String triage) {
     return new Alert(
         a.type(),

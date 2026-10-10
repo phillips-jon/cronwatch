@@ -1,7 +1,7 @@
 //! CronWatch for [apalis](https://docs.rs/apalis) 1.0 (its release
 //! candidates): each attempt of a worker's tasks recorded as a run, through
 //! a tower layer, and apalis-cron given CronWatch's own schedules, so a job
-//! that fails, runs late, never runs, gets stuck or runs slow is reported.
+//! that fails, runs late, never runs, gets stuck, or runs slow is reported.
 //!
 //! Unlike the rest of the workspace, this crate stays below 1.0 while apalis
 //! 1.0 is a release candidate: it is left out of 1.0's promise, and a
@@ -65,7 +65,7 @@
 //! back as pending, or a task cancelled while it ran) is taken back rather
 //! than judged ([`cronwatch::Job::run_or_discard`]).
 //!
-//! It works over any backend: a worker on apalis's Postgres, MySQL, SQLite
+//! It works over any backend: a worker on apalis's Postgres, MySQL, SQLite,
 //! or Redis storage records its tasks the same way. A worker whose job this
 //! process did not declare (queued tasks, or a worker in a process of its
 //! own while another process schedules) declares it from the definition the
@@ -239,7 +239,7 @@ impl Watcher {
     /// Declares the job `name` with `expr` in `zone` (an IANA name, `""` for
     /// the process's own) and `options`, and gives the backend for its
     /// worker (`WorkerBuilder::new(name).backend(...)`), which ticks on
-    /// exactly the fire times CronWatch expects. A name, schedule or option
+    /// exactly the fire times CronWatch expects. A name, schedule, or option
     /// CronWatch refuses is an error, with the SDK's message.
     pub fn cron(
         &self,

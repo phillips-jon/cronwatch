@@ -7,13 +7,13 @@ export interface PostgresOptions {
   connectionString?: string;
   /** Bring your own pool instead. It is not closed by close(). */
   pool?: pg.Pool;
-  /** Table name prefix: lowercase letters, digits and underscores. Default "cronwatch_". */
+  /** Table name prefix: lowercase letters, digits, and underscores. Default "cronwatch_". */
   prefix?: string;
 }
 
 /**
  * Keeps everything in Postgres through the `pg` driver. For apps on Vercel,
- * Neon, Supabase, Railway and the like, where there is no disk to keep a
+ * Neon, Supabase, Railway, and the like, where there is no disk to keep a
  * SQLite file on. Times are stored as BIGINT epoch milliseconds.
  */
 export function postgres(options: PostgresOptions = {}): Store {

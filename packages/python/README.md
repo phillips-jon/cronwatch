@@ -1,8 +1,8 @@
 # cronwatch-sdk
 
-Cron and scheduled-job monitoring that lives inside your Python app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make.
+Cron and scheduled-job monitoring that lives inside your Python app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget, or quietly does nothing. No server to run, no account to make.
 
-This is the Python port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Python process can share one database with a Node, Ruby, PHP, Go, Rust, Elixir, Java or .NET process, and [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) works against any of them.
+This is the Python port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text, and the same stored rows, so a Python process can share one database with a Node, Ruby, PHP, Go, Rust, Elixir, Java, or .NET process, and [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) works against any of them.
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
@@ -65,7 +65,7 @@ A run that is never finished is marked stuck by the first check after the job's 
 
 ### Options
 
-`job(name, ...)`: `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; default the process's), `grace` (default `"10m"`), `timeout` (default `"1h"`), `max_duration`, `budget` (`{"metric": ceiling}`), `floor` (`{"metric": floor}`), `expect` (a string the output must contain, a compiled `re` pattern it must match, or a function), `failures_before_alert` (default 1), `description`, `tags`. Durations are strings like `"1h30m"`, milliseconds, or `datetime.timedelta`; a duration string is at most 64 characters, and a longer one raises `ValueError`. A job name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit.
+`job(name, ...)`: `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; default the process's), `grace` (default `"10m"`), `timeout` (default `"1h"`), `max_duration`, `budget` (`{"metric": ceiling}`), `floor` (`{"metric": floor}`), `expect` (a string the output must contain, a compiled `re` pattern it must match, or a function), `failures_before_alert` (default 1), `description`, `tags`. Durations are strings like `"1h30m"`, milliseconds, or `datetime.timedelta`; a duration string is at most 64 characters, and a longer one raises `ValueError`. A job name is 1 to 120 letters, digits, `.`, `_`, `:`, or `-`, starting with a letter or digit.
 
 An `expect` pattern is searched in your process by `re`, which backtracks and, like an `expect` function, has no time limit. A pattern with unbounded repeats that can match the same text (`\n*\n*x`, `(a+)+b`, even `.*x`) can take seconds or longer on a long output that does not match: anchor it, avoid a repeat next to or inside another over the same characters, or use a plain string. See [expect rules](https://cronwatch.dev/docs/conditions/#expect-rules).
 
@@ -76,10 +76,10 @@ The client's methods: `job(name, ...)`, `run(name, fn=None, ...)` (a run without
 ### Stores
 
 - `cronwatch.stores.MemoryStore()`, the default: forgets on restart.
-- `cronwatch.stores.SqliteStore(path, prefix="cronwatch_")`: one file, WAL mode. The tables, statements and JSON are the SDK's SQLite store's, byte for byte, so a Node process using `@cronwatch/sdk/sqlite` on the same file sees the same jobs, runs and state.
+- `cronwatch.stores.SqliteStore(path, prefix="cronwatch_")`: one file, WAL mode. The tables, statements, and JSON are the SDK's SQLite store's, byte for byte, so a Node process using `@cronwatch/sdk/sqlite` on the same file sees the same jobs, runs, and state.
 - `cronwatch.stores.postgres.PostgresStore(url, prefix="cronwatch_")` (`pip install "cronwatch-sdk[postgres]"`, psycopg 3.2 or newer): the SDK's Postgres tables and statements. It reads `DATABASE_URL` when given no URL, and writes through a connection of its own, so a run recorded inside the app's transaction survives a rollback. `pool=` takes a psycopg_pool pool instead.
 
-A `prefix` is lowercase letters, digits and underscores, not starting with a digit, at most 47 characters; any other raises `ValueError`.
+A `prefix` is lowercase letters, digits, and underscores, not starting with a digit, at most 47 characters; any other raises `ValueError`.
 
 ### Alert channels
 
@@ -96,13 +96,13 @@ alerts = [
 ]
 ```
 
-`Slack`, `Discord` and `Webhook` (the alert as JSON, signed with `secret=`, with extra headers from `headers=`), the email providers `Resend`, `Postmark`, `Sendgrid`, `Mailgun` and `Ses` (signed with SigV4, no AWS SDK), `Twilio` for SMS, and the trackers `Sentry`, `Honeybadger`, `Datadog`, `Rollbar`, `Bugsnag` and `NewRelic` (`environment=` for Sentry, Honeybadger and Rollbar; `site=` and `tags=` for Datadog). Requests time out after ten seconds, redirects are refused rather than followed, and a provider's error never quotes a key.
+`Slack`, `Discord`, and `Webhook` (the alert as JSON, signed with `secret=`, with extra headers from `headers=`), the email providers `Resend`, `Postmark`, `Sendgrid`, `Mailgun`, and `Ses` (signed with SigV4, no AWS SDK), `Twilio` for SMS, and the trackers `Sentry`, `Honeybadger`, `Datadog`, `Rollbar`, `Bugsnag`, and `NewRelic` (`environment=` for Sentry, Honeybadger, and Rollbar; `site=` and `tags=` for Datadog). Requests time out after ten seconds, redirects are refused rather than followed, and a provider's error never quotes a key.
 
 ### Triage and pg_cron
 
 `cronwatch.triage.anthropic.Anthropic(context="A Django app on Fly.io.")` (`pip install "cronwatch-sdk[anthropic]"`), passed as `triage=`, adds Claude's short diagnosis to each alert. Recoveries are sent without one.
 
-`cronwatch.sources.pgcron.PgCron(url_or_connection, prefix="db:")`, passed in `sources=[...]`, watches pg_cron's jobs: each is declared with its schedule, and the rows of `cron.job_run_details` are copied in as runs on every check, so missed, failed, stuck and slow pg_cron jobs alert like any other.
+`cronwatch.sources.pgcron.PgCron(url_or_connection, prefix="db:")`, passed in `sources=[...]`, watches pg_cron's jobs: each is declared with its schedule, and the rows of `cron.job_run_details` are copied in as runs on every check, so missed, failed, stuck, and slow pg_cron jobs alert like any other.
 
 ### The dashboard
 
@@ -116,7 +116,7 @@ app.mount("/cronwatch", cw.routes().asgi)                                       
 
 Send the token as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps you signed in. It defaults to `$CRONWATCH_TOKEN`, and `token=None` serves the routes open, behind your own auth.
 
-With no token set the routes answer 503, except in development, where they make one and print a sign-in link. The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `ENVIRONMENT` that holds more than spaces, trimmed and lowercased; `development`, `dev`, `local`, `test` and `testing` count as development, and `production` and `prod` as production. The link names the host only when `origin` is set or the request's host is loopback (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`; a Host such as `localhost:1@evil.example` does not count), since a client chooses it. `/api/check` also takes the client's `cron_secret` as a bearer, so a platform cron can run checks. Behind a proxy, pass `origin="https://app.example.com"` (or `trust_proxy=True` when the proxy sets `X-Forwarded-Proto` and `X-Forwarded-Host`).
+With no token set the routes answer 503, except in development, where they make one and print a sign-in link. The environment is the first of `CRONWATCH_ENV`, `APP_ENV`, and `ENVIRONMENT` that holds more than spaces, trimmed and lowercased; `development`, `dev`, `local`, `test`, and `testing` count as development, and `production` and `prod` as production. The link names the host only when `origin` is set or the request's host is loopback (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`; a Host such as `localhost:1@evil.example` does not count), since a client chooses it. `/api/check` also takes the client's `cron_secret` as a bearer, so a platform cron can run checks. Behind a proxy, pass `origin="https://app.example.com"` (or `trust_proxy=True` when the proxy sets `X-Forwarded-Proto` and `X-Forwarded-Host`).
 
 ### Django
 
@@ -135,7 +135,7 @@ CRONWATCH = {
 urlpatterns = [..., path("cronwatch/", include("cronwatch.django.urls"))]
 ```
 
-`CRONWATCH` takes the client's options in upper case (`STORE`, `ALERTS`, `TRIAGE`, `SOURCES`, `CRON_SECRET`, `RETENTION`, `DEFAULTS`, `REDACT`, `DELIVER`, `ON_ERROR`), or `CLIENT` for a client you made yourself, and the dashboard's (`TOKEN`, `BASE_PATH`, `ORIGIN`, `TRUST_PROXY`). `cronwatch.django.client()` is the client made from them, and `cronwatch.client()` hands out the same one. `python manage.py cronwatch_check` runs one check, for cron to call every few minutes. `DEBUG` is the environment unless `CRONWATCH_ENV`, `APP_ENV` or `ENVIRONMENT` says otherwise: with it on and no token set, the dashboard makes one and prints its sign-in link to the runserver log.
+`CRONWATCH` takes the client's options in upper case (`STORE`, `ALERTS`, `TRIAGE`, `SOURCES`, `CRON_SECRET`, `RETENTION`, `DEFAULTS`, `REDACT`, `DELIVER`, `ON_ERROR`), or `CLIENT` for a client you made yourself, and the dashboard's (`TOKEN`, `BASE_PATH`, `ORIGIN`, `TRUST_PROXY`). `cronwatch.django.client()` is the client made from them, and `cronwatch.client()` hands out the same one. `python manage.py cronwatch_check` runs one check, for cron to call every few minutes. `DEBUG` is the environment unless `CRONWATCH_ENV`, `APP_ENV`, or `ENVIRONMENT` says otherwise: with it on and no token set, the dashboard makes one and prints its sign-in link to the runserver log.
 
 Declare jobs in a `cronwatch_jobs.py` module in any installed app: it is imported at startup, so `cronwatch_check` knows every job before it first runs and reports one that never does.
 
@@ -148,7 +148,7 @@ nightly = client().job("nightly-report", schedule="0 2 * * *", grace="15m")
 
 ### Async
 
-A job runs an `async def` the same ways: `async with job.run() as ctx`, `@job.monitor` on an async function (each await is a run), or `await job.run(fn)`. The store is used from a worker thread, so the event loop never waits on it. For an app that is async throughout, `cronwatch.aio.AsyncCronwatch` takes the same options and has the client's methods as coroutines (`await cw.check()`, `await cw.runs("nightly-report")`), with `job.start()`, `flush()` and `finish()` awaited too; `AsyncCronwatch(cronwatch.client())` shares a synchronous client.
+A job runs an `async def` the same ways: `async with job.run() as ctx`, `@job.monitor` on an async function (each await is a run), or `await job.run(fn)`. The store is used from a worker thread, so the event loop never waits on it. For an app that is async throughout, `cronwatch.aio.AsyncCronwatch` takes the same options and has the client's methods as coroutines (`await cw.check()`, `await cw.runs("nightly-report")`), with `job.start()`, `flush()`, and `finish()` awaited too; `AsyncCronwatch(cronwatch.client())` shares a synchronous client.
 
 ### Celery
 
@@ -187,7 +187,7 @@ cronwatch.apscheduler.watch(scheduler, grace="15m", jobs={"nightly-report": {"ti
 cw.start_checking()  # checks every minute, in a thread
 ```
 
-Every job is declared, named after its id, with its trigger as the schedule (cron triggers in their zone, intervals as `every <n>`). A job added, rescheduled or removed later is followed. `jobs=` gives options per job, by id; `exclude=` leaves jobs out, by id or name.
+Every job is declared, named after its id, with its trigger as the schedule (cron triggers in their zone, intervals as `every <n>`). A job added, rescheduled, or removed later is followed. `jobs=` gives options per job, by id; `exclude=` leaves jobs out, by id or name.
 
 Each run is recorded from APScheduler's events: a string it returns is the output, and an exception fails it. APScheduler tells a listener nothing while a job runs, so `cronwatch.current()` is `None` inside the job: return the text to record.
 
@@ -205,7 +205,7 @@ app = cron.wsgi   # or cron.asgi: the handler as the whole app
 lambda_handler = cron.aws_lambda                                       # AWS Lambda: API Gateway or a function URL
 ```
 
-It answers `{"ok", "job", "run", "status", "durationMs"}` with 200 or 500, 401 without the secret, and 503 when no secret is set outside development (`secret=None` lets anyone run it). A function that returns a response is answered with it, and, as for any run, a response of 400 or more fails the run. An `async def` makes an async handler. On Lambda, `cron.aws_lambda(event, context)` reads the bearer from a REST API's, an HTTP API's or a function URL's event, hands `fn` the event, and answers with the proxy result (`{"statusCode", "headers", "body", "isBase64Encoded"}`); a function may return a proxy result of its own. A function invoked directly (EventBridge Scheduler) gets an event with no headers, and IAM already decides who may invoke it, so give that handler `secret=None`.
+It answers `{"ok", "job", "run", "status", "durationMs"}` with 200 or 500, 401 without the secret, and 503 when no secret is set outside development (`secret=None` lets anyone run it). A function that returns a response is answered with it, and, as for any run, a response of 400 or more fails the run. An `async def` makes an async handler. On Lambda, `cron.aws_lambda(event, context)` reads the bearer from a REST API's, an HTTP API's, or a function URL's event, hands `fn` the event, and answers with the proxy result (`{"statusCode", "headers", "body", "isBase64Encoded"}`); a function may return a proxy result of its own. A function invoked directly (EventBridge Scheduler) gets an event with no headers, and IAM already decides who may invoke it, so give that handler `secret=None`.
 
 ### Deprecated
 

@@ -1,8 +1,8 @@
 # CronWatch for Craft CMS
 
-Monitoring for the work a Craft CMS site does in the background: its queue jobs and the console commands its crontab runs. Every run is recorded in the site's own database, and you are told when a run is missed, fails, gets stuck or runs much slower than usual, and again when it recovers. No server to run, no account to make.
+Monitoring for the work a Craft CMS site does in the background: its queue jobs and the console commands its crontab runs. Every run is recorded in the site's own database, and you are told when a run is missed, fails, gets stuck, or runs much slower than usual, and again when it recovers. No server to run, no account to make.
 
-This is the Craft CMS plugin of [the CronWatch library](https://cronwatch.dev/) (`cronwatch/cronwatch`), which also watches jobs in TypeScript, Ruby, Python, Go, Rust, Elixir, Java and .NET apps, plain PHP, Laravel, Symfony, WordPress and Drupal, and keeps the same tables in every language.
+This is the Craft CMS plugin of [the CronWatch library](https://cronwatch.dev/) (`cronwatch/cronwatch`), which also watches jobs in TypeScript, Ruby, Python, Go, Rust, Elixir, Java, and .NET apps, plain PHP, Laravel, Symfony, WordPress, and Drupal, and keeps the same tables in every language.
 
 ## Requirements
 
@@ -17,7 +17,7 @@ php craft plugin/install cronwatch
 
 Or from the [Plugin Store](https://plugins.craftcms.com/cronwatch) in the Control Panel.
 
-Installing makes three tables in Craft's database (`cronwatch_jobs`, `cronwatch_runs` and `cronwatch_state`, after Craft's table prefix); uninstalling drops them.
+Installing makes three tables in Craft's database (`cronwatch_jobs`, `cronwatch_runs`, and `cronwatch_state`, after Craft's table prefix); uninstalling drops them.
 
 ## What is watched
 
@@ -66,11 +66,11 @@ Missed and stuck runs are found by a check, `php craft cronwatch/check`, which p
 
 ## Settings
 
-Settings, Plugins, CronWatch: where alerts go (email through Craft's mailer, a Slack incoming webhook, a webhook, signed when given a secret, and under More channels Discord, email through Resend, Postmark, SendGrid, Mailgun or Amazon SES, text messages through Twilio, and Sentry, Honeybadger, Datadog, Rollbar, Bugsnag or New Relic, each once its required fields are set) and the grace a run is given (10 minutes by default). "Send a test alert" sends one to every channel the saved settings name and says what each answered. Each field takes an environment variable (`$SLACK_WEBHOOK_URL`), so a credential need not be in project config, and anything set in `config/cronwatch.php` wins over the form. Nothing leaves the site until a channel is set; with none, alerts go to Craft's log. A listener on `Cronwatch\Craft\Plugin::EVENT_ALERTS` adds channels (any of the library's, or a callable).
+Settings, Plugins, CronWatch: where alerts go (email through Craft's mailer, a Slack incoming webhook, a webhook, signed when given a secret, and under More channels Discord, email through Resend, Postmark, SendGrid, Mailgun, or Amazon SES, text messages through Twilio, and Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, or New Relic, each once its required fields are set) and the grace a run is given (10 minutes by default). "Send a test alert" sends one to every channel the saved settings name and says what each answered. Each field takes an environment variable (`$SLACK_WEBHOOK_URL`), so a credential need not be in project config, and anything set in `config/cronwatch.php` wins over the form. Nothing leaves the site until a channel is set; with none, alerts go to Craft's log. A listener on `Cronwatch\Craft\Plugin::EVENT_ALERTS` adds channels (any of the library's, or a callable).
 
 ## The dashboard
 
-CronWatch in the Control Panel's navigation, for users with access to the plugin: the jobs' health, the last day as a timeline, each job's runs and output. Silencing, forgetting and "Run check now" need the "Silence, forget and check jobs from the dashboard" permission as well, and carry Craft's CSRF token.
+CronWatch in the Control Panel's navigation, for users with access to the plugin: the jobs' health, the last day as a timeline, each job's runs and output. Silencing, forgetting, and "Run check now" need the "Silence, forget, and check jobs from the dashboard" permission as well, and carry Craft's CSRF token.
 
 The JSON API that [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) talks to is off until a token is set (`'apiToken' => '$CRONWATCH_TOKEN'` in `config/cronwatch.php`, or the `CRONWATCH_TOKEN` environment variable); it is then at `https://example.com/cronwatch/api`, with the token as a bearer token.
 

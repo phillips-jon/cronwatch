@@ -166,7 +166,7 @@ test("a job forgotten by another process comes back in a long-lived one that sti
   assert.equal((await store.getJob("nightly"))!.definition.schedule, "every 5m");
   assert.equal((await web.runs("nightly")).length, 1);
 
-  // So does a started run, a check, the board and the job's page in the process that declares it.
+  // So does a started run, a check, the board, and the job's page in the process that declares it.
   await forgotten();
   const handle = await nightly.start();
   assert.ok(await store.getJob("nightly"));

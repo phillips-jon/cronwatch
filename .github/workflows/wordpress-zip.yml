@@ -13,7 +13,7 @@
 # "svn" commits the same build to the plugin's SVN repository on
 # wordpress.org (https://plugins.svn.wordpress.org/cronwatch), which is what
 # the plugin directory serves: trunk/ becomes the build, tags/X.Y.Z a copy of
-# it, and assets/ the banners, icons and screenshots from
+# it, and assets/ the banners, icons, and screenshots from
 # packages/php/wordpress/assets. A prerelease is never committed, and a tag
 # already in SVN is left alone, so a rerun is safe. Stays off until the
 # repository variable WPORG_ENABLED is "true". Before that: on

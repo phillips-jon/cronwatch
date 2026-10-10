@@ -7,7 +7,7 @@ namespace Cronwatch;
 
 /// <summary>
 /// A run that spans calls, or processes: the SDK's <c>RunHandle</c>, from
-/// <see cref="Job.StartAsync"/>, <see cref="Job.ResumeAsync"/> or
+/// <see cref="Job.StartAsync"/>, <see cref="Job.ResumeAsync"/>, or
 /// <see cref="CronwatchClient.ResumeRunAsync"/>. The store never fails out of it: failures go to
 /// the client's error handler, and a store that fails during a finish leaves the handle active,
 /// its lines kept, so the finish can be called again. A handle left unfinished is what the stuck

@@ -3,7 +3,7 @@
 // replay it over the memory store and sqltest's over the SQL store on each
 // dialect. What a newer release wrote (a definition or state key, a run
 // status, a trigger, an open condition this release does not know)
-// survives a check, a silence, an unsilence and a run, and the alerts carry
+// survives a check, a silence, an unsilence, and a run, and the alerts carry
 // the definition as stored.
 package clientreplay
 

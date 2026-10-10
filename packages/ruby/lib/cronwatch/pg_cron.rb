@@ -21,9 +21,9 @@ module Cronwatch
     # them (the SDK's sources/pgcron.ts). As a source, on every check it
     # reads cron.job and declares each job with its schedule, then copies new
     # rows of cron.job_run_details in as runs (ids "pgcron:<runid>"), so the
-    # usual evaluation raises missed, failed, stuck and slow alerts.
+    # usual evaluation raises missed, failed, stuck, and slow alerts.
     #
-    # A job that is renamed, unscheduled or no longer picked keeps its old
+    # A job that is renamed, unscheduled, or no longer picked keeps its old
     # name's runs and history, and that name is declared again without a
     # schedule, so it is never reported missed. Its description says why.
     # Forgetting that old name from the dashboard while a run of it is still
@@ -35,7 +35,7 @@ module Cronwatch
     #     c.sources = [Cronwatch::Sources::PgCron.new(ActiveRecord::Base)]
     #   end
     #
-    # `db` is an ActiveRecord class, connection pool or connection
+    # `db` is an ActiveRecord class, connection pool, or connection
     # (queried through exec_query), a PG::Connection (exec_params), or
     # anything with `query(sql, params)` returning rows as hashes with string
     # keys.
@@ -43,11 +43,11 @@ module Cronwatch
     # jobs:     which jobs to watch: names or ids, or a callable that picks them (given a Job). Default every job the role can see.
     # prefix:   put before every job name, to keep them apart from your own ("db:"). Also keeps run ids apart.
     # job_name: a callable giving the CronWatch name for a Job. Default its jobname with anything other than
-    #           letters, digits, ".", "_", ":" and "-" turned into "-", or "pg_cron:<jobid>" when it has none.
+    #           letters, digits, ".", "_", ":", and "-" turned into "-", or "pg_cron:<jobid>" when it has none.
     #           The prefix goes in front either way. One that raises or returns no name, like a `jobs` or
     #           `options` callable that raises, is reported once and fails only that job, which keeps its last
     #           declaration until the callable works again.
-    # options: grace, timeout, max_duration, expect and the rest, for every job (a hash) or per job (a callable
+    # options: grace, timeout, max_duration, expect, and the rest, for every job (a hash) or per job (a callable
     #           given a Job). The schedule and timezone always come from pg_cron.
     # timezone: the timezone pg_cron reads its cron expressions in. Default the server's cron.timezone, read from
     #           pg_settings, which shows it only to roles with pg_read_all_settings; UTC (pg_cron's default) is
@@ -290,7 +290,7 @@ module Cronwatch
 
         # The names declared now, after the retires above. A run copied under
         # a retired name that was then forgotten (the dashboard's forget) has
-        # no job to go to: it is let go, never recorded and never read again.
+        # no job to go to: it is let go, never recorded, and never read again.
         @declared_now = host.respond_to?(:defined_jobs) ? host.defined_jobs.to_set(&:name) : nil
         alerts = []
         start_cursors(host, names, alerts, now)
@@ -445,7 +445,7 @@ module Cronwatch
         host.on_error(e, "source pg_cron: job #{name}")
       end
 
-      # A name this source used for a job that has since been renamed, unscheduled or dropped from `jobs`
+      # A name this source used for a job that has since been renamed, unscheduled, or dropped from `jobs`
       # is declared again without its schedule. Once per process, the same for names left scheduled in the
       # store while no process was watching.
       def retire_unused(host, names, definitions, all)

@@ -173,7 +173,7 @@ func TestServerCronOverForeignRow(t *testing.T) {
 // is not an object, and objects whose version is not a number.
 var damagedStates = []string{`{`, `not json`, `5`, `"x"`, `[]`, `null`, `{"version":"x"}`, `{"version":true}`, `{"version":{"a":1}}`, `{"version":[1]}`}
 
-// TestMySQLDamagedStateRowIsReplaced: a check, a silence and a second check
+// TestMySQLDamagedStateRowIsReplaced: a check, a silence, and a second check
 // over jobs whose state rows are damaged answer with no error, and the
 // silence replaces each row (it counts as version 0, as on SQLite).
 func TestMySQLDamagedStateRowIsReplaced(t *testing.T) {

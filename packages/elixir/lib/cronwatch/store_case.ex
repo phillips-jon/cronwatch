@@ -21,7 +21,7 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
 
     `use Cronwatch.StoreCase` is what 1.x promises. The functions this
     module had besides (`contract`, `replay_fixture`, `make`, `scenarios`,
-    `new_run` and `canonical`) were public by accident: they are deprecated
+    `new_run`, and `canonical`) were public by accident: they are deprecated
     and go in 1.0, and the tests the template defines run what they ran.
     """
 
@@ -89,7 +89,7 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
     @t0 1_767_605_400_000
     @min 60_000
 
-    # An instance over `store`, with a clock, a channel keeping its alerts and
+    # An instance over `store`, with a clock, a channel keeping its alerts, and
     # an error handler keeping the errors' text.
     defp instance(store, clock) do
       name = Module.concat(__MODULE__, "I#{System.unique_integer([:positive])}")
@@ -478,7 +478,7 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
       must(c(store, :set_state, [state(full)]))
 
       same_json(
-        "pendingRecovery, undelivered and sending round-trip",
+        "pendingRecovery, undelivered, and sending round-trip",
         json_of(must(c(store, :get_state, ["a"])), &JobState.to_json/1),
         full
       )
@@ -568,7 +568,7 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
     @doc false
     # Replays the store cases of `conformance/store.json` (its text) against
     # stores from `make`, a zero-arity function answering an empty store each
-    # call: prune scripts, `compare_and_set_state` steps and `update_run_if`
+    # call: prune scripts, `compare_and_set_state` steps, and `update_run_if`
     # steps, each read back and compared with what the SDK's memory store
     # answered. Answers how many cases were replayed.
     @spec run_replay(String.t(), (-> Store.t())) :: pos_integer()

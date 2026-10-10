@@ -147,7 +147,7 @@ class WebOriginTest < Minitest::Test
     assert_raises(ArgumentError) { Cronwatch::Web.configured_origin(:sym) }
   end
 
-  # A non-ASCII host becomes punycode through URI::IDNA, the simpleidn gem
+  # A non-ASCII host becomes punycode through URI::IDNA, the simpleidn gem,
   # or Addressable, whichever is there; with none of them it raises clearly.
   def test_a_non_ascii_host_is_converted_to_punycode_or_refused_clearly
     idna = Cronwatch::Web::Origin

@@ -22,7 +22,7 @@ module Cronwatch
       desc "Creates the CronWatch migration and initializer."
 
       class_option :prefix, type: :string, default: Cronwatch::Stores::ActiveRecord::DEFAULT_PREFIX,
-                            desc: "Table name prefix: lowercase letters, digits and underscores"
+                            desc: "Table name prefix: lowercase letters, digits, and underscores"
       class_option :database, type: :string, aliases: %i[--db],
                               desc: "The database for the tables, in an app with several (from config/database.yml)"
 
@@ -107,7 +107,7 @@ module Cronwatch
 
           require "cronwatch/active_record"
 
-          # The tables CronWatch keeps jobs, runs and alert state in. They are
+          # The tables CronWatch keeps jobs, runs, and alert state in. They are
           # created with the SDK's own statements, so a Node process using
           # @cronwatch/sdk can share them.
           class #{migration_name.camelize} < ActiveRecord::Migration[#{::ActiveRecord::Migration.current_version}]
@@ -127,7 +127,7 @@ module Cronwatch
           # frozen_string_literal: true
 
           # CronWatch: told when a scheduled job is missed, failed, stuck, slow,
-          # over budget or under its floor. https://cronwatch.dev/docs/
+          # over budget, or under its floor. https://cronwatch.dev/docs/
           #
           # Monitor a job by including Cronwatch::ActiveJob and declaring its schedule:
           #
@@ -138,7 +138,7 @@ module Cronwatch
           #
           # and run Cronwatch::CheckJob every few minutes to catch the runs that never happen.
           Cronwatch.configure do |c|
-            # Jobs, runs and alert state, in #{database_name ? "the #{database_name} database (see app/models/cronwatch_record.rb)" : "this app's database"}.
+            # Jobs, runs, and alert state, in #{database_name ? "the #{database_name} database (see app/models/cronwatch_record.rb)" : "this app's database"}.
             c.store = Cronwatch::Stores::ActiveRecord.new#{store_args}
 
             # Where alerts go. With none set, they are written to standard error.
@@ -154,7 +154,7 @@ module Cronwatch
             # Applied to every job that does not set its own.
             # c.defaults = { grace: "10m", timezone: "Europe/London", failures_before_alert: 1 }
 
-            # Called with (error, where) when the store, a channel or triage fails. Default: Rails.logger.
+            # Called with (error, where) when the store, a channel, or triage fails. Default: Rails.logger.
             # c.on_error = ->(error, where) { Rails.error.report(error, handled: true, context: { cronwatch: where }) }
 
             # The bearer secret the dashboard's check endpoint takes. Default: ENV["CRON_SECRET"].

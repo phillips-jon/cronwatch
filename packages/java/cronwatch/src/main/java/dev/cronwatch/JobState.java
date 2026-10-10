@@ -266,11 +266,11 @@ public record JobState(
   }
 
   /**
-   * Reads the SDK's JSON value leniently, since a foreign, hand-edited or damaged state must affect
-   * only its own job: an entry of {@code open} whose value is not a number is dropped, and {@code
-   * silencedUntil} and {@code lastAlertAt} that are not numbers read as null. A queued entry that
-   * is not an alert is dropped rather than fail every read of the state, since it could never be
-   * delivered, and so is an entry of {@code sending} that is not an object ({@link SendingAlert}
+   * Reads the SDK's JSON value leniently, since a foreign, hand-edited, or damaged state must
+   * affect only its own job: an entry of {@code open} whose value is not a number is dropped, and
+   * {@code silencedUntil} and {@code lastAlertAt} that are not numbers read as null. A queued entry
+   * that is not an alert is dropped rather than fail every read of the state, since it could never
+   * be delivered, and so is an entry of {@code sending} that is not an object ({@link SendingAlert}
    * reads the rest leniently). {@code underFloor} keeps only its strings, and is absent when none.
    *
    * @throws Json.JsonException when it is not an object

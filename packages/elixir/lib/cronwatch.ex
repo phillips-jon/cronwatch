@@ -1,13 +1,13 @@
 defmodule Cronwatch do
   @moduledoc """
-  Know when your cron jobs fail, run late or never run.
+  Know when your cron jobs fail, run late, or never run.
 
   The same library as `@cronwatch/sdk`, the library behind cronwatch.dev,
   for Elixir and Erlang services: it records each run of a job in a store
   the app already has, judges it (failed, stuck, slow, over budget, under
   floor, missed its schedule), and sends one alert when a condition opens and one recovery
   when it closes. An Elixir process shares a store with Node, Ruby, Python,
-  PHP, Go and Rust processes byte for byte.
+  PHP, Go, and Rust processes byte for byte.
 
   An instance is a child of the app's supervision tree:
 
@@ -63,7 +63,7 @@ defmodule Cronwatch do
   `triage`, `sources`, `cron_secret` (a string, `false` for none, or left
   out to read `CRON_SECRET` when needed; one of only whitespace, given or
   read, is none), `retention` (default `"30d"`),
-  `defaults` (`grace`, `timeout`, `timezone` and `failures_before_alert` for
+  `defaults` (`grace`, `timeout`, `timezone`, and `failures_before_alert` for
   every job), `redact` (a function, or `false`), `deliver` (`:now` or
   `:check`), `on_error` (a function of the error and where), `clock`,
   `check_every` (check on an interval; leave it out where another process
@@ -94,7 +94,7 @@ defmodule Cronwatch do
   @doc """
   The default redaction: blanks values that look like secrets (secret-named
   pairs, credentials in URLs, authorization headers, private keys, JWTs,
-  webhook URLs and common API key formats), exactly as the SDK's default
+  webhook URLs, and common API key formats), exactly as the SDK's default
   does. A `redact:` function can call it and add its own on top.
   """
   @spec redact_secrets(String.t()) :: String.t()
@@ -107,7 +107,7 @@ defmodule Cronwatch do
   @doc """
   Declares a job and answers its handle. Options: `schedule`, `timezone`,
   `grace`, `timeout`, `max_duration`, `budget`, `floor`, `expect`,
-  `failures_before_alert`, `description` and `tags`, kept in the order given
+  `failures_before_alert`, `description`, and `tags`, kept in the order given
   (the stored definition follows it), and `instance`.
   """
   @spec job(String.t(), keyword()) :: {:ok, Job.t()} | {:error, Error.t()}
@@ -131,7 +131,7 @@ defmodule Cronwatch do
 
   @doc """
   Runs `fun` as a recorded run and answers what it answered. `fun` is given
-  the run's `Cronwatch.Context`. A raise, throw, exit, `{:error, reason}` or
+  the run's `Cronwatch.Context`. A raise, throw, exit, `{:error, reason}`, or
   `:error` fails the run, and is handed back as it came (raised again with
   its stacktrace, or returned); anything else succeeds. A binary it returns,
   or `{:ok, binary}`, is the output when nothing was logged.
@@ -199,7 +199,7 @@ defmodule Cronwatch do
 
   @doc """
   Reports a number for a run: tokens, cost, rows, anything, watched against
-  budgets, floors and baselines. A later value for the same name replaces an
+  budgets, floors, and baselines. A later value for the same name replaces an
   earlier one. Raises `Cronwatch.Error` for a value that is not a finite number.
   """
   @spec metric(Context.t() | RunHandle.t(), String.t() | atom(), number()) :: :ok
@@ -241,7 +241,7 @@ defmodule Cronwatch do
   error handler; it never fails for them.
 
   Called with a keyword list instead of a job, it is `start_checking/1`, a
-  form deprecated since 1.0 (it warns once each call) and removed in 2.0.
+  form deprecated since 0.11 (it warns once each call) and removed in 2.0.
   """
   @spec start(Job.t() | String.t() | keyword(), keyword()) :: {:ok, RunHandle.t()} | {:error, Error.t()} | :ok
   def start(job_or_opts, opts \\ [])

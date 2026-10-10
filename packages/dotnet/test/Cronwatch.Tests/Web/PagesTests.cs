@@ -9,7 +9,7 @@ using Xunit;
 namespace Cronwatch.Tests;
 
 /// <summary>
-/// The dashboard's pages, timelines and app shell, held to the SDK's captures in
+/// The dashboard's pages, timelines, and app shell, held to the SDK's captures in
 /// <c>packages/ruby/test/web/golden.json</c> where a page can be built from what the captures
 /// say, and to the Java port's cases for the pieces.
 /// </summary>

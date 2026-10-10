@@ -5,7 +5,7 @@ namespace Cronwatch.Tests;
 
 /// <summary>
 /// <c>conformance/format.json</c>: alert titles and messages, and numbers as
-/// <c>toLocaleString</c> writes them. The output cap, stored definitions and expect rules are
+/// <c>toLocaleString</c> writes them. The output cap, stored definitions, and expect rules are
 /// the client's and the engine's, replayed where those live.
 /// </summary>
 public class FormatConformanceTests

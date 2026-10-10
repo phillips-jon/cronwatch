@@ -57,7 +57,7 @@ defmodule Cronwatch.Web.Timeline do
   @doc "\"22:42\", in UTC."
   def clock_utc(t), do: t |> JS.iso_string() |> binary_part(11, 5)
 
-  # The UTC month (1 to 12), day and weekday (0 for Sunday) of t.
+  # The UTC month (1 to 12), day, and weekday (0 for Sunday) of t.
   defp civil(t) do
     days = JS.floor_div(t, @day_ms)
     {_, m, d} = JS.civil_from_days(days)
@@ -304,12 +304,12 @@ defmodule Cronwatch.Web.Timeline do
 
       open?.("over_budget") and last != nil ->
         over = over_ceilings(job)
-        text = if over == [], do: "went over budget", else: "went over budget on #{Enum.join(over, " and ")}"
+        text = if over == [], do: "went over budget", else: "went over budget on #{Format.and_list(over)}"
         "#{text} at #{when_utc(last.started_at, now)}"
 
       open?.("under_floor") and last != nil ->
         under = under_floors(job)
-        text = if under == [], do: "fell short", else: "fell short on #{Enum.join(under, " and ")}"
+        text = if under == [], do: "fell short", else: "fell short on #{Format.and_list(under)}"
         "#{text} at #{when_utc(last.started_at, now)}"
 
       open?.("slow") and last != nil and last.duration_ms != nil ->
@@ -595,7 +595,7 @@ defmodule Cronwatch.Web.Timeline do
       {boxed.("run ok"), "ran"},
       {boxed.("run bad"), "failed"},
       {boxed.("run timeout"), "timed out"},
-      {boxed.("run warn"), "over budget, under floor or slow"},
+      {boxed.("run warn"), "over budget, under floor, or slow"},
       {boxed.("run running"), "running"},
       {boxed.("missed"), "missed"}
     ]

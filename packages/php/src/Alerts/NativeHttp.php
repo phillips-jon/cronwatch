@@ -13,7 +13,7 @@ namespace Cronwatch\Alerts;
  * RequestTimeout; past it while the body is still arriving it returns the
  * answer with an empty body.
  *
- * The URL, the body and the headers are marked #[\SensitiveParameter]: a
+ * The URL, the body, and the headers are marked #[\SensitiveParameter]: a
  * webhook URL's path, an API key in a header or a body is a credential, and
  * an exception's trace (which an error tracker shows) would otherwise hold
  * them.

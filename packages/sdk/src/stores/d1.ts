@@ -19,7 +19,7 @@ export interface D1DatabaseLike {
 }
 
 export interface D1Options {
-  /** Table name prefix: lowercase letters, digits and underscores. Default "cronwatch_". */
+  /** Table name prefix: lowercase letters, digits, and underscores. Default "cronwatch_". */
   prefix?: string;
   /**
    * Create the tables on first use (CREATE TABLE IF NOT EXISTS), once per
@@ -34,8 +34,8 @@ const created = new WeakMap<object, Set<string>>();
 
 /**
  * Keeps everything in Cloudflare D1, for Workers. D1 is SQLite, so this is
- * the SQLite store's schema, statements and row mapping over D1's
- * prepare, bind and batch. Create it where the binding is, inside the
+ * the SQLite store's schema, statements, and row mapping over D1's
+ * prepare, bind, and batch. Create it where the binding is, inside the
  * handler: `d1(env.DB)`.
  */
 export function d1(database: D1DatabaseLike, options: D1Options = {}): Store {

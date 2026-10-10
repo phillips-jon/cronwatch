@@ -1,5 +1,5 @@
 """Keeps everything in one SQLite file through the standard library's sqlite3
-(stores/sqlite.ts): the same tables, statements and JSON as the SDK's store,
+(stores/sqlite.ts): the same tables, statements, and JSON as the SDK's store,
 so a Node process and a Python process can share the file. WAL mode, so the
 app's reads never block on a run being written. The right choice for a
 single server."""
@@ -54,7 +54,7 @@ class SqliteStore:
     """``SqliteStore("./data/cronwatch.db")``. The directory is created if
     missing, and ":memory:" works too. Pass ``connection=`` to bring your own
     open sqlite3 connection (in autocommit mode, ``isolation_level=None``).
-    ``prefix`` names the tables: lowercase letters, digits and underscores,
+    ``prefix`` names the tables: lowercase letters, digits, and underscores,
     default "cronwatch_"."""
 
     def __init__(self, path: str | os.PathLike[str] = "./data/cronwatch.db", *, connection: sqlite3.Connection | None = None, prefix: str = _sql.DEFAULT_PREFIX) -> None:

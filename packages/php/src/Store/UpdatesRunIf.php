@@ -10,7 +10,7 @@ use Cronwatch\Run;
 interface UpdatesRunIf
 {
     /**
-     * Write a run's status, finishedAt, durationMs, error, output and metrics
+     * Write a run's status, finishedAt, durationMs, error, output, and metrics
      * only when its stored status is one of `fromStatuses` (SQL: UPDATE ...
      * WHERE id = ? AND status IN (...)). Returns whether it wrote. This is what
      * lets exactly one of several processes finishing the same run evaluate it.

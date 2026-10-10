@@ -1,7 +1,7 @@
 /**
  * @cronwatch/sdk/node: serve a fetch-style handler (cw.routes().handler, or
  * a job's handler()) from Node's http module and the frameworks built on it:
- * a plain http server, Express and Connect, NestJS, Koa, Strapi and Firebase
+ * a plain http server, Express and Connect, NestJS, Koa, Strapi, and Firebase
  * onRequest. The SDK core stays free of node: imports so it runs on Workers;
  * this entry point is the only one that uses Node's http and stream types.
  */
@@ -27,7 +27,7 @@ export interface NodeHandlerOptions {
    * and with a 404 when there is no next. The path is read from
    * `req.originalUrl` (so Express mount paths count) or `req.url`. Leave it
    * out to answer every request the handler is given, which suits
-   * `app.use("/cronwatch", ...)`, a Nest controller and a Firebase function.
+   * `app.use("/cronwatch", ...)`, a Nest controller, and a Firebase function.
    */
   basePath?: string;
 }
@@ -35,7 +35,7 @@ export interface NodeHandlerOptions {
 /** Called by Express and Connect for the next middleware, or with an error. */
 export type NodeNext = (error?: unknown) => void;
 
-/** A handler for http.createServer, Express or Connect, Nest and Firebase onRequest. */
+/** A handler for http.createServer, Express or Connect, Nest, and Firebase onRequest. */
 export type NodeHandler = (req: IncomingMessage, res: ServerResponse, next?: NodeNext) => Promise<void>;
 
 /** The parts of a Koa context the middleware uses, so the SDK needs no Koa types. */

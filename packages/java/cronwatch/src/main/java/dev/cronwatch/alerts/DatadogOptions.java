@@ -38,7 +38,7 @@ public final class DatadogOptions {
 
   /**
    * The site as the SDK reads it: a scheme, an {@code api.} or {@code app.} and trailing slashes
-   * taken off, then letters, digits, dots and hyphens only.
+   * taken off, then letters, digits, dots, and hyphens only.
    */
   static String readSite(String given) {
     String site = given;
@@ -103,7 +103,7 @@ public final class DatadogOptions {
 
     /**
      * Extra tags, {@code env:prod} say, replacing any given before. Every event also has {@code
-     * cronwatch}, {@code job:<name>} and {@code alert:<type>}.
+     * cronwatch}, {@code job:<name>}, and {@code alert:<type>}.
      */
     public Builder tags(String... tags) {
       this.tags = new ArrayList<>(List.of(tags));

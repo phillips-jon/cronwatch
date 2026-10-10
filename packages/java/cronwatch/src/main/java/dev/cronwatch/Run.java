@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
  * @param error the error, when it failed
  * @param output lines logged, or the string the job returned; capped at 16 KB
  * @param metrics numbers the run reported
- * @param trigger what started the run: {@code run}, {@code handler}, {@code start} or a value of
+ * @param trigger what started the run: {@code run}, {@code handler}, {@code start}, or a value of
  *     the app's
  */
 public record Run(

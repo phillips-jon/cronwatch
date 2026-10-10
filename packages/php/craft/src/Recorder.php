@@ -123,7 +123,7 @@ final class Recorder
             $secret = $settings->value('webhookSecret');
             $channels[] = new Webhook($webhook, [], $secret !== '' ? $secret : null);
         }
-        // Discord, the email providers, Twilio and the error trackers, each once its required fields are set.
+        // Discord, the email providers, Twilio, and the error trackers, each once its required fields are set.
         array_push($channels, ...ChannelSettings::channels(
             fn (string $key): string => $settings->value(ChannelSettings::camel($key)),
             $link,
@@ -226,7 +226,7 @@ final class Recorder
     /**
      * The job a queue job runs as, or null when its class is not watched.
      *
-     * @return array{string, array<string, mixed>, list<string>}|null the name, options and tags
+     * @return array{string, array<string, mixed>, list<string>}|null the name, options, and tags
      */
     public function queueJob(string $class): ?array
     {

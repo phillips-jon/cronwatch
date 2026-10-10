@@ -1,19 +1,19 @@
 ---
 title: Getting started
-description: Install @cronwatch/sdk, declare a job, wrap it, mount the dashboard and run the first check.
+description: Install @cronwatch/sdk, declare a job, wrap it, mount the dashboard, and run the first check.
 order: 1
 ---
 
 # Getting started
 
-CronWatch is a library. You install it in the app that runs your scheduled jobs, it records every run in a database you already have, and it alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. There is nothing to sign up for and no server to run.
+CronWatch is a library. You install it in the app that runs your scheduled jobs, it records every run in a database you already have, and it alerts when a run is missed, fails, gets stuck, runs slow, or goes over budget. There is nothing to sign up for and no server to run.
 
-This page sets up the TypeScript library. Every other language has a port with the same rules, alerts and stored rows, so processes in any of them can share one database:
+This page sets up the TypeScript library. Every other language has a port with the same rules, alerts, and stored rows, so processes in any of them can share one database:
 
 - **Ruby**: the `cronwatch` gem. See [Ruby on Rails](/docs/rails/) and [Ruby](/docs/ruby/).
-- **Python**: `cronwatch-sdk`. See [Django](/docs/django/), [Celery](/docs/celery/) and [Python](/docs/python/).
-- **PHP**: `cronwatch/cronwatch`, and a plugin for WordPress. See [PHP](/docs/php/), [WordPress](/docs/wordpress/), [Laravel](/docs/laravel/), [Symfony](/docs/symfony/), [Drupal](/docs/drupal/) and [Craft CMS](/docs/craft/).
-- **Go**: `cronwatch.dev/go`, with modules for robfig/cron, gocron, River and Asynq. See [Go](/docs/go/) and [Go schedulers](/docs/go-schedulers/).
+- **Python**: `cronwatch-sdk`. See [Django](/docs/django/), [Celery](/docs/celery/), and [Python](/docs/python/).
+- **PHP**: `cronwatch/cronwatch`, and a plugin for WordPress. See [PHP](/docs/php/), [WordPress](/docs/wordpress/), [Laravel](/docs/laravel/), [Symfony](/docs/symfony/), [Drupal](/docs/drupal/), and [Craft CMS](/docs/craft/).
+- **Go**: `cronwatch.dev/go`, with modules for robfig/cron, gocron, River, and Asynq. See [Go](/docs/go/) and [Go schedulers](/docs/go-schedulers/).
 - **Rust**: the `cronwatch` crate, with crates for tokio-cron-scheduler and apalis. See [Rust](/docs/rust/) and [Rust schedulers](/docs/rust-schedulers/).
 - **Elixir**: the `cronwatch` package on Hex, with integrations for Oban and Quantum. See [Elixir](/docs/elixir/) and [Elixir schedulers](/docs/elixir-schedulers/).
 - **Java**: `dev.cronwatch:cronwatch` on Maven Central, with a Spring Boot starter (`@Scheduled` and ShedLock) and modules for Quartz and JobRunr. See [Java](/docs/java/) and [Java schedulers](/docs/java-schedulers/).
@@ -25,7 +25,7 @@ This page sets up the TypeScript library. Every other language has a port with t
 npm install @cronwatch/sdk
 ```
 
-Pick a store. SQLite for one server, Postgres for anything on Vercel, Neon, Supabase or Railway, D1 on [Cloudflare Workers](/docs/cloudflare/) (no driver to install):
+Pick a store. SQLite for one server, Postgres for anything on Vercel, Neon, Supabase, or Railway, D1 on [Cloudflare Workers](/docs/cloudflare/) (no driver to install):
 
 ```bash
 npm install better-sqlite3     # Node 22 or newer for better-sqlite3 13
@@ -62,9 +62,9 @@ Slack is only the example. `alerts` takes any number of channels, each its own i
 | Slack | `slack` from `@cronwatch/sdk/slack` | an incoming webhook URL |
 | Discord | `discord` from `@cronwatch/sdk/discord` | a channel webhook URL |
 | Webhook | `webhook` from `@cronwatch/sdk/webhook` | your URL, and a secret if requests should be signed |
-| Email | `resend`, `postmark`, `sendgrid`, `mailgun` or `ses` from `@cronwatch/sdk/<name>` | the provider's API key, a `from` address the provider has verified, and `to` |
-| SMS | `twilio` from `@cronwatch/sdk/twilio` | an account SID, an auth token, a from number (or messaging service) and the numbers to text |
-| Error trackers | `sentry`, `honeybadger`, `datadog`, `rollbar`, `bugsnag` or `newrelic` | the project's API key or DSN |
+| Email | `resend`, `postmark`, `sendgrid`, `mailgun`, or `ses` from `@cronwatch/sdk/<name>` | the provider's API key, a `from` address the provider has verified, and `to` |
+| SMS | `twilio` from `@cronwatch/sdk/twilio` | an account SID, an auth token, a from number (or messaging service), and the numbers to text |
+| Error trackers | `sentry`, `honeybadger`, `datadog`, `rollbar`, `bugsnag`, or `newrelic` | the project's API key or DSN |
 | Your own | `custom(name, fn)` from `@cronwatch/sdk` | a function that sends the alert |
 
 Email, for instance, through Resend:
@@ -95,7 +95,7 @@ export const nightlyReport = cw.job("nightly-report", {
 });
 ```
 
-Every option is optional. A job with no schedule is still watched for failures, duration and budgets; it just cannot be missed.
+Every option is optional. A job with no schedule is still watched for failures, duration, and budgets; it just cannot be missed.
 
 ## Wrap the work
 
@@ -137,7 +137,7 @@ import { cw } from "@/lib/cronwatch";
 export const { GET, POST, DELETE } = cw.routes();
 ```
 
-Set `CRONWATCH_TOKEN` to a long random string. Open `/cronwatch?token=<it>` once and the browser keeps a cookie. Without one, [in development](/docs/dashboard/#development), the routes make a token of their own and print a sign-in link to the server log on the first request. The link names the host only when that request came to a loopback host (`localhost`, a `.localhost` name, `127.0.0.0/8` or `::1`) or you set `origin`; otherwise it gives the path alone, for you to open on your own host. Outside development, they answer 503 (unless you pass `token: null` to serve them open).
+Set `CRONWATCH_TOKEN` to a long random string. Open `/cronwatch?token=<it>` once and the browser keeps a cookie. Without one, [in development](/docs/dashboard/#development), the routes make a token of their own and print a sign-in link to the server log on the first request. The link names the host only when that request came to a loopback host (`localhost`, a `.localhost` name, `127.0.0.0/8`, or `::1`) or you set `origin`; otherwise it gives the path alone, for you to open on your own host. Outside development, they answer 503 (unless you pass `token: null` to serve them open).
 
 ## Run the check
 
@@ -160,4 +160,4 @@ See [Next.js and Vercel](/docs/nextjs/) and [Servers and scripts](/docs/node/) f
 
 ## What you get
 
-Open `/cronwatch` and every job is there with its health, last run, next due time and a sparkline of recent durations. Click through for the run history with errors, output tails and metrics. Alerts arrive in your channel with the specifics, and, if you turn on [triage](/docs/triage/), with a short diagnosis. Point the [MCP server](/docs/mcp/) at the same URL and your agent can read all of it.
+Open `/cronwatch` and every job is there with its health, last run, next due time, and a sparkline of recent durations. Click through for the run history with errors, output tails, and metrics. Alerts arrive in your channel with the specifics, and, if you turn on [triage](/docs/triage/), with a short diagnosis. Point the [MCP server](/docs/mcp/) at the same URL and your agent can read all of it.

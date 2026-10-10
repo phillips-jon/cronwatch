@@ -237,7 +237,7 @@ pub async fn run<S: Store>(make: impl FnOnce() -> S) {
     );
     must(store.set_state(&state(full)).await);
     same_json(
-        "pendingRecovery, undelivered and sending round-trip",
+        "pendingRecovery, undelivered, and sending round-trip",
         &json_of(&must(store.get_state("a").await), JobState::to_json),
         full,
     );
@@ -448,7 +448,7 @@ pub async fn replay_fixture<S: Store>(fixture: &str, mut make: impl FnMut() -> S
 /// Replays the `foreignVersion` cases of `conformance/store.json` (its text)
 /// against `store`, which holds its states as JSON text: for each, job `v`
 /// is deleted, `write_raw` puts the case's state text in the state table as
-/// it is (a state another process wrote, its version `1.5`, `"x"` or
+/// it is (a state another process wrote, its version `1.5`, `"x"`, or
 /// `2.0`), and each compare-and-set step must be refused or written as the
 /// SDK's was: the version counts as `state_version`
 /// reads it. Returns how many cases were replayed.

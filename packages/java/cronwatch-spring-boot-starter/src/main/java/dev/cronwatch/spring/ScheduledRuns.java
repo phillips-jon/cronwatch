@@ -22,7 +22,7 @@ import org.springframework.scheduling.support.ScheduledTaskObservationContext;
 final class ScheduledRuns implements ObservationHandler<ScheduledTaskObservationContext> {
   /**
    * The trigger of the runs it records: the integration's name, as its tag. Runs recorded before
-   * 1.0 carry {@code scheduled}; nothing reads the trigger back.
+   * 0.11 carry {@code scheduled}; nothing reads the trigger back.
    */
   static final String TRIGGER = CronwatchScheduling.TAG;
 

@@ -11,7 +11,7 @@ use Drupal\ultimate_cron\UltimateCron;
  * Ultimate Cron's cron service, with each cron run recorded as drupal:cron.
  *
  * CronServicePass makes the "cron" service this class when Ultimate Cron's
- * is there, so its constructor, arguments and method calls stay Ultimate
+ * is there, so its constructor, arguments, and method calls stay Ultimate
  * Cron's. run() is Ultimate Cron's (each enabled job that is due launched,
  * then core's queues unless Ultimate Cron runs them as jobs), with the whole
  * run recorded around it and the check after it, as WatchedCron does for

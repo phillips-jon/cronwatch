@@ -40,7 +40,7 @@ if Code.ensure_loaded?(Oban) do
 
     ## Runs
 
-    Handlers on `[:oban, :job, :start]`, `:stop` and `:exception` run in the
+    Handlers on `[:oban, :job, :start]`, `:stop`, and `:exception` run in the
     worker's own process: each attempt is a run (trigger `oban`, id
     `oban:<app>:<job id>:<attempt>`, with the jobs table's prefix before the
     job's id when it is not `public`, since a job's id is unique only within
@@ -73,7 +73,7 @@ if Code.ensure_loaded?(Oban) do
     started the instance.
 
     Options: `oban` (the Oban instance's name, default `Oban`), `app`,
-    `defaults` (job options for every job, before its schedule) and
+    `defaults` (job options for every job, before its schedule), and
     `workers`.
     """
 
@@ -643,7 +643,7 @@ if Code.ensure_loaded?(Oban) do
           nil
 
         # Every job the app's queues run passes through here: one not
-        # declared in the instance, not inserted by the Cron plugin and not
+        # declared in the instance, not inserted by the Cron plugin, and not
         # named is let go with a table read, never a call to the watch, so a
         # busy queue does not wait in line on one process.
         Runs.job(cfg.instance, name) == nil and not cron?(job) and not Map.has_key?(cfg.workers, name) ->
@@ -681,7 +681,7 @@ if Code.ensure_loaded?(Oban) do
     defp close_rescued(_cfg, _cw_job, _job, _conf), do: :ok
 
     @doc false
-    # An attempt's run id: the app's tag, the job's id and the attempt
+    # An attempt's run id: the app's tag, the job's id, and the attempt
     # (`oban:billing:42:1`), with the jobs table's prefix before the id when
     # it is not the default (`oban:billing:jobs2:42:1`). A job's id is unique
     # only within its table, so two apps sharing a store with an Oban

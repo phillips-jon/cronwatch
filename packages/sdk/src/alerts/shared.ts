@@ -1,6 +1,6 @@
 /**
  * Helpers shared by the provider channels. Only fetch and Web Crypto, so the
- * channels run on Node, Cloudflare Workers, Deno and Bun alike. Not an entry
+ * channels run on Node, Cloudflare Workers, Deno, and Bun alike. Not an entry
  * point: each channel bundles its own copy.
  */
 import { isoTime } from "../duration.js";
@@ -17,7 +17,7 @@ export function severity(type: Alert["type"]): Severity {
   return "error";
 }
 
-/** The scheme, host and port only. A URL's path or query can hold a credential. */
+/** The scheme, host, and port only. A URL's path or query can hold a credential. */
 export function origin(url: string): string {
   try {
     return new URL(url).origin;
@@ -102,7 +102,7 @@ export async function sha256Hex(text: string): Promise<string> {
 }
 
 /**
- * A stable 32 hex character id for one alert: the same job, type and time
+ * A stable 32 hex character id for one alert: the same job, type, and time
  * always give the same id, so a provider that deduplicates on it drops a
  * resend of an alert it already took.
  */
@@ -131,7 +131,7 @@ export function runSummary(alert: Alert): Record<string, unknown> | null {
   return { id: run.id, status: run.status, startedAt: isoTime(run.startedAt), durationMs: run.durationMs, trigger: run.trigger };
 }
 
-/** Title, message, triage and link as one plain text block, the way every channel reads. */
+/** Title, message, triage, and link as one plain text block, the way every channel reads. */
 export function plainText(alert: Alert, link: string | undefined): string {
   return [alert.title, "", alert.message, ...(alert.triage ? ["", `Triage: ${alert.triage}`] : []), ...(link ? ["", `Open: ${link}`] : [])].join("\n");
 }

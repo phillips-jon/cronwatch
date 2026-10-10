@@ -1,7 +1,7 @@
 defmodule Cronwatch.PublicAPIReportTest do
   # The public API, written out in api.txt so that a change to it is a line
   # of the diff: every module HexDocs shows, with each function, macro,
-  # callback and type it documents (by name and arity), and which are
+  # callback, and type it documents (by name and arity), and which are
   # deprecated. Cronwatch.Bridge is left out: it is for integration authors,
   # outside the 1.x promise.
   #

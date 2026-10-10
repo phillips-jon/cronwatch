@@ -6,7 +6,7 @@ defmodule Cronwatch.Web.Origin do
   # or line breaks in it are dropped, slashes after the scheme may be missing
   # or backslashes, credentials are ignored, the host is lowercased (percent
   # escapes decoded, IPv4 numbers written out, IPv6 compressed, a host
-  # outside ASCII written in punycode) and a default port is left out.
+  # outside ASCII written in punycode), and a default port is left out.
   # URI.parse/1 is RFC 3986, which reads all of these differently.
 
   import Bitwise
@@ -43,7 +43,7 @@ defmodule Cronwatch.Web.Origin do
 
   @doc """
   `scheme://host[:port]` for text that is a scheme and a bare host, or nil
-  when it carries a path, credentials, a query or a fragment, or is not an
+  when it carries a path, credentials, a query, or a fragment, or is not an
   http or https URL.
   """
   @spec bare(String.t()) :: String.t() | nil
@@ -56,7 +56,7 @@ defmodule Cronwatch.Web.Origin do
 
   @doc """
   The origin of `value`, and whether anything past the host would show in the
-  URL (a path other than `/`, credentials, a query or a fragment).
+  URL (a path other than `/`, credentials, a query, or a fragment).
   """
   @spec read(String.t()) :: {:ok, String.t(), boolean()} | {:error, :not_url | :not_http}
   def read(value) do

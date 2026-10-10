@@ -35,7 +35,7 @@ _QUOTED = 32
 
 
 def _not_a_duration(label: str, value: Any) -> ValueError:
-    return ValueError(f'{label} "{value}" is not a duration like "15m", "1h30m" or "90s"')
+    return ValueError(f'{label} "{value}" is not a duration like "15m", "1h30m", or "90s"')
 
 
 def parse_duration(value: Duration, label: str = "duration") -> int | float:

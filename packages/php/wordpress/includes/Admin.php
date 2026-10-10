@@ -80,7 +80,7 @@ final class Admin
      * Sanitizes and saves the posted settings. Returns the notice to show:
      * "saved", or the fields refused, joined by "-" in this order: "grace"
      * when the grace did not parse, "secret" when a webhook secret typed in
-     * held a control character, "token" when a token typed in was refused,
+     * held a control character, "token" when a token typed in was refused, and
      * "channels" when another channel is only partly filled in or refused
      * (its problems kept for the page to show; it sends nothing until they
      * are fixed) ("grace-token" when two were; the rest is saved either way). A token the plugin makes is kept for the page to
@@ -105,7 +105,7 @@ final class Admin
         ] + self::channelSettings($posted, $old, $refused);
         // The webhook's signing secret: never shown again, so left blank the saved one stays. One typed in is
         // saved exactly as typed, since the receiver signs with the same bytes (sanitize_text_field() would
-        // escape "<", strip "%XX" and collapse spaces); one holding a control character is refused.
+        // escape "<", strip "%XX", and collapse spaces); one holding a control character is refused.
         $secret = isset($posted['webhook_secret']) && is_string($posted['webhook_secret']) ? $posted['webhook_secret'] : '';
         if (!empty($posted['webhook_secret_clear'])) {
             $new['webhook_secret'] = '';
@@ -119,7 +119,7 @@ final class Admin
         // The API's token: one typed in (never shown again), a new one made on request, or one made when the API is first turned on.
         $token = preg_replace('/\s+/', '', $text('api_token')) ?? '';
         if ($token !== '') {
-            // Checked as typed, and saved as typed: letters, digits and . _ ~ + / = -, which
+            // Checked as typed, and saved as typed: letters, digits, and . _ ~ + / = -, which
             // no sanitizing changes, so the token saved is the one the owner gives the client.
             if (preg_match(self::TOKEN_PATTERN, $token) === 1) {
                 $new['api_token'] = $token;
@@ -146,7 +146,7 @@ final class Admin
             set_transient('cronwatch_channels_' . get_current_user_id(), $problems, 600);
             $refused[] = 'channels';
         }
-        // "grace" first, then "secret", "token" and "channels", as the page reads them.
+        // "grace" first, then "secret", "token", and "channels", as the page reads them.
         usort($refused, fn (string $a, string $b): int => array_search($a, self::REFUSALS, true) <=> array_search($b, self::REFUSALS, true));
         return $refused === [] ? 'saved' : implode('-', array_unique($refused));
     }
@@ -264,11 +264,11 @@ final class Admin
                 echo '<div class="notice notice-error"><p>' . esc_html__('The grace was not a duration such as 10m or 1h30m, so it was left as it was. The rest was saved.', 'cronwatch') . '</p></div>';
             }
             if (in_array('secret', $refused, true)) {
-                echo '<div class="notice notice-error"><p>' . esc_html__('A secret was not saved: it may not hold a line break, a tab or another control character. The saved one was kept, and the rest was saved.', 'cronwatch') . '</p></div>';
+                echo '<div class="notice notice-error"><p>' . esc_html__('A secret was not saved: it may not hold a line break, a tab, or another control character. The saved one was kept, and the rest was saved.', 'cronwatch') . '</p></div>';
             }
             if (in_array('token', $refused, true)) {
                 /* translators: %d: the least number of characters an API token may have. */
-                echo '<div class="notice notice-error"><p>' . esc_html(sprintf(__('The API token was not saved: it needs at least %d characters, each a letter, a digit or one of . _ ~ + / = -. The rest was saved.', 'cronwatch'), self::TOKEN_MIN)) . '</p></div>';
+                echo '<div class="notice notice-error"><p>' . esc_html(sprintf(__('The API token was not saved: it needs at least %d characters, each a letter, a digit, or one of . _ ~ + / = -. The rest was saved.', 'cronwatch'), self::TOKEN_MIN)) . '</p></div>';
             }
             if (in_array('channels', $refused, true)) {
                 $problems = get_transient('cronwatch_channels_' . get_current_user_id());
@@ -311,7 +311,7 @@ final class Admin
             echo '<div class="notice notice-info"><p>' . esc_html__('The new API token is below. Copy it now: it is not shown again.', 'cronwatch') . '</p><p><code>' . esc_html($made) . '</code></p></div>';
         }
 
-        echo '<p>' . esc_html__('CronWatch records every WP-Cron event as it runs and alerts you when one is missed, fails, gets stuck or runs slow. WP-Cron only runs when someone visits the site, so for reliable checks run WP-Cron and the check from the system crontab (see the plugin\'s readme).', 'cronwatch') . '</p>';
+        echo '<p>' . esc_html__('CronWatch records every WP-Cron event as it runs and alerts you when one is missed, fails, gets stuck, or runs slow. WP-Cron only runs when someone visits the site, so for reliable checks run WP-Cron and the check from the system crontab (see the plugin\'s readme).', 'cronwatch') . '</p>';
         echo '<p><a class="button" href="' . esc_url(admin_url('admin.php?page=' . AdminDashboard::PAGE)) . '">' . esc_html__('Open the dashboard', 'cronwatch') . '</a> '
             . esc_html__('Each event\'s health, its last day and week, and every run with its output.', 'cronwatch') . '</p>';
         if (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON) {
@@ -335,7 +335,7 @@ final class Admin
         self::renderChannels($settings);
 
         echo '<h2>' . esc_html__('JSON API', 'cronwatch') . '</h2>';
-        echo '<p>' . esc_html__('Off unless you turn it on. When on, CronWatch\'s JSON API (the jobs, their runs, silencing and the check) answers at the address below to anyone who sends the token, so an MCP server (@cronwatch/mcp) or a script can reach this site. The dashboard itself stays in wp-admin.', 'cronwatch') . '</p>';
+        echo '<p>' . esc_html__('Off unless you turn it on. When on, CronWatch\'s JSON API (the jobs, their runs, silencing, and the check) answers at the address below to anyone who sends the token, so an MCP server (@cronwatch/mcp) or a script can reach this site. The dashboard itself stays in wp-admin.', 'cronwatch') . '</p>';
         echo '<table class="form-table" role="presentation"><tbody>';
         /* translators: %s: the JSON API's base URL. */
         $base = sprintf(__('Base URL: %s', 'cronwatch'), Api::baseUrl());
@@ -344,7 +344,7 @@ final class Admin
         $tokenHelp = $settings['api_token'] !== ''
             ? __('A token is saved. Leave blank to keep it, or type a new one.', 'cronwatch')
             /* translators: %d: the least number of characters an API token may have. */
-            : sprintf(__('Leave blank and one is made when you turn the API on, or type one of at least %d letters, digits and . _ ~ + / = -.', 'cronwatch'), self::TOKEN_MIN);
+            : sprintf(__('Leave blank and one is made when you turn the API on, or type one of at least %d letters, digits, and . _ ~ + / = -.', 'cronwatch'), self::TOKEN_MIN);
         self::row('api_token', __('API token', 'cronwatch'), '<input type="password" class="regular-text" id="cronwatch-api_token" name="cronwatch[api_token]" value="" autocomplete="new-password">'
             . ($settings['api_token'] !== '' ? ' <label><input type="checkbox" name="cronwatch[api_token_new]" value="1"> ' . esc_html__('Make a new one', 'cronwatch') . '</label>' : ''), $tokenHelp);
         echo '</tbody></table>';

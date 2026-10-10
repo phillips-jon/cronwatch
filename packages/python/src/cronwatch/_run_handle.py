@@ -121,7 +121,7 @@ class RunHandle:
 
     def flush(self) -> None:
         """Append the lines and metrics added so far to the stored run, which must
-        still be running and belong to this job. A read, change and write of
+        still be running and belong to this job. A read, change, and write of
         the run's row, written only while it is still running: two processes
         appending to one run at the same moment can lose one's lines, but a
         flush never undoes a finish. When the write fails the lines stay here
@@ -144,7 +144,7 @@ class RunHandle:
                 self._put_back(taken)
 
     def finish(self, outcome: Any = None, *, result: Any = UNSET, error: Any = UNSET) -> Run | None:
-        """Finish the run, judge it like any other and send what that produces.
+        """Finish the run, judge it like any other, and send what that produces.
 
             finish()                       # ok
             finish({"status": "ok"})       # ok

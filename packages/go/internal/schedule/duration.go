@@ -1,9 +1,9 @@
 // Package schedule is the SDK's duration.ts and schedule.ts: durations
 // ("15m", "1h30m", a number of milliseconds) parsed and written as the SDK
 // does, and schedules ("0 2 * * *", "@hourly", "every 5m") with their fire
-// times, due times, deadlines and what a run covers. Cron fire times come
+// times, due times, deadlines, and what a run covers. Cron fire times come
 // from the port of croner in the cron package, so a Go process and a Node,
-// Ruby, Python or PHP process sharing one store agree on every due time.
+// Ruby, Python, or PHP process sharing one store agree on every due time.
 //
 // Where it cannot match the SDK, see the cron package: a date no month has
 // never fires, and croner's one-time dates are refused.
@@ -32,7 +32,7 @@ func round(x float64) float64 {
 }
 
 // ParseDuration is the SDK's parseDuration: "15m" is 900000. It takes a
-// string, a number of milliseconds (float64, int, int64) or a
+// string, a number of milliseconds (float64, int, int64), or a
 // time.Duration (its exact milliseconds). Compound strings such as "1h30m"
 // are summed, with whitespace allowed between the parts. label names the
 // value in the error ("grace", "timeout"); "" is "duration". The errors
@@ -68,7 +68,7 @@ func ParseDuration(value any, label string) (float64, error) {
 }
 
 func notADuration(label, value string) error {
-	return fmt.Errorf("%s \"%s\" is not a duration like \"15m\", \"1h30m\" or \"90s\"", label, value)
+	return fmt.Errorf("%s \"%s\" is not a duration like \"15m\", \"1h30m\", or \"90s\"", label, value)
 }
 
 // parseText reads a duration string as duration.ts does: the text trimmed

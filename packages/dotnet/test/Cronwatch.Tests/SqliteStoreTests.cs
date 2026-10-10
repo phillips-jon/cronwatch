@@ -10,6 +10,8 @@ using Cronwatch.StoreTesting;
 using Microsoft.Data.Sqlite;
 using Xunit;
 
+#pragma warning disable CS0618 // StoreReplay and FinishOnce, deprecated, still run the port's own replay and finish-once checks
+
 namespace Cronwatch.Tests;
 
 /// <summary>The SQL store on SQLite beyond the contract: the SDK's schema, rows of other shapes, the multi-process scenarios, and the app's transactions.</summary>

@@ -215,7 +215,7 @@ final class HttpTest extends TestCase
             foreach (['null', '(null)', 'NULL', 'empty', '(empty)', 'true', 'false'] as $word) {
                 putenv("CRONWATCH_TOKEN={$word}");
                 $_SERVER['CRONWATCH_TOKEN'] = $_ENV['CRONWATCH_TOKEN'] = $word;
-                // What env('CRONWATCH_TOKEN') in config/cronwatch.php gives: null, "" or a bool.
+                // What env('CRONWATCH_TOKEN') in config/cronwatch.php gives: null, "", or a bool.
                 $this->app['config']->set('cronwatch.dashboard.token', \Illuminate\Support\Env::get('CRONWATCH_TOKEN'));
                 $status = $this->getJson('/cronwatch/api/jobs', ['Authorization' => "Bearer {$word}"])->getStatusCode();
                 $this->assertContains($status, [401, 503], "CRONWATCH_TOKEN={$word} is not the token");

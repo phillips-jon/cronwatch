@@ -10,12 +10,12 @@ import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A URL read as the WHATWG URL parser (and so fetch) reads an http or https URL, the Go, Rust and
- * Elixir ports' rules: characters up to U+0020 around it dropped and every tab, CR and LF inside it
- * removed; the slashes after the scheme, and backslashes, read as fetch reads them; the host
- * lowercased, IPv4 in its dotted form (hex, octal and short forms read) and IPv6 compressed; the
+ * A URL read as the WHATWG URL parser (and so fetch) reads an http or https URL, the Go, Rust, and
+ * Elixir ports' rules: characters up to U+0020 around it dropped and every tab, CR, and LF inside
+ * it removed; the slashes after the scheme, and backslashes, read as fetch reads them; the host
+ * lowercased, IPv4 in its dotted form (hex, octal, and short forms read) and IPv6 compressed; the
  * scheme's own port left out; dot segments resolved; and a space or other character a URL cannot
- * hold percent-encoded in the path, query and fragment. {@code java.net.URI} is RFC 2396, which
+ * hold percent-encoded in the path, query, and fragment. {@code java.net.URI} is RFC 2396, which
  * refuses a space and reads several of these differently. A host outside ASCII is refused rather
  * than converted to punycode (the JDK's IDNA is 2003, WHATWG's is UTS 46), and so is an IPv6 host
  * with a zone, which WHATWG's IPv6 parser does not read.
@@ -67,7 +67,7 @@ public record WhatwgUrl(
     return !username.isEmpty() || !password.isEmpty();
   }
 
-  /** {@code url.origin}: the scheme, host and port. */
+  /** {@code url.origin}: the scheme, host, and port. */
   public String origin() {
     return scheme + "://" + host + (port < 0 ? "" : ":" + port);
   }
@@ -486,7 +486,7 @@ public record WhatwgUrl(
     return b.toString();
   }
 
-  // ---- the path, query and fragment
+  // ---- the path, query, and fragment
 
   private static String path(String text) {
     String[] split = text.replace('\\', '/').split("/", -1);

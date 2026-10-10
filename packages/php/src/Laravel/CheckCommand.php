@@ -20,7 +20,7 @@ final class CheckCommand extends Command
     protected $signature = 'cronwatch:check';
 
     /** @var string */
-    protected $description = 'Look for missed, failed, stuck and slow jobs and send alerts';
+    protected $description = 'Look for missed, failed, stuck, and slow jobs and send alerts';
 
     public function handle(ScheduledTasks $tasks): int
     {

@@ -26,7 +26,7 @@ use Cronwatch\Web\Response;
  * dashboard's own same-origin check.
  *
  * The dashboard's links are paths under its base path, so it is given a
- * marker as its base and every link, form and redirect under the marker is
+ * marker as its base and every link, form, and redirect under the marker is
  * rewritten to admin.php?page=cronwatch&cw=<path> (with the nonce on each
  * form's action). Its pages' head is the plugin's (head()): the dashboard's
  * stylesheet, css/dashboard.css (the library's Html::CSS, which build.php
@@ -120,8 +120,8 @@ final class AdminDashboard
 
     /**
      * The head of the dashboard's pages, in place of the library's own (its
-     * manifest, app.js and inline stylesheet): the stylesheet, registered,
-     * enqueued and printed through WordPress's styles, and the icon.
+     * manifest, app.js, and inline stylesheet): the stylesheet, registered,
+     * enqueued, and printed through WordPress's styles, and the icon.
      */
     public static function head(string $base): string
     {
@@ -134,7 +134,7 @@ final class AdminDashboard
 
     /**
      * The CSP of the dashboard's pages in wp-admin: the library's, less what
-     * the app shell needed (no script, manifest or worker), with the
+     * the app shell needed (no script, manifest, or worker), with the
      * stylesheet's origin ('self' unless the plugins are served from another,
      * WP_PLUGIN_URL), inline style attributes (the timeline places its marks
      * with them), and wp-admin as the one page that may frame it.
@@ -160,7 +160,7 @@ final class AdminDashboard
     }
 
     /**
-     * The dashboard's answer made to live in wp-admin: links, forms and
+     * The dashboard's answer made to live in wp-admin: links, forms, and
      * redirects under the marker point at admin.php?page=cronwatch&cw=<path>,
      * forms carry the nonce, and the pages' CSP is the plugin's (csp()).
      */

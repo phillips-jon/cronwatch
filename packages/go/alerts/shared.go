@@ -46,7 +46,7 @@ func hmacSHA256(key []byte, data string) []byte {
 }
 
 // alertID is a stable 32 hex character id for one alert: the same job,
-// type and time always give the same id, so a provider that deduplicates on
+// type, and time always give the same id, so a provider that deduplicates on
 // it drops a resend of an alert it already took.
 func alertID(a cronwatch.Alert) string {
 	return sha256Hex(a.Job + "\n" + string(a.Type) + "\n" + js.FormatNumber(float64(a.At)))[:32]
@@ -99,7 +99,7 @@ func linkFor(link func(cronwatch.Alert) string, a cronwatch.Alert) string {
 	return link(a)
 }
 
-// plainText is the title, message, triage and link as one plain text
+// plainText is the title, message, triage, and link as one plain text
 // block, the way every channel reads.
 func plainText(a cronwatch.Alert, link string) string {
 	lines := []string{a.Title, "", a.Message}

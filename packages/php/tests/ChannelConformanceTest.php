@@ -15,10 +15,10 @@ use Cronwatch\Tests\Support\FakeHttp;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Replays conformance/channels.json: every channel's request (URL, headers
+ * Replays conformance/channels.json: every channel's request (URL, headers,
  * and body, byte for byte) for every sample alert, the errors each gives
  * for a refused request, Twilio's delivery to some numbers and not others,
- * and the text cuts (error bodies, subjects, SMS segments and bodies).
+ * and the text cuts (error bodies, subjects, SMS segments, and bodies).
  */
 final class ChannelConformanceTest extends TestCase
 {

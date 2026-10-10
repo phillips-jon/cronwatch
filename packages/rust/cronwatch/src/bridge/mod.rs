@@ -68,7 +68,7 @@ pub fn app_name() -> String {
 }
 
 /// The tag that names the app under an integration's tag: `<tag>:<app>`,
-/// the app's name lowercased, with anything but letters, digits, `.`, `_`
+/// the app's name lowercased, with anything but letters, digits, `.`, `_`,
 /// and `-` made `-`. A name that is empty once cleaned, or longer than 48
 /// characters, is cut and given 8 hex characters of its MD5, so two names
 /// never share a tag. The PHP port's `appTag()`, character for character.
@@ -100,7 +100,7 @@ pub fn app_tag(tag: &str, app: &str) -> String {
 }
 
 /// Whether `name` is a CronWatch job name: 1 to 120 letters, digits, `.`,
-/// `_`, `:` or `-`, starting with a letter or digit.
+/// `_`, `:`, or `-`, starting with a letter or digit.
 pub fn valid_name(name: &str) -> bool {
     crate::options::valid_name(name)
 }
@@ -112,7 +112,7 @@ pub fn valid_name(name: &str) -> bool {
 pub fn validate(name: &str, options: &JobOptions) -> Result<(), Error> {
     if !valid_name(name) {
         return Err(Error::Invalid(format!(
-            "job name {} must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\" or \"-\"",
+            "job name {} must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\", or \"-\"",
             crate::js::quote(name)
         )));
     }

@@ -277,7 +277,7 @@ public final class Html {
     return out;
   }
 
-  /** The board: every job's health, its last day and its recent runs. */
+  /** The board: every job's health, its last day, and its recent runs. */
   public static String dashboardPage(
       List<JobSummary> jobs,
       Map<String, List<Run>> runsByJob,

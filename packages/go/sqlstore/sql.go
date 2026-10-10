@@ -1,11 +1,11 @@
 package sqlstore
 
-// The schema, statements and parameters. SQLite's and Postgres's are
-// stores/sql.ts's text for text, so a Node, Ruby, Python, PHP and Go
+// The schema, statements, and parameters. SQLite's and Postgres's are
+// stores/sql.ts's text for text, so a Node, Ruby, Python, PHP, and Go
 // process can share one database and sqlite_master reads the same whoever
 // made the tables. MySQL (and MariaDB) has a dialect of its own, the PHP
-// port's, since it has no ON CONFLICT, no partial index and no TEXT
-// primary key: the same tables, columns and values, with the JSON columns
+// port's, since it has no ON CONFLICT, no partial index, and no TEXT
+// primary key: the same tables, columns, and values, with the JSON columns
 // as text holding the SDK's JSON byte for byte, never MySQL's JSON type,
 // which would rewrite it.
 
@@ -34,7 +34,7 @@ var prefixRE = regexp.MustCompile(`^[a-z_][a-z0-9_]*$`)
 func tablePrefix(prefix string) (string, error) {
 	if !prefixRE.MatchString(prefix) || len(prefix) > maxPrefix {
 		//lint:ignore ST1005 the SDK's message, word for word
-		return "", fmt.Errorf("cronwatch: invalid table prefix %s. Use lowercase letters, digits and underscores, not starting with a digit, at most %d characters.", js.Quote(prefix), maxPrefix)
+		return "", fmt.Errorf("cronwatch: invalid table prefix %s. Use lowercase letters, digits, and underscores, not starting with a digit, at most %d characters.", js.Quote(prefix), maxPrefix)
 	}
 	return prefix, nil
 }

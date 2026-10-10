@@ -12,7 +12,7 @@ use Illuminate\Database\ConnectionResolverInterface;
 
 /**
  * A store in the app's database, made from one of config/database.php's
- * connections: MySQL and MariaDB (MysqlStore), Postgres (PostgresStore) or
+ * connections: MySQL and MariaDB (MysqlStore), Postgres (PostgresStore), or
  * SQLite (SqliteStore). It reads the connection's settings (host, port,
  * database, credentials, socket, SSL and other PDO options, Postgres's
  * sslmode and search_path, the write side of a read/write split) and opens
@@ -39,7 +39,7 @@ final class DatabaseStore
             'sqlite' => self::sqlite($laravel, $config, $prefix),
             'mysql', 'mariadb' => new MysqlStore(self::mysqlDsn($config), self::text($config['username'] ?? null), self::text($config['password'] ?? null), prefix: $prefix, options: self::options($config)),
             'pgsql' => new PostgresStore(self::pgsqlDsn($config), self::text($config['username'] ?? null), self::text($config['password'] ?? null), prefix: $prefix, options: self::options($config)),
-            default => throw new \InvalidArgumentException("CronWatch keeps its tables in MySQL, MariaDB, Postgres or SQLite; the {$name} connection is {$driver}. Set cronwatch.store.connection to another connection, or cronwatch.store.driver to sqlite."),
+            default => throw new \InvalidArgumentException("CronWatch keeps its tables in MySQL, MariaDB, Postgres, or SQLite; the {$name} connection is {$driver}. Set cronwatch.store.connection to another connection, or cronwatch.store.driver to sqlite."),
         };
     }
 
@@ -80,7 +80,7 @@ final class DatabaseStore
         $field = function (mixed $value): ?string {
             $text = self::text($value);
             if ($text !== null && str_contains($text, ';')) {
-                throw new \InvalidArgumentException('CronWatch cannot put a host, port, socket or database name holding ";" in a DSN');
+                throw new \InvalidArgumentException('CronWatch cannot put a host, port, socket, or database name holding ";" in a DSN');
             }
             return $text;
         };

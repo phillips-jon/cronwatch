@@ -1,5 +1,5 @@
 //! `conformance/format.json`: alert titles and messages, numbers as
-//! `toLocaleString` writes them, the output cap, stored definitions and
+//! `toLocaleString` writes them, the output cap, stored definitions, and
 //! expect rules.
 
 use super::{Failures, field, fixture, int, js_rule, objects};

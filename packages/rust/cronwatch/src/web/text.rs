@@ -1,6 +1,6 @@
 //! What the dashboard's pages need to write values the way the SDK's
 //! templates do (routes/escape.ts and JavaScript itself): `escapeHtml`,
-//! `escapeName`, `String(value)`, `toFixed`, `Math.round` and
+//! `escapeName`, `String(value)`, `toFixed`, `Math.round`, and
 //! `encodeURIComponent`, and how a header's bytes are read and a secret
 //! compared.
 
@@ -39,7 +39,7 @@ fn is_separator(c: u8) -> bool {
 
 /// `escapeName`: a job name shown as text, with `<wbr>` after each run of
 /// `_ : . / -` that something else follows, so a long name wraps at its
-/// separators. Only for text, never an attribute, a URL or a title.
+/// separators. Only for text, never an attribute, a URL, or a title.
 pub(crate) fn escape_name(s: &str) -> String {
     let text = escape_html(s);
     let bytes = text.as_bytes();

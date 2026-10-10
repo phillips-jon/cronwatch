@@ -9,7 +9,7 @@ use Cronwatch\Output;
 use Cronwatch\Run;
 
 /**
- * What a job receives: its name, run id and start, a signal that aborts at
+ * What a job receives: its name, run id, and start, a signal that aborts at
  * the job's timeout, and log() and metric().
  */
 final class JobContext

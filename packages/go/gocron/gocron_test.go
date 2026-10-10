@@ -290,7 +290,7 @@ func TestASyncAfterShutdownUnschedulesNothing(t *testing.T) {
 // CronWatch's) left its run running, to be reported stuck, and the next
 // end of that job was paired with it.
 // Watch, deprecated, is New(cw, options).Option(); Panic is PanicError and
-// Converted is robfigcron.Converted, under their names before 1.0.
+// Converted is robfigcron.Converted, under their names before 0.11.
 func TestTheDeprecatedNamesStillWork(t *testing.T) {
 	k := newKit(t)
 	s, err := gocron.NewScheduler(cwgocron.Watch(k.cw, cwgocron.Options{}), gocron.WithLocation(time.UTC))

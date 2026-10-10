@@ -296,7 +296,7 @@ func composeAlert(draft alertDraft, def Definition, now int64) Alert {
 		for i, c := range d.After {
 			names[i] = strings.Replace(string(c), "_", " ", 1)
 		}
-		after := strings.Join(names, ", ")
+		after := andList(names)
 		at := "just now"
 		if run != nil {
 			at = whenInt(&run.StartedAt, now)
@@ -321,4 +321,13 @@ func composeAlert(draft alertDraft, def Definition, now int64) Alert {
 		Message:    strings.Join(lines, "\n"),
 		At:         now,
 	}
+}
+
+// andList joins words as an English list, with a serial comma from three
+// on: "a", "a and b", "a, b, and c". Every port joins the same way.
+func andList(words []string) string {
+	if len(words) <= 2 {
+		return strings.Join(words, " and ")
+	}
+	return strings.Join(words[:len(words)-1], ", ") + ", and " + words[len(words)-1]
 }

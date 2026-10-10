@@ -43,7 +43,7 @@ module Cronwatch
     # Run ids that start with this belong to the pg_cron source (Sources::PgCron).
     RESERVED_RUN_ID_PREFIX = "pgcron:"
     # The longest run id, in UTF-16 code units (JavaScript's string length):
-    # what start, resume and record_run take, and every store holds.
+    # what start, resume, and record_run take, and every store holds.
     MAX_RUN_ID = 200
     private_constant :CHANNEL_TIMEOUT_MS, :DEFAULT_OPTIONS, :FORK_LOCK, :HISTORY_MAX, :HISTORY_PAGE, :MAX_RUN_ID,
                      :PRUNE_INTERVAL_MS, :RESERVED_RUN_ID_PREFIX, :RETRY_BUDGET_MS, :SILENCE_OPTIONS, :STATE_ATTEMPTS,
@@ -77,7 +77,7 @@ module Cronwatch
 
     attr_reader :store, :alerts, :triage, :cron_secret, :retention_ms, :defaults, :sources
 
-    # store:       where jobs, runs and state live. Defaults to an in-memory store that forgets on restart.
+    # store:       where jobs, runs, and state live. Defaults to an in-memory store that forgets on restart.
     # alerts:      where alerts go: objects with #call(alert) and #name. Defaults to the console.
     # triage:      a callable taking a TriageContext and returning a short diagnosis, added to every alert but recoveries.
     # cron_secret: a second bearer Cronwatch::Web accepts for /api/check, for an outside cron. Defaults to
@@ -85,11 +85,11 @@ module Cronwatch
     #              variable, counts as unset. Pass nil for none. Anything but a String or nil (false, a
     #              number, a Symbol) raises TypeError.
     # retention:   how long finished runs are kept. Default "30d".
-    # defaults:    grace, timeout, timezone and failures_before_alert applied to every job unless it sets its own.
-    # redact:      applied to every run's output and error before it is stored, shown or sent to an alert
+    # defaults:    grace, timeout, timezone, and failures_before_alert applied to every job unless it sets its own.
+    # redact:      applied to every run's output and error before it is stored, shown, or sent to an alert
     #              channel or triage. The default (Output.redact_secrets) blanks values that look like secrets
     #              (password=..., Authorization headers, URL credentials, bearer tokens, JWTs, PEM private
-    #              keys, webhook URLs, AWS, GitHub, Slack, Stripe, Google and API key formats). Pass your own
+    #              keys, webhook URLs, AWS, GitHub, Slack, Stripe, Google, and API key formats). Pass your own
     #              callable, or false to keep output exactly as logged. A callable that raises or returns
     #              something other than a String is reported to on_error ("redact") and the default is used.
     # now:         the clock, a callable returning epoch milliseconds. Tests use this.
@@ -159,7 +159,7 @@ module Cronwatch
     def job(name, **options)
       name = name.to_s if name.is_a?(Symbol)
       unless name.is_a?(String) && NAME_RE.match?(name)
-        raise ArgumentError, "job name \"#{name}\" must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\" or \"-\""
+        raise ArgumentError, "job name \"#{name}\" must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\", or \"-\""
       end
 
       definition = build_definition(name, options)
@@ -618,7 +618,7 @@ module Cronwatch
       ticker
     end
 
-    # Locks, the check in flight, the interval thread and the channel and
+    # Locks, the check in flight, the interval thread, and the channel and
     # triage threads belong to one process. A forked child (Puma, Unicorn,
     # Sidekiq) starts with fresh ones, so start and check work there.
     def reset_process_state
@@ -718,7 +718,7 @@ module Cronwatch
       expect = definition.expect
       return if expect.nil? || expect.is_a?(String) || expect.is_a?(Regexp) || expect.respond_to?(:call)
 
-      raise ArgumentError, "job \"#{name}\": expect must be a string, a RegExp or a function"
+      raise ArgumentError, "job \"#{name}\": expect must be a string, a RegExp, or a function"
     end
 
     # String(value) as JavaScript writes it, for the messages above.
@@ -1338,7 +1338,7 @@ module Cronwatch
       Evaluate.unevaluable_summary(stored, recent, state, at)
     end
 
-    # Read, change and write one job's state, in turn with every other update to it.
+    # Read, change, and write one job's state, in turn with every other update to it.
     def patch_state(name)
       ensure_ready
       state, = update_state(name) do |current|
@@ -1492,7 +1492,7 @@ module Cronwatch
     end
 
     # Sets the alert's triage to the diagnosis, or to nil (JSON null) when
-    # there is none (it raised, timed out or answered nil or ""), so it is
+    # there is none (it raised, timed out, or answered nil or ""), so it is
     # tried once per alert. While a triage that timed out is still going,
     # alerts go out without one rather than start another beside it.
     def add_triage(alert, timeout_ms)

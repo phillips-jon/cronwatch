@@ -34,7 +34,7 @@ use PHPUnit\Framework\TestCase;
  * rules, titles and messages, health and stats, output and redaction, and
  * the store scripts against every store. Values are compared as the JSON the
  * SDK would write, so key order and number formatting count too. The
- * channel, pg_cron and triage fixtures are replayed by tests of their own
+ * channel, pg_cron, and triage fixtures are replayed by tests of their own
  * (ChannelConformanceTest, ClientConformanceTest, PgCronTest, TriageTest), listed here so a new
  * fixture fails until something replays it.
  */
@@ -472,7 +472,7 @@ final class ConformanceTest extends TestCase
         $this->eachCase(self::fixture('output.json')->redactAndCap, fn (\stdClass $c) => self::differs($c->result, self::digest(Output::redactAndCap(self::expand($c->input), $redact))));
     }
 
-    /** An error message from a name, a message and frames, as a Throwable's is written, or from a value that is not one. */
+    /** An error message from a name, a message, and frames, as a Throwable's is written, or from a value that is not one. */
     public function testErrorMessage(): void
     {
         $this->eachCase(self::fixture('output.json')->errorMessage, function (\stdClass $c): ?string {

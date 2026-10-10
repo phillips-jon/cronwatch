@@ -6,7 +6,7 @@ defmodule Cronwatch.RunHandle do
   Lines and metrics wait in the handle (in the instance's table, owned by
   the process that made the handle and dropped when it ends) until
   `flush/1` or `finish/2` merges them onto a fresh read of the stored run.
-  The store never fails out of `start`, `resume`, `flush` or `finish`:
+  The store never fails out of `start`, `resume`, `flush`, or `finish`:
   failures go to the error handler, and a store that fails during `finish`
   leaves the handle active, lines kept, so it can be called again. A handle
   whose process ended while it was active records nothing; a run left
@@ -297,7 +297,7 @@ defmodule Cronwatch.RunHandle do
   end
 
   @doc """
-  Finishes the run, judges it like any other and sends what that produces.
+  Finishes the run, judges it like any other, and sends what that produces.
   `outcome` is nil (success), the text the run produced, `{:ok, result}`
   (treated as a job function's result), or `{:error, reason}` (a failure).
   Answers the run as recorded, or nil when nothing was recorded: the run was

@@ -7,7 +7,7 @@ Gem::Specification.new do |spec|
   spec.version = Cronwatch::VERSION
   spec.authors = ["Jon C. Phillips"]
   spec.summary = "Cron and scheduled-job monitoring that lives inside your app."
-  spec.description = "Wrap a job, run a check, get told when it is missed, failed, stuck, slow or over budget. " \
+  spec.description = "Wrap a job, run a check, get told when it is missed, failed, stuck, slow, or over budget. " \
                      "The Ruby port of @cronwatch/sdk: same rules, same alerts, same stored rows."
   spec.homepage = "https://cronwatch.dev"
   spec.license = "MIT"

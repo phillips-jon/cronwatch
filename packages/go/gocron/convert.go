@@ -30,13 +30,13 @@ var cronParser = cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | 
 //     it, in its CRON_TZ or loc, checked against robfig/cron's own fire
 //     times (robfigcron.Convert).
 //   - DurationJob: "every <duration>".
-//   - DailyJob, WeeklyJob and MonthlyJob with an interval of 1: a cron of
+//   - DailyJob, WeeklyJob, and MonthlyJob with an interval of 1: a cron of
 //     their times of day (when they are every combination of their hours,
-//     minutes and seconds, as a cron's fields are), days of the week and
+//     minutes, and seconds, as a cron's fields are), days of the week, and
 //     days of the month (the last as "L"), checked against gocron's own rule
 //     for the times of a day (time.Date in loc) around every clock change.
 //
-// Anything else, a random duration, an interval of more than one day, week
+// Anything else, a random duration, an interval of more than one day, week,
 // or month, other days from the end of the month, a one-time job, is
 // refused, and the job is watched without a schedule. where names the job
 // in the error.
@@ -109,7 +109,7 @@ func Convert(s gocron.JobSchedule, loc *time.Location, where string) (robfigcron
 // hms is a time of day.
 type hms struct{ h, m, s int }
 
-// wall is the cron for a daily, weekly or monthly job's times on the days
+// wall is the cron for a daily, weekly, or monthly job's times on the days
 // matches allows, checked against gocron's rule for them.
 func wall(where string, loc *time.Location, at []time.Time, dom, month, dow string, matches func(time.Time) bool) (robfigcron.Converted, error) {
 	if len(at) == 0 {
@@ -129,7 +129,7 @@ func wall(where string, loc *time.Location, at []time.Time, dom, month, dow stri
 	times = slices.Compact(times)
 	hours, minutes, seconds = unique(hours), unique(minutes), unique(seconds)
 	if len(hours)*len(minutes)*len(seconds) != len(times) {
-		return robfigcron.Converted{}, bridge.Refuse("%s runs at times of day a cron cannot say at once (not every combination of their hours, minutes and seconds); give the job a schedule of its own", where)
+		return robfigcron.Converted{}, bridge.Refuse("%s runs at times of day a cron cannot say at once (not every combination of their hours, minutes, and seconds); give the job a schedule of its own", where)
 	}
 	text := fmt.Sprintf("%s %s %s %s %s", bridge.FieldText(minutes, 0, 59), bridge.FieldText(hours, 0, 23), dom, month, dow)
 	if s := bridge.FieldText(seconds, 0, 59); s != "0" {

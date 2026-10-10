@@ -6,18 +6,18 @@ using System.Threading.Tasks;
 namespace Cronwatch;
 
 /// <summary>
-/// Where jobs, runs and state live: the SDK's <c>Store</c>. <see cref="MemoryStore"/> is one, and
+/// Where jobs, runs, and state live: the SDK's <c>Store</c>. <see cref="MemoryStore"/> is one, and
 /// <c>SqlStore</c> keeps them in the app's own database. A store of the app's own should
 /// pass <c>Cronwatch.StoreTesting.StoreContract</c>.
 /// </summary>
 /// <remarks>
 /// Every method may be called from any number of threads at once. Any exception is the store's
 /// failure: the client reports it to its error handler and carries on, and never lets it stop a
-/// job. A store holds text without U+0000: it drops every NUL from a run's trigger, output, error
+/// job. A store holds text without U+0000: it drops every NUL from a run's trigger, output, error,
 /// and metric names, and from every key and string of a definition and a state, as it writes
 /// them. The conditional writes are the optional <see cref="IUpdateRunIfStore"/>,
-/// <see cref="ICompareAndSetStateStore"/> and <see cref="IDeleteRunIfStore"/>; without them the client
-/// falls back to a read and a write, as the SDK does. A store that holds something is
+/// <see cref="ICompareAndSetStateStore"/>, and <see cref="IDeleteRunIfStore"/>; without them the
+/// client falls back to a read and a write, as the SDK does. A store that holds something is
 /// <see cref="System.IAsyncDisposable"/>, and the client disposes it with itself.
 /// </remarks>
 public interface IStore
@@ -34,13 +34,13 @@ public interface IStore
     /// <summary>Every job, by name in UTF-16 code unit order.</summary>
     Task<IReadOnlyList<StoredJob>> ListJobsAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Removes a job, its runs and its state.</summary>
+    /// <summary>Removes a job, its runs, and its state.</summary>
     Task DeleteJobAsync(string name, CancellationToken cancellationToken = default);
 
     /// <summary>Inserts a run, refusing an id already stored.</summary>
     Task InsertRunAsync(Run run, CancellationToken cancellationToken = default);
 
-    /// <summary>Writes a run's status, finish, duration, error, output and metrics. A run that is gone stays gone.</summary>
+    /// <summary>Writes a run's status, finish, duration, error, output, and metrics. A run that is gone stays gone.</summary>
     Task UpdateRunAsync(Run run, CancellationToken cancellationToken = default);
 
     /// <summary>The run, or null when there is no such run.</summary>

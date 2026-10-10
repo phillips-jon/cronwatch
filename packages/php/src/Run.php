@@ -11,10 +11,10 @@ namespace Cronwatch;
 final class Run
 {
     /**
-     * @param string $status "running", "ok", "failed" or "timeout" (see RunStatus)
+     * @param string $status "running", "ok", "failed", or "timeout" (see RunStatus)
      * @param string|null $output lines logged, or the string the job returned, capped at 16 KB
      * @param array<string, int|float> $metrics
-     * @param string $trigger what started the run: "run", "start" or a value you pass
+     * @param string $trigger what started the run: "run", "start", or a value you pass
      */
     public function __construct(
         public string $id,
@@ -60,7 +60,7 @@ final class Run
      * state, which a foreign or hand-edited row may hold anything in. A start
      * that is not a number reads as 0, a finish or duration as null, an error
      * or output that is not text as null, metrics that are not an object as
-     * none (and of an object, only the numbers), an id, job or status that is
+     * none (and of an object, only the numbers), an id, job, or status that is
      * not a string or a number as "", and a trigger that is not text as
      * "run", so one odd value never makes the job's state unreadable. (fromJson() takes a run given in code, whose
      * wrong types are an error to report.)

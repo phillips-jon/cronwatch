@@ -18,7 +18,7 @@ import (
 )
 
 // Duration is what a duration option takes: text like "15m", "1h30m",
-// "90s" or "2d" (the SDK's form, kept as written in the stored
+// "90s", or "2d" (the SDK's form, kept as written in the stored
 // definition), a time.Duration, or a whole or fractional number of
 // milliseconds. A time.Duration is stored as its milliseconds, as the SDK
 // stores a number.
@@ -69,7 +69,7 @@ func (c *jobConfig) put(key string, value any) {
 // Schedule is when the job is supposed to run: a five or six field cron
 // expression ("0 2 * * *"), a nickname ("@hourly"), or an interval
 // ("every 5m"). Leave it out for a job with no fixed cadence: failures,
-// duration and budgets are still watched, but nothing is ever missed.
+// duration, and budgets are still watched, but nothing is ever missed.
 func Schedule(expr string) JobOption { return func(c *jobConfig) { c.put("schedule", expr) } }
 
 // Timezone is the IANA zone the cron expression is read in. The default is
@@ -281,7 +281,7 @@ const (
 	DeliverAtCheck DeliverMode = "check"
 )
 
-// WithStore is where jobs, runs and state live. The default is a
+// WithStore is where jobs, runs, and state live. The default is a
 // MemoryStore, which forgets on restart.
 func WithStore(store Store) Option {
 	return func(c *Client) error {
@@ -342,7 +342,7 @@ func WithRetention[D Duration](d D) Option {
 // defaultable are the options WithDefaults takes, as the SDK's defaults.
 var defaultable = map[string]bool{"grace": true, "timeout": true, "timezone": true, "failuresBeforeAlert": true}
 
-// WithDefaults applies Grace, Timeout, Timezone and FailuresBeforeAlert to
+// WithDefaults applies Grace, Timeout, Timezone, and FailuresBeforeAlert to
 // every job that does not set its own.
 func WithDefaults(options ...JobOption) Option {
 	return func(c *Client) error {
@@ -352,7 +352,7 @@ func WithDefaults(options ...JobOption) Option {
 		}
 		for _, key := range cfg.set {
 			if !defaultable[key] {
-				return fmt.Errorf("WithDefaults takes grace, timeout, timezone and failuresBeforeAlert, not %s", key)
+				return fmt.Errorf("WithDefaults takes grace, timeout, timezone, and failuresBeforeAlert, not %s", key)
 			}
 		}
 		c.defaults = cfg.fields
@@ -361,7 +361,7 @@ func WithDefaults(options ...JobOption) Option {
 }
 
 // WithRedact replaces the default redaction (see RedactSecrets) of every run's
-// output and error before it is stored, shown or sent anywhere. A redact
+// output and error before it is stored, shown, or sent anywhere. A redact
 // function that panics is reported to the error handler and the default is
 // used.
 func WithRedact(fn func(text string) string) Option {

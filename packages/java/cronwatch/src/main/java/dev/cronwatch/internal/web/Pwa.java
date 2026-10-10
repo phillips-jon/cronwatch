@@ -10,10 +10,10 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * What makes the dashboard an installable web app ({@code routes/pwa.ts}): a manifest, icons, a
- * service worker, the script that registers it and a page to show offline. None of it says anything
- * about the jobs, so it is served without the token (a browser fetches the manifest and icons
- * without cookies in some flows). The files are the SDK's, byte for byte, resources in the jar:
- * {@code scripts/make-dashboard-icons.mjs} writes the icons and {@code
+ * service worker, the script that registers it, and a page to show offline. None of it says
+ * anything about the jobs, so it is served without the token (a browser fetches the manifest and
+ * icons without cookies in some flows). The files are the SDK's, byte for byte, resources in the
+ * jar: {@code scripts/make-dashboard-icons.mjs} writes the icons and {@code
  * packages/ruby/test/web/golden.mjs} the style sheet and scripts, and both fail {@code npm run
  * check:conformance} when a copy here is stale.
  */
@@ -111,7 +111,7 @@ public final class Pwa {
         .set("short_name", "CronWatch")
         .set(
             "description",
-            "The scheduled jobs of this app: their health, their last day and their runs.")
+            "The scheduled jobs of this app: their health, their last day, and their runs.")
         .set("start_url", base + "/")
         .set("scope", base + "/")
         .set("display", "standalone")

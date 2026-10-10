@@ -1,7 +1,7 @@
 defmodule Cronwatch.Delivery do
   @moduledoc false
-  # Composing, triaging, sending and queueing alerts (client.ts outbox,
-  # dispatch, retryUndelivered, recordDelivery, deliver and addTriage).
+  # Composing, triaging, sending, and queueing alerts (client.ts outbox,
+  # dispatch, retryUndelivered, recordDelivery, deliver, and addTriage).
 
   alias Cronwatch.ChannelContext
   alias Cronwatch.Config
@@ -255,7 +255,7 @@ defmodule Cronwatch.Delivery do
     end
   end
 
-  # A raise, throw or exit in a channel or triage is its error, answered
+  # A raise, throw, or exit in a channel or triage is its error, answered
   # from the task rather than crashing it (and logging a crash report).
   defp guarded(fun) do
     fun.()

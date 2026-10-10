@@ -18,8 +18,10 @@ namespace Cronwatch.StoreTesting;
 /// Each process is a <see cref="CronwatchClient"/> of its own over a store
 /// <see cref="IShared.Open"/> gives, racing on tasks of their own. It throws a
 /// <see cref="StoreContractException"/> at the first thing that goes wrong, and depends on no test
-/// framework.
+/// framework. Not part of the 1.x promise, which covers <see cref="StoreContract.RunAsync"/>
+/// alone: the port's own tests race the SQL store with it.
 /// </summary>
+[Obsolete("Public by accident: the store kit promises StoreContract.RunAsync. It still works, and is removed in 1.0.")]
 public static class FinishOnce
 {
     private const long T0 = 1_767_605_400_000L;

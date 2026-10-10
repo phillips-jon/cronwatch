@@ -1,10 +1,10 @@
 defmodule Cronwatch.Conformance.ProviderChannelsTest do
   # Replays the provider sections of conformance/channels.json, the requests
-  # the SDK's email, SMS and tracker channels make (scripts/conformance.mjs
+  # the SDK's email, SMS, and tracker channels make (scripts/conformance.mjs
   # drives them with a stub fetch): every request's URL, headers (name,
-  # value and position) and body, byte for byte, for each sample alert and
+  # value, and position), and body, byte for byte, for each sample alert and
   # option set; the error each gives for a refused request; Twilio's partial
-  # delivery; and the email subject and SMS cuts. The Slack, Discord and
+  # delivery; and the email subject and SMS cuts. The Slack, Discord, and
   # webhook sections and the error body cuts are replayed beside the
   # transport, in channels_test.exs.
   use ExUnit.Case, async: true
@@ -86,7 +86,7 @@ defmodule Cronwatch.Conformance.ProviderChannelsTest do
     end
   end
 
-  test "conformance/channels.json: the providers' requests, errors, Twilio's partial delivery and the cuts" do
+  test "conformance/channels.json: the providers' requests, errors, Twilio's partial delivery, and the cuts" do
     f = Conformance.fixture("channels")
     {by_name, first} = alerts(f)
     rec = RecordingTransport.start()

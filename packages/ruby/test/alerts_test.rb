@@ -158,7 +158,7 @@ class AlertsTest < Minitest::Test
     assert_equal "[cronwatch] j recovered\nA run just now succeeded after: failed.\n", out.string
   end
 
-  # One request to a real socket: Net::HTTP, the headers and the body as sent.
+  # One request to a real socket: Net::HTTP, the headers, and the body as sent.
   def test_the_default_http_adapter_posts_to_a_real_server
     server = TCPServer.new("127.0.0.1", 0)
     port = server.addr[1]

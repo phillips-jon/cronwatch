@@ -70,7 +70,7 @@ module Cronwatch
 
     # Append the lines and metrics added so far to the stored run, which must
     # still be running and belong to this job. Output is redacted as it is
-    # written. A read, change and write of the run's row, written only while
+    # written. A read, change, and write of the run's row, written only while
     # it is still running: two processes appending to one run at the same
     # moment can lose one's lines, but a flush never undoes a finish. When
     # the write fails the lines stay here for finish. The first 16 KB of
@@ -99,7 +99,7 @@ module Cronwatch
       nil
     end
 
-    # Finish the run, judge it like any other and send what that produces.
+    # Finish the run, judge it like any other, and send what that produces.
     #
     #   finish                        # ok
     #   finish(status: "ok")          # ok

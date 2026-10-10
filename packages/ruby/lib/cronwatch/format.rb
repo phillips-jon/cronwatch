@@ -29,6 +29,14 @@ module Cronwatch
       lines.last(n).join("\n")
     end
 
+    # Words joined as an English list, with a serial comma from three on:
+    # "a", "a and b", "a, b, and c". Every port joins the same way.
+    def and_list(words, conjunction = "and")
+      return words.join(" #{conjunction} ") if words.length <= 2
+
+      "#{words[0...-1].join(", ")}, #{conjunction} #{words[-1]}"
+    end
+
     # "Error: x" for a bare message, but not "Error: TypeError: x" for one that already names itself.
     def error_line(error)
       text = first_lines(error, 4)
@@ -94,7 +102,7 @@ module Cronwatch
             lines << "#{since.nil? ? "" : "Missed since #{at_time(since, now)}. "}It has no schedule now, so nothing is due; the missed alert is closed."
             "#{name} is no longer scheduled"
           else
-            after = details[:after].map { |c| c.to_s.sub("_", " ") }.join(", ")
+            after = and_list(details[:after].map { |c| c.to_s.sub("_", " ") })
             lines << "A run #{run ? at_time(run.started_at, now) : "just now"} succeeded#{after.empty? ? "" : " after: #{after}"}."
             lines << "Ran #{Duration.format(run.duration_ms)}." if run && !run.duration_ms.nil?
             "#{name} recovered"

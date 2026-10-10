@@ -15,8 +15,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The SDK's {@code schedule.ts}: schedules ("0 2 * * *", "@hourly", "every 5m") with their fire
- * times, due times, deadlines and what a run covers. Cron fire times come from the port of croner
- * in {@code internal.cron}, so a Java process and a Node, Ruby, Python, PHP, Go, Rust or Elixir
+ * times, due times, deadlines, and what a run covers. Cron fire times come from the port of croner
+ * in {@code internal.cron}, so a Java process and a Node, Ruby, Python, PHP, Go, Rust, or Elixir
  * process sharing one store agree on every due time. Refusals are {@link IllegalArgumentException}s
  * with the SDK's message.
  */

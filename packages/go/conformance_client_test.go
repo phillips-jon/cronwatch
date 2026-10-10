@@ -1,7 +1,7 @@
 package cronwatch_test
 
 // Replays conformance/client.json, which the SDK writes by driving its
-// client through the public API: the run ids Start, Resume and RecordRun
+// client through the public API: the run ids Start, Resume, and RecordRun
 // take (runIds), and what the client keeps of stored data a newer release
 // wrote (unknownFields, over the memory store here and over the SQL store
 // in sqltest).

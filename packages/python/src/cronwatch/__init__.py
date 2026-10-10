@@ -12,8 +12,8 @@
 
     cw.start_checking()  # checks for missed and stuck runs every minute, in a daemon thread
 
-The Python port of @cronwatch/sdk: the same rules, the same alert text and
-the same stored rows, so a Python, a Node and a Ruby process can share one
+The Python port of @cronwatch/sdk: the same rules, the same alert text, and
+the same stored rows, so a Python, a Node, and a Ruby process can share one
 database.
 """
 
@@ -49,7 +49,7 @@ from .types import (
     StoredJob,
 )
 
-# cronwatch.client, the module 1.0 made internal (it is cronwatch._client),
+# cronwatch.client, the module 0.11 made internal (it is cronwatch._client),
 # is also the function below: its deprecated name is imported here, before
 # the function takes the name back, so importing it later cannot replace the
 # function.

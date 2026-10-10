@@ -9,7 +9,7 @@ package sqltest
 // to the bytes and SQLite type of every column. Then a Node client and a Go
 // client take turns on one file, and on one job's state version.
 //
-// Needs node on the PATH, the SDK built and its SQLite driver installed
+// Needs node on the PATH, the SDK built, and its SQLite driver installed
 // (`npm ci && npm run build` at the repository root); skipped, with the
 // reason, without them.
 

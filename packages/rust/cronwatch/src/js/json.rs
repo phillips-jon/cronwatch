@@ -310,13 +310,13 @@ fn quote_into(b: &mut String, s: &str) {
     b.push('"');
 }
 
-/// [`parse`]'s error before 1.0, now the one JSON error every reader
+/// [`parse`]'s error before 0.11, now the one JSON error every reader
 /// answers.
 #[doc(hidden)]
 #[deprecated(note = "use cronwatch::JsonError, which js::parse answers; this name goes at 1.0")]
 pub type ParseError = JsonError;
 
-/// How deep arrays and objects may nest. The parser, `to_json` and `Drop`
+/// How deep arrays and objects may nest. The parser, `to_json`, and `Drop`
 /// all recurse, so text nested thousands deep (a request body, a stored
 /// row) would overflow a thread's stack and abort the process; nothing
 /// CronWatch or an app stores comes near this.

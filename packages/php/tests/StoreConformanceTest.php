@@ -22,7 +22,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * The test every store passes (store-conformance.ts): memory, SQLite in
- * memory and on disk, MySQL and MariaDB. Copy it to check a store of your own.
+ * memory and on disk, MySQL, and MariaDB. Copy it to check a store of your own.
  */
 final class StoreConformanceTest extends TestCase
 {
@@ -197,7 +197,7 @@ final class StoreConformanceTest extends TestCase
         $undelivered = new Alert('failed', null, ['consecutiveFailures' => 1], 'a', new JobDefinition(['name' => 'a']), 'a failed', 'boom', 7);
         $full = new JobState('a', ['stuck' => 7], 1, null, 6, ['missed'], [$undelivered], sending: [new SendingAlert(8, $undelivered)]);
         $store->setState($full);
-        $this->assertSame(self::json($store, Js::stringify($full)), self::json($store, Js::stringify($store->getState('a'))), 'pendingRecovery, undelivered and sending round-trip');
+        $this->assertSame(self::json($store, Js::stringify($full)), self::json($store, Js::stringify($store->getState('a'))), 'pendingRecovery, undelivered, and sending round-trip');
         $store->setState(new JobState('a', [], 0, 99, 6));
 
         // compareAndSetState: writes only over the version it was told to expect.

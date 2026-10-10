@@ -155,7 +155,7 @@ func ErrorMessage(v any) string {
 // ErrorName is the name an error goes by in "Name: message": its type's
 // name, without the pointer or the package, when the type is exported
 // (*fs.PathError is "PathError"). Errors made by errors.New and fmt.Errorf,
-// joined errors and unexported types are "Error", as a plain JavaScript
+// joined errors, and unexported types are "Error", as a plain JavaScript
 // Error is, since their type names say nothing to a reader.
 func ErrorName(err error) string {
 	t := reflect.TypeOf(err)
@@ -329,7 +329,7 @@ var patterns = []pattern{
 	// Incoming webhook URLs carry their secret in the path.
 	template(jsre.MustCompile(`(\bhooks\.slack\.com\/(?:services|workflows|triggers)\/)[A-Za-z0-9/_-]{1,255}`, "gi"), "$1"+Redacted),
 	template(jsre.MustCompile(`(\bdiscord(?:app)?\.com\/api\/(?:v\d{1,2}\/)?webhooks\/)[A-Za-z0-9/_-]{1,255}`, "gi"), "$1"+Redacted),
-	// Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI and Google style keys.
+	// Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI, and Google style keys.
 	template(jsre.MustCompile(`\b(?:AKIA|ASIA)[0-9A-Z]{16}\b`, "g"), Redacted),
 	template(jsre.MustCompile(`\b(?:gh[pousr]_[A-Za-z0-9]{30,255}|github_pat_[A-Za-z0-9_]{20,255})\b`, "g"), Redacted),
 	template(jsre.MustCompile(`\bxox[abposr]-[A-Za-z0-9-]{10,255}`, "g"), Redacted),
@@ -341,8 +341,8 @@ var patterns = []pattern{
 
 // RedactSecrets is the default redact: it blanks values that look like
 // secrets (key=value pairs with secret-ish names, Authorization headers,
-// URL credentials, bearer tokens, JWTs, PEM private keys, webhook URLs and
-// well-known token formats) before output or an error is stored, shown or
+// URL credentials, bearer tokens, JWTs, PEM private keys, webhook URLs, and
+// well-known token formats) before output or an error is stored, shown, or
 // sent anywhere. The text is matched as UTF-16 code units, as JavaScript
 // holds it, and turned back into UTF-8 once at the end, so a match that
 // cut a character outside the BMP in two leaves U+FFFD where JavaScript

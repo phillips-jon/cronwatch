@@ -13,7 +13,7 @@ public static class CronwatchHostExtensions
     /// <summary>
     /// Given <c>cronwatch check</c> (<paramref name="args"/> starting with <c>cronwatch</c>),
     /// takes the client from the host's container without starting the host, so no web server,
-    /// queue or hosted job starts, runs one check, prints what it found, and answers the exit
+    /// queue, or hosted job starts, runs one check, prints what it found, and answers the exit
     /// status (0, 1 for a failed check or a client the container cannot make, 2 for a command it
     /// does not know); given anything else, runs the host as <c>RunAsync</c> would and answers 0.
     /// It never ends the process, so <c>Main</c> returns the status:

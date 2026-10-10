@@ -1,5 +1,5 @@
 // Package storetest is the test every CronWatch store passes: the memory
-// store, and the sqlstore package on SQLite, Postgres and MySQL. It is the
+// store, and the sqlstore package on SQLite, Postgres, and MySQL. It is the
 // SDK's store-conformance.ts, and a replay of the store cases in the
 // repository's conformance/store.json. Run it against a store of your own:
 //
@@ -8,7 +8,7 @@
 //	}
 //
 // Run is the one name here the 1.x releases promise. The other exported
-// names are the module's own test kit (its fixture replays, clocks and
+// names are the module's own test kit (its fixture replays, clocks, and
 // captures), deprecated, and go in 1.0.
 package storetest
 
@@ -283,7 +283,7 @@ func Run(t *testing.T, newStore func(t *testing.T) cronwatch.Store) {
 	must(store.SetState(ctx, state(t, full)))
 	s, err = store.GetState(ctx, "a")
 	must(err)
-	sameJSON(t, "pendingRecovery, undelivered and sending round-trip", s, full)
+	sameJSON(t, "pendingRecovery, undelivered, and sending round-trip", s, full)
 	must(store.SetState(ctx, state(t, `{"job":"a","open":{},"consecutiveFailures":0,"silencedUntil":99,"lastAlertAt":6}`)))
 
 	// CompareAndSetState writes only over the version it was told to expect.
@@ -357,7 +357,7 @@ func Run(t *testing.T, newStore func(t *testing.T) cronwatch.Store) {
 
 // ReplayFixture replays the store cases of conformance/store.json (at
 // path) against stores from newStore, which must each be empty: prune scripts,
-// CompareAndSetState steps and UpdateRunIf steps, each read back and
+// CompareAndSetState steps, and UpdateRunIf steps, each read back and
 // compared with what the SDK's memory store answered.
 //
 // Deprecated: only Run is promised; this is the module's own test kit, and
@@ -496,7 +496,7 @@ func ReplayFixture(t *testing.T, path string, newStore func(t *testing.T) cronwa
 	must(store.Close())
 
 	// nul: text is written without U+0000, which Postgres refuses: a run's
-	// trigger, output, error and metric names, and every key and string of
+	// trigger, output, error, and metric names, and every key and string of
 	// a definition and a state.
 	store = newStore(t)
 	must(store.Init(ctx))

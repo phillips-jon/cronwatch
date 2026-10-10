@@ -20,7 +20,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * {@code conformance/health.json}: health, summaries, percentiles, state normalization, silence,
- * which queued alerts a retry drops, a run's duration, a state's version and its failures in a row.
+ * which queued alerts a retry drops, a run's duration, a state's version, and its failures in a
+ * row.
  */
 class HealthConformanceTest {
   private static List<Run> runs(@Nullable Object v) {

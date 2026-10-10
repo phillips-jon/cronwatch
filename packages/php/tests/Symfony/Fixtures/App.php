@@ -25,7 +25,7 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
 // A Symfony app for the bundle's tests, in one file (tests/Symfony/TestCase.php
 // requires it, since PSR-4 finds one class a file): a kernel with
-// FrameworkBundle, SecurityBundle and CronwatchBundle, a schedule the test
+// FrameworkBundle, SecurityBundle, and CronwatchBundle, a schedule the test
 // fills in, messages and their handlers, and a controller running a job's
 // handler().
 

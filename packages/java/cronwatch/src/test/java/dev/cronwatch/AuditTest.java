@@ -211,7 +211,7 @@ class AuditTest {
                     .defaults(JobOptions.builder().field("schedule", "@hourly"))
                     .build());
     assertEquals(
-        "defaults takes grace, timeout, timezone and failuresBeforeAlert, not schedule",
+        "defaults takes grace, timeout, timezone, and failuresBeforeAlert, not schedule",
         e.getMessage());
     Cronwatch.builder()
         .defaults(JobOptions.builder().field("grace", "5m"))

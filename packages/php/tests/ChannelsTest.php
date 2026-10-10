@@ -560,7 +560,7 @@ final class ChannelsTest extends TestCase
     /**
      * tests/servers/raw.php in a mode, started; its port once it listens.
      *
-     * @return array{resource, resource, int} the process, its output and the port
+     * @return array{resource, resource, int} the process, its output, and the port
      */
     private function raw(string ...$args): array
     {

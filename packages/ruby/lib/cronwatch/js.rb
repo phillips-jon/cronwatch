@@ -2,9 +2,9 @@
 
 module Cronwatch
   # The few places JavaScript and Ruby disagree about text and numbers,
-  # settled the JavaScript way. The SDK writes the stored rows, alert text and
+  # settled the JavaScript way. The SDK writes the stored rows, alert text, and
   # webhook bodies, so the gem reproduces them byte for byte: Math.round,
-  # String(number), JSON.stringify, String.prototype.trim and lengths counted
+  # String(number), JSON.stringify, String.prototype.trim, and lengths counted
   # in UTF-16 code units.
   #
   # @api private
@@ -140,7 +140,7 @@ module Cronwatch
     end
 
     # JSON.stringify for plain data: hashes, arrays, strings, numbers, true,
-    # false and nil, and anything with a to_h (the gem's Structs) or as_json.
+    # false, and nil, and anything with a to_h (the gem's Structs) or as_json.
     def json(value)
       case value
       when nil then "null"

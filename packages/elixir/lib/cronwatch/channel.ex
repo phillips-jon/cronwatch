@@ -50,8 +50,8 @@ defmodule Cronwatch.Triage do
   `TriageFn`, as a behaviour. Given to an instance as `{module, opts}`, or as
   a function of one argument (the context). `c:triage/2` is given the
   options and a context map with `:alert`, `:recent_runs` (the job's five
-  newest) and `:transport` (the instance's `transport:` option), and answers
-  `{:ok, text}`, `nil` or `{:error, reason}`. It is tried once per alert and
+  newest), and `:transport` (the instance's `transport:` option), and answers
+  `{:ok, text}`, `nil`, or `{:error, reason}`. It is tried once per alert and
   stopped after 25 seconds. An optional `c:init/1` checks the options once,
   when the instance starts, and answers what `c:triage/2` is then given.
   """

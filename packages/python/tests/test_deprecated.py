@@ -1,4 +1,4 @@
-"""What was public by accident before 1.0 still works under its old name,
+"""What was public by accident before 0.11 still works under its old name,
 warning with a DeprecationWarning, until 1.0 removes it: the implementation
 modules, now underscored, and the helpers the public modules exposed. The
 renames of documented API warn the same way and go in 2.0."""

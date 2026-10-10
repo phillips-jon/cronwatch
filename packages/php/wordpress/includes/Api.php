@@ -22,7 +22,7 @@ use Cronwatch\Web\Response;
  * https://example.com/?rest_route=/cronwatch/v1 without pretty permalinks).
  * A request needs `Authorization: Bearer <token>`, which the route's
  * permission callback checks (in constant time) before anything else runs;
- * the dashboard then answers with the SDK's JSON, status and headers, byte
+ * the dashboard then answers with the SDK's JSON, status, and headers, byte
  * for byte, which the plugin writes itself rather than letting the REST
  * server encode it again. WordPress's own REST headers (Link, the CORS
  * headers) stay.
@@ -86,7 +86,7 @@ final class Api
             }
         }
         // The dashboard's own refusal of this request, its credentials taken
-        // out: the SDK's 401 (or its 403 for a cross-site change), body and headers.
+        // out: the SDK's 401 (or its 403 for a cross-site change), body, and headers.
         $refusal = self::dashboard($settings)->handle(self::request($rest, false));
         if ($refusal->status < 400) {
             $refusal = new Response(401, ['content-type' => 'application/json; charset=utf-8', 'cache-control' => 'no-store'] + Dashboard::SECURITY_HEADERS, '{"ok":false,"error":"Unauthorized"}');

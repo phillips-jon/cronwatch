@@ -134,7 +134,7 @@ def test_store_conformance(store: Any) -> None:
         }
     )
     store.set_state(full)
-    assert store.get_state("a").to_dict() == full.to_dict(), "pendingRecovery, undelivered and sending round-trip"
+    assert store.get_state("a").to_dict() == full.to_dict(), "pendingRecovery, undelivered, and sending round-trip"
     assert store.get_state("a").to_dict()["sending"][0]["until"] == 8
     store.set_state(JobState(job="a", open={}, silenced_until=99, last_alert_at=6))
 

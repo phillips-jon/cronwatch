@@ -47,7 +47,7 @@ test("submits every page without an old release, or one with no key yet", () => 
   assert.equal(changedUrls(now, dist({ "index.html": "home", "docs/index.html": "docs" }, { key: false })).length, 2);
 });
 
-test("posts the host, key, key location and URLs", async () => {
+test("posts the host, key, key location, and URLs", async () => {
   let sent;
   const status = await submit(["https://cronwatch.dev/", "https://cronwatch.dev/docs/"], KEY, {
     fetch: async (url, init) => { sent = { url, body: JSON.parse(init.body) }; return { status: 202 }; },

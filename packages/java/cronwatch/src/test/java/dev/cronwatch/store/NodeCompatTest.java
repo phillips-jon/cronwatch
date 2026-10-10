@@ -39,11 +39,11 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * A Node process and a Java process sharing one SQLite file: the SDK's store (from the built
  * packages/sdk/dist) and {@link SqlStore} replay the same store calls (shared_store.json, the Ruby,
- * Python, Go and Rust ports' fixture), and each must read what the other wrote exactly as it reads
+ * Python, Go, and Rust ports' fixture), and each must read what the other wrote exactly as it reads
  * its own, down to the bytes and SQLite type of every column; the tables are the same whoever makes
  * them; and the two take turns on one job's state version.
  *
- * <p>Needs node on the PATH, the SDK built and its SQLite driver installed ({@code npm ci && npm
+ * <p>Needs node on the PATH, the SDK built, and its SQLite driver installed ({@code npm ci && npm
  * run build} at the repository root); skipped, with the reason, without them.
  */
 class NodeCompatTest {

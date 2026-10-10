@@ -264,7 +264,7 @@ internal sealed class JsreParser
     private static bool IsDigit(char c) => c >= '0' && c <= '9';
 
     /// <summary>
-    /// Reads a bounded quantifier ("{n}", "{n,}" or "{n,m}") at the parser's position: the bounds
+    /// Reads a bounded quantifier ("{n}", "{n,}", or "{n,m}") at the parser's position: the bounds
     /// and the index after its closing brace, or null when the opening brace is a literal (Annex B).
     /// </summary>
     private (int Min, int Max, int After)? Brace()
@@ -531,7 +531,7 @@ internal sealed class JsreParser
             case 'p':
             case 'P':
                 // JavaScript reads these as a backreference, a control character, a named
-                // backreference or a property; read as the plain letter they would match
+                // backreference, or a property; read as the plain letter they would match
                 // something else, so they are refused.
                 throw new ArgumentException("jsre: \\" + c + " is not supported");
             case 'x':

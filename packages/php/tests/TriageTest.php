@@ -19,7 +19,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Claude triage against conformance/triage.json, with no network: the
  * parameters the SDK builds for each alert and option set, the HTTP request
- * the official client makes of them (URL, headers and body byte for byte),
+ * the official client makes of them (URL, headers, and body byte for byte),
  * and how each kind of answer is read.
  */
 final class TriageTest extends TestCase

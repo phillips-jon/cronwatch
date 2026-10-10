@@ -16,7 +16,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * The integrations' examples in packages/java/README.md ({@code ```java spring}, {@code ```java
- * quartz} and {@code ```java jobrunr} blocks) compile against this build, each as the body of a
+ * quartz}, and {@code ```java jobrunr} blocks) compile against this build, each as the body of a
  * method of its own; the core's own test compiles the plain {@code ```java} blocks.
  */
 class ReadmeTest {

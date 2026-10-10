@@ -24,7 +24,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * transport a worker must consume for it to run, and lists the schedules
  * and their watched messages.
  */
-#[AsCommand(name: 'cronwatch:check', description: 'Look for missed, failed, stuck and slow jobs and send alerts')]
+#[AsCommand(name: 'cronwatch:check', description: 'Look for missed, failed, stuck, and slow jobs and send alerts')]
 final class CheckCommand extends Command
 {
     /**
@@ -41,7 +41,7 @@ final class CheckCommand extends Command
 
     protected function configure(): void
     {
-        $this->setDescription('Look for missed, failed, stuck and slow jobs and send alerts');
+        $this->setDescription('Look for missed, failed, stuck, and slow jobs and send alerts');
         $this->addOption('status', null, InputOption::VALUE_NONE, 'Say where the check is scheduled and what a worker must consume, without checking');
     }
 

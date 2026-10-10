@@ -101,7 +101,7 @@ impl Job {
     /// `error` for a caller who sent the secret. A function that returns an
     /// HTTP answer (a [`web::Response`](crate::web::Response), or with the
     /// `tower` feature an `http::Response` whose body is `Full<Bytes>`,
-    /// `String`, `Vec<u8>`, `Bytes`, `&'static str`, `()` or `Empty<Bytes>`)
+    /// `String`, `Vec<u8>`, `Bytes`, `&'static str`, `()`, or `Empty<Bytes>`)
     /// is answered with it, and a status of 400 or more fails the run with
     /// `HTTP <status> <reason>`. A panic in `f` is a failed run answered 500,
     /// as the SDK answers a throw. A `String` returned is the run's output

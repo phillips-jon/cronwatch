@@ -1,6 +1,6 @@
 //! A real tokio-cron-scheduler scheduler, on the wall clock (it reads
 //! `Utc::now()`, so tokio's paused clock cannot drive it): jobs every second
-//! whose runs, errors and panics are recorded, a job removed while it runs,
+//! whose runs, errors, and panics are recorded, a job removed while it runs,
 //! the check job, and two apps on one store.
 
 use std::sync::atomic::{AtomicUsize, Ordering};

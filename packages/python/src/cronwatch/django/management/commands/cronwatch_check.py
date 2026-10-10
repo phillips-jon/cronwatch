@@ -1,7 +1,7 @@
 """`python manage.py cronwatch_check`: one check, for cron to call.
 
 Looks for missed and stuck runs across every job, sends alerts, retries
-undelivered ones and prunes old runs (cw.check()). Schedule it every few
+undelivered ones, and prunes old runs (cw.check()). Schedule it every few
 minutes; nothing else notices a job that never ran.
 
     */5 * * * * cd /app && python manage.py cronwatch_check

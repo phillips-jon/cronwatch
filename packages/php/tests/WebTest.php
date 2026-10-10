@@ -28,7 +28,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 
 /**
  * The SDK's routes tests (routes.test.ts, routes-security.test.ts,
- * routes-origin.test.ts, routes-pwa.test.ts and routes-timeline.test.ts)
+ * routes-origin.test.ts, routes-pwa.test.ts, and routes-timeline.test.ts)
  * against Cronwatch\Web\Dashboard, as the Python package's test_web.py has
  * them, plus what only PHP needs: the superglobals, a path-info mount, the
  * development token kept between requests, and the PSR-15 middleware.
@@ -475,7 +475,7 @@ final class WebTest extends TestCase
     }
 
     /**
-     * The words Laravel's env() reads as null, true, false or empty count as
+     * The words Laravel's env() reads as null, true, false, or empty count as
      * unset in CRONWATCH_TOKEN, so `CRONWATCH_TOKEN=null` in a .env file is
      * not the password "null" (Laravel hands the config null and the
      * variable keeps the word).
@@ -497,7 +497,7 @@ final class WebTest extends TestCase
         $this->assertSame('null', $this->routes($this->client(), 'null')->token());
     }
 
-    /** A token given in code that is not a string, null or false throws (routes-security.test.ts). */
+    /** A token given in code that is not a string, null, or false throws (routes-security.test.ts). */
     public function testATokenGivenInCodeThatIsNotAStringOrNullThrows(): void
     {
         foreach ([[true, 'boolean'], [5, 'number'], [1.5, 'number'], [['tok'], 'an array'], [new \stdClass(), 'object']] as [$value, $type]) {
@@ -529,7 +529,7 @@ final class WebTest extends TestCase
         $this->assertSame(200, self::send($this->routes($this->client(), false), 'GET', '/cronwatch/api/jobs')->status);
         $this->assertSame([], $this->logged, 'and makes no token');
 
-        // null never reads the environment: in 0.x it did.
+        // null never reads the environment: before 0.11 it did.
         putenv('CRONWATCH_ENV=production');
         putenv('CRONWATCH_TOKEN=envtok');
         $this->assertSame(200, self::send($this->routes($this->client(), null), 'GET', '/cronwatch/api/jobs')->status);

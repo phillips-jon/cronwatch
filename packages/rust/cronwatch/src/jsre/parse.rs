@@ -228,7 +228,7 @@ impl Parser {
         self.quantifier(t)
     }
 
-    /// Reads `{n}`, `{n,}` or `{n,m}` at the parser's position: the bounds and
+    /// Reads `{n}`, `{n,}`, or `{n,m}` at the parser's position: the bounds and
     /// the index after the `}`, or `None` when the `{` is a literal (Annex B).
     fn brace(&self) -> Option<(usize, Option<usize>, usize)> {
         let src = &self.src;
@@ -277,7 +277,7 @@ impl Parser {
                 (0, Some(1))
             }
             '{' => {
-                // {n}, {n,} or {n,m}; anything else is a literal "{" (Annex B).
+                // {n}, {n,}, or {n,m}; anything else is a literal "{" (Annex B).
                 let Some((n, m, after)) = self.brace() else {
                     return Ok(t);
                 };
@@ -425,7 +425,7 @@ impl Parser {
             '0' => set.add(0),
             '1'..='9' | 'c' | 'k' | 'p' | 'P' => {
                 // JavaScript reads these as a backreference, a control
-                // character, a named backreference or a property; read as the
+                // character, a named backreference, or a property; read as the
                 // plain letter they would match something else, so they are
                 // refused.
                 return Err(format!("jsre: \\{c} is not supported"));
@@ -552,7 +552,7 @@ impl CharSet {
         found
     }
 
-    /// Works out the final membership bitmap: `\s`, "everything but `\s`"
+    /// Works out the final membership bitmap: `\s`, "everything but `\s`",
     /// and negation folded in.
     pub(super) fn freeze(&mut self) {
         if self.fin.is_some() {

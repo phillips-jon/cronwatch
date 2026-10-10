@@ -20,6 +20,15 @@ function tail(text: string | null, n: number): string {
   return lines.slice(Math.max(0, lines.length - n)).join("\n");
 }
 
+/**
+ * Words joined as an English list, with a serial comma from three on:
+ * "a", "a and b", "a, b, and c". Every port joins the same way.
+ */
+export function andList(words: readonly string[]): string {
+  if (words.length <= 2) return words.join(" and ");
+  return `${words.slice(0, -1).join(", ")}, and ${words[words.length - 1]}`;
+}
+
 /** "Error: x" for a bare message, but not "Error: TypeError: x" for one that already names itself. */
 function errorLine(error: string): string {
   const text = firstLines(error, 4);
@@ -95,7 +104,7 @@ export function composeAlert(draft: AlertDraft, def: StoredJobDefinition, now: n
         break;
       }
       title = `${name} recovered`;
-      const after = draft.details.after.map((c) => c.replace("_", " ")).join(", ");
+      const after = andList(draft.details.after.map((c) => c.replace("_", " ")));
       lines.push(`A run ${run ? when(run.startedAt, now) : "just now"} succeeded${after ? ` after: ${after}` : ""}.`);
       if (run?.durationMs !== null && run?.durationMs !== undefined) lines.push(`Ran ${formatDuration(run.durationMs)}.`);
       break;

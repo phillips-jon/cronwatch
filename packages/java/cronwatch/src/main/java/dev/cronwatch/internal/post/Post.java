@@ -25,15 +25,15 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The one POST the alert channels and Claude triage make, as the SDK makes it with fetch ({@code
- * alerts/shared.ts}), the Go port's {@code internal/post}, the Rust port's {@code alerts::post} and
- * the Elixir port's {@code Alerts.Post}: the URL read as fetch reads it, only http and https,
+ * alerts/shared.ts}), the Go port's {@code internal/post}, the Rust port's {@code alerts::post},
+ * and the Elixir port's {@code Alerts.Post}: the URL read as fetch reads it, only http and https,
  * headers checked as fetch checks them, one ten second deadline for the whole request, a redirect
  * refused rather than followed (the transport's rule), at most 1 MiB of an answer read, and an
  * error that names only the URL's origin, with every secret the caller holds cut out of a quoted
  * answer before it is cut to 200 characters.
  *
  * <p>The request goes out through a {@link Transport} on a virtual thread of its own, interrupted
- * past the deadline, so the deadline holds whatever the transport does, while connecting, sending
+ * past the deadline, so the deadline holds whatever the transport does, while connecting, sending,
  * or reading the answer.
  */
 public final class Post {
@@ -161,7 +161,7 @@ public final class Post {
   }
 
   /**
-   * {@code new URL(url).origin}: the scheme, host and port only; {@code "null"} for a URL of a
+   * {@code new URL(url).origin}: the scheme, host, and port only; {@code "null"} for a URL of a
    * scheme that has no origin and {@code "(invalid URL)"} for text that is no URL. A URL's path or
    * query can hold a credential, so an error names only this.
    */
@@ -193,17 +193,17 @@ public final class Post {
   }
 
   /**
-   * The headers as a request sends them: each name a token, each value without the spaces, tabs and
-   * line breaks around it, as fetch sends it. A name that is not a token, or a value with a line
-   * break or NUL inside, is refused, as fetch refuses them, so no header can add another; the error
-   * names the header, never its value, which may be a credential.
+   * The headers as a request sends them: each name a token, each value without the spaces, tabs,
+   * and line breaks around it, as fetch sends it. A name that is not a token, or a value with a
+   * line break or NUL inside, is refused, as fetch refuses them, so no header can add another; the
+   * error names the header, never its value, which may be a credential.
    */
   public static List<Map.Entry<String, String>> headers(List<Map.Entry<String, String>> list) {
     List<Map.Entry<String, String>> out = new ArrayList<>(list.size());
     for (Map.Entry<String, String> h : list) {
       String name = h.getKey();
       if (!token(name)) {
-        throw fail("a header name must be a token (letters, digits and !#$%&'*+.^_`|~-)");
+        throw fail("a header name must be a token (letters, digits, and !#$%&'*+.^_`|~-)");
       }
       String value = trimHttp(h.getValue());
       if (value.indexOf('\r') >= 0 || value.indexOf('\n') >= 0 || value.indexOf('\0') >= 0) {

@@ -30,14 +30,14 @@ if Code.ensure_loaded?(Quantum) do
     Quantum skips it. One that differs (the crontab package matches a day of
     the month and a day of the week both, where croner matches either) is
     reported once and watched without a schedule. Jobs added, deleted,
-    activated or deactivated at run time are followed through Quantum's own
+    activated, or deactivated at run time are followed through Quantum's own
     telemetry (`[:quantum, :job, :add | :update | :delete]`), and the jobs are
     read again every minute besides; a job no longer active is declared
     again without its schedule.
 
     ## Runs
 
-    Quantum's `[:quantum, :job, :start]`, `:stop` and `:exception` events, in
+    Quantum's `[:quantum, :job, :start]`, `:stop`, and `:exception` events, in
     the task that runs the job, start and finish a run (trigger `quantum`),
     with its context in that task, so `Cronwatch.log/1` works inside the
     job's function. A job's function answering `{:error, reason}` fails the
@@ -54,7 +54,7 @@ if Code.ensure_loaded?(Quantum) do
     `$CRONWATCH_APP_ID`, else the OTP application that started the instance.
 
     Options: `scheduler` (the Quantum scheduler module, required), `app`,
-    `defaults` (job options for every job, before its schedule) and `jobs`
+    `defaults` (job options for every job, before its schedule), and `jobs`
     (job options by the Quantum job's name).
     """
 

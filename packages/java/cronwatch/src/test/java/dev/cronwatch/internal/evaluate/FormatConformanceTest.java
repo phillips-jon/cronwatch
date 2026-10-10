@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * {@code conformance/format.json}: alert titles and messages, numbers as {@code toLocaleString}
- * writes them, the output cap, stored definitions and expect rules; and {@code output.json}'s
+ * writes them, the output cap, stored definitions, and expect rules; and {@code output.json}'s
  * {@code expectText} cases, which hold the run recorder to the SDK's.
  */
 class FormatConformanceTest {

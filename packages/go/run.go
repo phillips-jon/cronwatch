@@ -133,7 +133,7 @@ type contextKey struct{}
 
 // Current is the job context of the run ctx belongs to, or nil outside one.
 // A nil *JobContext is safe to use: it logs and reports nothing, and has
-// no name, run or start, so code shared with work run outside a job (a
+// no name, run, or start, so code shared with work run outside a job (a
 // gocron task, say) may call Current(ctx).Log without a check.
 func Current(ctx context.Context) *JobContext {
 	jc, _ := ctx.Value(contextKey{}).(*JobContext)

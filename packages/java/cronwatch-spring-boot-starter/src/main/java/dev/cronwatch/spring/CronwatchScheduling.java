@@ -43,7 +43,7 @@ import org.springframework.util.StringUtils;
  *
  * <p>A job is named {@code SimpleClassName.method} after the bean's own class (not its proxy's),
  * the fully qualified name when two classes' simple names would give one name,
- * {@code @CronwatchJob(name = ...)} or {@code cronwatch.jobs[<name>].name} to name it. A cron is
+ * {@code @CronwatchJob(name = ...)}, or {@code cronwatch.jobs[<name>].name} to name it. A cron is
  * Spring's six-field expression in the annotation's zone, else the JVM's, checked against Spring's
  * own {@link CronExpression} and watched without a schedule when the two differ; a {@code
  * fixedRate} or a {@code fixedDelay} is {@code every <interval>}. Jobs are tagged {@code
@@ -76,9 +76,9 @@ public final class CronwatchScheduling
   private record Checked(@Nullable String schedule, @Nullable String problem) {}
 
   /**
-   * Each cron's check against Spring's own fire times, by the job, the cron, the zone and the year,
-   * so the sync before each check walks only what changed: a cron that fires each second in a zone
-   * with daylight saving takes most of a second to walk. Only what the last declaration saw is
+   * Each cron's check against Spring's own fire times, by the job, the cron, the zone, and the
+   * year, so the sync before each check walks only what changed: a cron that fires each second in a
+   * zone with daylight saving takes most of a second to walk. Only what the last declaration saw is
    * kept. Guarded by {@code lock}.
    */
   private final Map<String, Checked> checked = new HashMap<>();
@@ -269,7 +269,7 @@ public final class CronwatchScheduling
           watch.reportOnce(
               "cronwatch: "
                   + label
-                  + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\""
+                  + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\","
                   + " or \"-\"), so it is not watched; name it with @CronwatchJob(name = ...)",
               "declaring " + label);
           continue;

@@ -12,7 +12,7 @@ import (
 	cronwatch "cronwatch.dev/go"
 )
 
-// A job declared once and run: the failure is recorded, judged and alerted.
+// A job declared once and run: the failure is recorded, judged, and alerted.
 func Example() {
 	ctx := context.Background()
 	now := time.Date(2026, 1, 5, 2, 0, 0, 0, time.UTC).UnixMilli()

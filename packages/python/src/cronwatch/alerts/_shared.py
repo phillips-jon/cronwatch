@@ -67,7 +67,7 @@ def severity(type_: object) -> str:
 
 
 def origin(url: str) -> str:
-    """The scheme, host and port only, as ``new URL(url).origin``. A URL's path or query can hold a credential."""
+    """The scheme, host, and port only, as ``new URL(url).origin``. A URL's path or query can hold a credential."""
     try:
         parts = urllib.parse.urlsplit(_js.trim(str(url)))
         host = host_of(parts)
@@ -161,7 +161,7 @@ def sha256_hex(text: str) -> str:
 
 
 def alert_id(alert: Alert) -> str:
-    """A stable 32 hex character id for one alert: the same job, type and time
+    """A stable 32 hex character id for one alert: the same job, type, and time
     always give the same id, so a provider that deduplicates on it drops a
     resend of an alert it already took."""
     return sha256_hex(f"{alert.job}\n{alert.type}\n{_js.number(alert.at)}")[:32]
@@ -217,7 +217,7 @@ def run_summary(alert: Alert) -> dict[str, Any] | None:
 
 
 def plain_text(alert: Alert, link: str | None) -> str:
-    """Title, message, triage and link as one plain text block, the way every channel reads."""
+    """Title, message, triage, and link as one plain text block, the way every channel reads."""
     lines = [alert.title, "", alert.message]
     if present(alert.triage):
         lines += ["", f"Triage: {alert.triage}"]

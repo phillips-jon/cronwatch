@@ -318,7 +318,7 @@ func TestParseDuration(t *testing.T) {
 	if _, err := ParseDuration(-time.Second, "timeout"); err == nil || err.Error() != "timeout must be a non-negative number of milliseconds" {
 		t.Error(err)
 	}
-	if _, err := ParseDuration(true, "grace"); err == nil || err.Error() != `grace "true" is not a duration like "15m", "1h30m" or "90s"` {
+	if _, err := ParseDuration(true, "grace"); err == nil || err.Error() != `grace "true" is not a duration like "15m", "1h30m", or "90s"` {
 		t.Error(err)
 	}
 }
@@ -339,7 +339,7 @@ func TestADurationOver64CharactersIsRefusedQuotingItsFirst32(t *testing.T) {
 	}
 	check(long, "grace", `grace "`+long[:32]+`..." `+tooLong)
 	// Characters are code points: forty emoji are eighty UTF-16 units but under the cap.
-	check(strings.Repeat("\U0001F600", 40), "", `duration "`+strings.Repeat("\U0001F600", 40)+`" is not a duration like "15m", "1h30m" or "90s"`)
+	check(strings.Repeat("\U0001F600", 40), "", `duration "`+strings.Repeat("\U0001F600", 40)+`" is not a duration like "15m", "1h30m", or "90s"`)
 	check(strings.Repeat("\U0001F600", 65), "", `duration "`+strings.Repeat("\U0001F600", 32)+`..." `+tooLong)
 	started := time.Now()
 	check(strings.Repeat("1", 1<<20), "silence duration", `silence duration "`+strings.Repeat("1", 32)+`..." `+tooLong)

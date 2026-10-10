@@ -5,7 +5,7 @@
  *
  *   - every SDK entry point loads with import and with require,
  *   - the MCP package loads, and its bin runs,
- *   - tsc accepts both under node16 ESM, node16 CJS (.cts) and bundler
+ *   - tsc accepts both under node16 ESM, node16 CJS (.cts), and bundler
  *     resolution, with skipLibCheck off,
  *   - the entries meant for Cloudflare Workers (the core, D1, pg-cron and
  *     every channel) typecheck with only @cloudflare/workers-types, and
@@ -64,7 +64,7 @@ for (const e of entries) {
   if (!expected[e]) throw new Error(`check-packages: add ${e} to the expected exports`);
 }
 // The entries that must run on Cloudflare Workers with no nodejs_compat:
-// everything except the Node drivers, the Node adapter and Anthropic triage.
+// everything except the Node drivers, the Node adapter, and Anthropic triage.
 const NODE_ONLY = ["@cronwatch/sdk/sqlite", "@cronwatch/sdk/postgres", "@cronwatch/sdk/node", "@cronwatch/sdk/anthropic"];
 const workersEntries = entries.filter((e) => !NODE_ONLY.includes(e));
 

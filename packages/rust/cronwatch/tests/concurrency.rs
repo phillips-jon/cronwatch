@@ -437,7 +437,7 @@ async fn a_job_forgotten_by_another_process_comes_back_in_a_long_lived_one_that_
     assert_eq!(stored_schedule(&*store, "nightly").await, "every 5m");
     assert_eq!(web.runs("nightly").await.len(), 1);
 
-    // So does a started run, a check, the board and the job's page in the
+    // So does a started run, a check, the board, and the job's page in the
     // process that declares it.
     forgotten().await;
     let handle = nightly.start(cronwatch::StartOptions::new()).await.unwrap();

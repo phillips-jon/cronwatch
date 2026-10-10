@@ -14,7 +14,7 @@ use PHPUnit\Framework\TestCase;
  * the plugin goes in as the zip wordpress/build.php makes, with
  * fixtures/cwt-fixtures.php as a must-use plugin beside it, and the tests
  * drive it as a site would be: `wp cron event run`, wp-cron.php requested
- * from PHP's built-in server, `wp cronwatch check`, the settings handlers
+ * from PHP's built-in server, `wp cronwatch check`, the settings handlers,
  * and uninstalling. CRONWATCH_TEST_WPCLI is the path to wp-cli.phar, and
  * CRONWATCH_TEST_WP_VERSION the WordPress version (default below).
  *
@@ -43,7 +43,7 @@ final class WordPressTest extends TestCase
             return;
         }
         if (!extension_loaded('mysqli') || !extension_loaded('pdo_mysql') || !class_exists(\ZipArchive::class) || !function_exists('proc_open')) {
-            self::$skip = 'needs mysqli, pdo_mysql, zip and proc_open';
+            self::$skip = 'needs mysqli, pdo_mysql, zip, and proc_open';
             return;
         }
         self::$skip = null;
@@ -524,7 +524,7 @@ final class WordPressTest extends TestCase
         $this->assertSame(900000, $result['job']);
         $this->assertSame('refused', $result['duplicate']);
         $this->assertSame([true, false, true], $result['updateIf'], 'written only over the statuses given, and a write that changes nothing still counts');
-        $this->assertSame("caf\u{e9} 100% 'quoted' \\ back \u{1F600}", $result['run']['output'], 'quotes, % and four byte characters survive $wpdb');
+        $this->assertSame("caf\u{e9} 100% 'quoted' \\ back \u{1F600}", $result['run']['output'], 'quotes, %, and four byte characters survive $wpdb');
         $this->assertSame([true, false, true, false], $result['cas']);
         $this->assertSame(2, $result['version']);
         $this->assertSame(1, $result['pruned']);

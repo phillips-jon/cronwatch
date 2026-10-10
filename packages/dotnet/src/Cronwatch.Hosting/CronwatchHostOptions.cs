@@ -21,7 +21,7 @@ public sealed class CronwatchHostOptions
     private readonly ChannelList _alerts = new();
     private readonly List<ISource> _sources = [];
 
-    /// <summary>Where jobs, runs and state live. Default: a <see cref="MemoryStore"/>.</summary>
+    /// <summary>Where jobs, runs, and state live. Default: a <see cref="MemoryStore"/>.</summary>
     public IStore? Store { get; set; }
 
     /// <summary>
@@ -63,7 +63,7 @@ public sealed class CronwatchHostOptions
     /// <summary>How long finished runs are kept. Default: <c>Cronwatch:Retention</c>, else <c>"30d"</c>.</summary>
     public Duration? Retention { get; set; }
 
-    /// <summary>Defaults for every job: only <c>Grace</c>, <c>Timeout</c>, <c>Timezone</c> and <c>FailuresBeforeAlert</c>.</summary>
+    /// <summary>Defaults for every job: only <c>Grace</c>, <c>Timeout</c>, <c>Timezone</c>, and <c>FailuresBeforeAlert</c>.</summary>
     public JobOptions? Defaults { get; set; }
 
     /// <summary>Takes secrets out of output and errors before they are stored (see <see cref="CronwatchOptions.Redact"/>).</summary>

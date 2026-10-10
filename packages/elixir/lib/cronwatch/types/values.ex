@@ -1,6 +1,6 @@
 defmodule Cronwatch.RunStatus do
   @moduledoc """
-  Where a run stands, as the SDK writes it: `"running"`, `"ok"`, `"failed"`
+  Where a run stands, as the SDK writes it: `"running"`, `"ok"`, `"failed"`,
   or `"timeout"`. Statuses are strings, never atoms, since stored values come
   from other writers and a newer SDK may add one.
   """
@@ -26,7 +26,7 @@ defmodule Cronwatch.Condition do
   @moduledoc """
   Something wrong with a job that opens once, alerts, and closes with a
   recovery, as the SDK writes it, in the SDK's order: `"missed"`, `"failed"`,
-  `"stuck"`, `"slow"`, `"over_budget"` and `"under_floor"`.
+  `"stuck"`, `"slow"`, `"over_budget"`, and `"under_floor"`.
   """
 
   @doc "Every condition, in the SDK's order."
@@ -64,7 +64,7 @@ end
 defmodule Cronwatch.Health do
   @moduledoc """
   How a job looks at a glance, as the SDK writes it: `"healthy"`, `"late"`,
-  `"failing"`, `"stuck"`, `"silenced"` or `"never_ran"`.
+  `"failing"`, `"stuck"`, `"silenced"`, or `"never_ran"`.
   """
 
   @doc false

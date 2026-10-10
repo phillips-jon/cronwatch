@@ -20,7 +20,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * client-hardening.test.ts. The SDK's tests of a hung channel, a triage
- * aborted mid-call and the interval timer have no PHP counterpart: PHP sends
+ * aborted mid-call, and the interval timer have no PHP counterpart: PHP sends
  * in turn and cannot cut a call short, and there is no start() (see
  * DESIGN.md); what replaces them is here too.
  */
@@ -562,7 +562,7 @@ final class ClientHardeningTest extends TestCase
         $this->assertStringNotContainsString('opaqueTOKEN', $output);
         $this->assertLessThanOrEqual($cap + strlen("[earlier output trimmed]\n"), strlen($output));
 
-        // Errors, recorded runs and flushed lines the same way.
+        // Errors, recorded runs, and flushed lines the same way.
         $this->failing(fn () => $cw->run('thrown', self::thrower(str_repeat('e', $cap) . " {$bearer} " . str_repeat('z', $cap - 40))));
         $this->assertStringNotContainsString('opaqueTOKEN', $cw->runs('thrown')[0]->error);
         $cw->job('imported');

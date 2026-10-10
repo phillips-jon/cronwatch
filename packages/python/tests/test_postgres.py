@@ -136,7 +136,7 @@ def test_output_and_errors_with_nul_characters_are_still_recorded(prefix: str) -
     assert run.output == "beforeafter"
     assert run.error.startswith("RuntimeError: badbyte")
     assert cw.store.get_state("nul").consecutive_failures == 1, "the state, with its alert, was written too"
-    # So are a trigger, metric names and a definition's text.
+    # So are a trigger, metric names, and a definition's text.
     nul2 = cw.job("nul2", description="a\x00b", tags=["t\x00"], budget={"c\x00": 5})
     nul2.run(lambda ctx: ctx.metric("ro\x00ws", 2), trigger="cr\x00on")
     [second] = cw.runs("nul2")

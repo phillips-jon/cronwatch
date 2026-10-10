@@ -153,7 +153,7 @@ public class WhatwgUrlTests
             [new("a", "b c"), new("X-Y", "")],
             Cronwatch.Internal.Post.Headers([new("a", " \t b c \r\n"), new("X-Y", "  ")]));
         var e = Assert.Throws<CronwatchException>(() => Cronwatch.Internal.Post.Headers([new("a b", "v")]));
-        Assert.Equal("a header name must be a token (letters, digits and !#$%&'*+.^_`|~-)", e.Message);
+        Assert.Equal("a header name must be a token (letters, digits, and !#$%&'*+.^_`|~-)", e.Message);
         foreach (string bad in new[] { "sekret\rX: y", "sekret\nX: y", "sek\0ret" })
         {
             e = Assert.Throws<CronwatchException>(() => Cronwatch.Internal.Post.Headers([new("authorization", bad)]));

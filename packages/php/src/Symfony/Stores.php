@@ -46,7 +46,7 @@ final class Stores
             return new SqliteStore($url, prefix: $prefix);
         }
         $scheme = preg_match('#^([A-Za-z][A-Za-z0-9+.\-]*):#', $url, $m) === 1 ? $m[1] : 'this';
-        throw new \InvalidArgumentException("CronWatch stores in MySQL, MariaDB, Postgres or SQLite; a {$scheme} URL is not one of them");
+        throw new \InvalidArgumentException("CronWatch stores in MySQL, MariaDB, Postgres, or SQLite; a {$scheme} URL is not one of them");
     }
 
     /** @param list<string> $names */

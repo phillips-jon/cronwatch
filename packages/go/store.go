@@ -2,7 +2,7 @@ package cronwatch
 
 import "context"
 
-// Store is where jobs, runs and state live. MemoryStore is one; the
+// Store is where jobs, runs, and state live. MemoryStore is one; the
 // sqlstore package keeps them in the app's own database. A store of your
 // own should pass the storetest package's contract test.
 type Store interface {
@@ -13,11 +13,11 @@ type Store interface {
 	GetJob(ctx context.Context, name string) (*StoredJob, error)
 	// ListJobs is every job, by name in byte order.
 	ListJobs(ctx context.Context) ([]StoredJob, error)
-	// DeleteJob removes a job, its runs and its state.
+	// DeleteJob removes a job, its runs, and its state.
 	DeleteJob(ctx context.Context, name string) error
 	// InsertRun refuses an id already stored.
 	InsertRun(ctx context.Context, run Run) error
-	// UpdateRun writes a run's status, finish, duration, error, output and
+	// UpdateRun writes a run's status, finish, duration, error, output, and
 	// metrics. A run that is gone stays gone.
 	UpdateRun(ctx context.Context, run Run) error
 	// GetRun is nil when there is no such run.

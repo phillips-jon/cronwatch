@@ -1,5 +1,5 @@
 //! What every email channel sends (`alerts/email.ts`): one subject, a plain
-//! text body and a small HTML body, so an alert reads the same whichever
+//! text body, and a small HTML body, so an alert reads the same whichever
 //! provider carries it.
 
 use super::post::cut;

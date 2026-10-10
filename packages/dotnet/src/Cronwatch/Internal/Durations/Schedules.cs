@@ -38,8 +38,8 @@ internal readonly record struct Expectation(long DueAt, double Deadline);
 
 /// <summary>
 /// The SDK's <c>schedule.ts</c>: schedules ("0 2 * * *", "@hourly", "every 5m") with their fire
-/// times, due times, deadlines and what a run covers. Cron fire times come from the port of
-/// croner, so a .NET process and a Node, Ruby, Python, PHP, Go, Rust, Elixir or Java process
+/// times, due times, deadlines, and what a run covers. Cron fire times come from the port of
+/// croner, so a .NET process and a Node, Ruby, Python, PHP, Go, Rust, Elixir, or Java process
 /// sharing one store agree on every due time. Refusals are <see cref="ArgumentException"/>s with
 /// the SDK's message.
 /// </summary>

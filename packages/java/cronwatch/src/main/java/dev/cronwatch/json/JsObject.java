@@ -16,8 +16,8 @@ import org.jspecify.annotations.Nullable;
  * JavaScript object does.
  *
  * <p>Values are what {@link Json} reads and writes: {@code null}, a {@link Boolean}, a {@link
- * Number}, a {@link String}, a {@link List} of values or a {@code JsObject}. A definition, a
- * state's unknown keys and a stored alert are kept as these, so a field another writer added is
+ * Number}, a {@link String}, a {@link List} of values, or a {@code JsObject}. A definition, a
+ * state's unknown keys, and a stored alert are kept as these, so a field another writer added is
  * written back where it was.
  *
  * <p>Not safe for use from several threads at once without a lock of the caller's.

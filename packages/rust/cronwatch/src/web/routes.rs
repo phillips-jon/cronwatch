@@ -1,6 +1,6 @@
 //! The dashboard and its small JSON API (routes/index.ts), carried over
 //! from the Go port's `routes.go`: the same URLs, JSON, status codes,
-//! headers, cookie, redirects, cross-site rule and token rules as the SDK's
+//! headers, cookie, redirects, cross-site rule, and token rules as the SDK's
 //! routes, so `@cronwatch/mcp` works against a Rust app as it does against
 //! a Node one.
 
@@ -47,7 +47,7 @@ const COOKIE_MAX_AGE: u32 = 60 * 60 * 24 * 30;
 pub const DEFAULT_BASE_PATH: &str = "/cronwatch";
 
 // 'self' only for what the app shell needs: app.js (which registers the
-// service worker and the theme toggle), the manifest, the worker and the icons.
+// service worker and the theme toggle), the manifest, the worker, and the icons.
 // No inline script, and the pages work without any.
 const PAGE_CSP: &str = "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 const ASSET_CSP: &str = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'";
@@ -100,7 +100,7 @@ impl RoutesOptions {
     /// cookie is set. Without it the token is `CRONWATCH_TOKEN`; an empty
     /// string, or one of only whitespace, given here or in the variable,
     /// counts as unset. With no token in development
-    /// (`CRONWATCH_ENV`, `APP_ENV` or `RUST_ENV` naming it), the routes make
+    /// (`CRONWATCH_ENV`, `APP_ENV`, or `RUST_ENV` naming it), the routes make
     /// a random one and print a sign-in link to standard output on their
     /// first request; with no token otherwise they answer 503. `/api/check`
     /// also takes the client's cron secret as a bearer, so a platform cron
@@ -204,7 +204,7 @@ impl Client {
             _ => crate::env::secret_var("CRONWATCH_TOKEN").unwrap_or_default(),
         };
         // A handler cannot tell a local caller from a remote one (proxies,
-        // tunnels and a server listening on every interface all look alike),
+        // tunnels, and a server listening on every interface all look alike),
         // so development gets a token too: made here, and shown only in the
         // log.
         let generated = configured.is_empty() && !opted_out && environment() == "development";
@@ -588,7 +588,7 @@ impl Routes {
             let _ = writeln!(std::io::stdout().lock(), "{line}");
         }
 
-        // The app shell: the manifest, icons, service worker, app.js and the
+        // The app shell: the manifest, icons, service worker, app.js, and the
         // offline page. Served to anyone, since a browser fetches some of it
         // without cookies and none of it says anything about the jobs.
         if method == "GET" || method == "HEAD" {

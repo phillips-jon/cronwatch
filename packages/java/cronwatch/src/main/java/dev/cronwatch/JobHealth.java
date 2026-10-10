@@ -5,7 +5,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * How a job looks at a glance: the SDK's string, with constants for the values it knows. Silence
- * wins, then stuck, failing and late.
+ * wins, then stuck, failing, and late.
  */
 public final class JobHealth {
   /** Nothing is wrong. */

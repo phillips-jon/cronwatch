@@ -68,7 +68,7 @@ public class GoldenTests
         return builder.Build();
     }
 
-    /// <summary>Sends a capture through the test server with the target as sent, answering status, headers and body.</summary>
+    /// <summary>Sends a capture through the test server with the target as sent, answering status, headers, and body.</summary>
     private static async Task<(int Status, List<KeyValuePair<string, string>> Headers, byte[] Body)> ThroughTestServerAsync(TestServer server, Capture c, string target)
     {
         HttpContext context = await server.SendAsync(ctx =>

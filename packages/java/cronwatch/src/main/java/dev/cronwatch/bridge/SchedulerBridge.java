@@ -24,8 +24,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * What the scheduler integrations share ({@code @Scheduled} in the Spring Boot starter, {@code
- * cronwatch-quartz}), carried over from the Go, Rust and Elixir ports' bridge. An app does not need
- * it; a scheduler integration of the app's own can.
+ * cronwatch-quartz}), carried over from the Go, Rust, and Elixir ports' bridge. An app does not
+ * need it; a scheduler integration of the app's own can.
  *
  * <ul>
  *   <li>{@link Watch} declares a scheduler's entries as jobs, one per name, tagged with the
@@ -38,11 +38,11 @@ import org.jspecify.annotations.Nullable;
  * <p>Which jobs are this app's is told by two tags, the integration's ({@code quartz}) and the
  * app's under it ({@code quartz:<app>}, see {@link #appTag}), so two apps sharing one store never
  * declare each other's jobs without a schedule. That is the PHP port's rule for Laravel and
- * Symfony, as the Go, Rust and Elixir ports have it.
+ * Symfony, as the Go, Rust, and Elixir ports have it.
  *
  * <p>The package is for integration authors and is outside the 1.x promise: it changes when an
  * integration needs it to, in any minor release. The name matches the .NET port's {@code
- * SchedulerBridge}; {@link Bridge}, its name before 1.0, is a deprecated alias.
+ * SchedulerBridge}; {@link Bridge}, its name before 0.11, is a deprecated alias.
  */
 public final class SchedulerBridge {
   private static final Pattern NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._:-]{0,119}");
@@ -96,7 +96,7 @@ public final class SchedulerBridge {
 
   /**
    * The tag that names the app under an integration's tag: {@code <tag>:<app>}, the app's name
-   * lowercased, with anything but letters, digits, {@code .}, {@code _} and {@code -} made {@code
+   * lowercased, with anything but letters, digits, {@code .}, {@code _}, and {@code -} made {@code
    * -}. A name that is empty once cleaned, or longer than 48 characters, is cut and given 8 hex
    * characters of its MD5, so two names never share a tag. The PHP port's {@code appTag()},
    * character for character.
@@ -130,7 +130,7 @@ public final class SchedulerBridge {
     return tag + ":" + s;
   }
 
-  /** PHP's {@code trim()}: spaces, tabs, newlines, returns, NULs and vertical tabs. */
+  /** PHP's {@code trim()}: spaces, tabs, newlines, returns, NULs, and vertical tabs. */
   private static String trimPhp(String s) {
     int start = 0;
     int end = s.length();
@@ -171,7 +171,7 @@ public final class SchedulerBridge {
 
   /**
    * Whether {@code name} is a CronWatch job name: 1 to 120 letters, digits, {@code .}, {@code _},
-   * {@code :} or {@code -}, starting with a letter or digit.
+   * {@code :}, or {@code -}, starting with a letter or digit.
    */
   public static boolean validName(String name) {
     return NAME.matcher(name).matches();
@@ -208,7 +208,7 @@ public final class SchedulerBridge {
   /**
    * The options that declare a job again without its schedule: its description followed by {@code
    * (no longer scheduled)} ({@code A scheduled task} when it had none), its tags, grace, timeout,
-   * maxDuration, budget, floor and failuresBeforeAlert, as stored.
+   * maxDuration, budget, floor, and failuresBeforeAlert, as stored.
    */
   public static JobOptions unscheduled(Definition def) {
     String description = def.description();
@@ -354,7 +354,7 @@ public final class SchedulerBridge {
   public static final Duration SYNC_TIMEOUT = Duration.ofSeconds(30);
 
   /**
-   * Runs {@code sync} (an integration's declarations, {@link Watch#settle} and {@link
+   * Runs {@code sync} (an integration's declarations, {@link Watch#settle}, and {@link
    * Watch#unschedule}) on a thread of its own and waits at most {@code limit} for it, so a store
    * that hangs never holds the caller (a scheduler's thread) for good. A throw in it, or running
    * past the limit ({@code the sync took longer than 30 seconds; gave up}), is reported to the

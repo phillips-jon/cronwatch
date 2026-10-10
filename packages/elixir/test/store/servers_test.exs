@@ -13,7 +13,7 @@ defmodule Cronwatch.Store.SQLDialectTest do
     assert q.set_state =~ "VALUES ($1, $2::text::jsonb) ON CONFLICT (job)"
   end
 
-  test "MySQL's dialect is the PHP, Go and Rust ports'" do
+  test "MySQL's dialect is the PHP, Go, and Rust ports'" do
     s = SQL.schema(:mysql, "cw_")
     assert length(s) == 3
 
@@ -137,7 +137,7 @@ defmodule Cronwatch.Store.PostgresTest do
     {:ok, st} = EctoStore.get_state(h, "nul")
     assert st.consecutive_failures == 1, "the state, with its alert, was written too"
 
-    # So are a trigger, metric names and a definition's text.
+    # So are a trigger, metric names, and a definition's text.
     {:ok, _} =
       Cronwatch.job("nul2", description: "a\0b", tags: ["t\0"], budget: %{"c\0" => 5}, instance: cw)
 
@@ -351,7 +351,7 @@ defmodule Cronwatch.Store.MySQLDialectTests do
 
   # State rows a damaged or hand-edited row could hold in the LONGTEXT
   # column: text that is not JSON, JSON that is not an object, and objects
-  # whose version is not a number. A check, a silence and a second check
+  # whose version is not a number. A check, a silence, and a second check
   # answer with no error, and the silence replaces each row (it counts as
   # version 0, as on SQLite).
   @doc false

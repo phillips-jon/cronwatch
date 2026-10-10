@@ -307,7 +307,7 @@ var kept = []string{"tags", "grace", "timeout", "maxDuration", "budget", "floor"
 
 // Unscheduled is the options that declare a job again without its
 // schedule: its description with " (no longer scheduled)", its tags,
-// grace, timeout, maxDuration, budget, floor and failuresBeforeAlert.
+// grace, timeout, maxDuration, budget, floor, and failuresBeforeAlert.
 func Unscheduled(def cronwatch.Definition) []cronwatch.JobOption {
 	description := def.Description()
 	if description == "" {

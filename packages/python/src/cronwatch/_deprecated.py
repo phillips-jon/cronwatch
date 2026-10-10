@@ -1,4 +1,4 @@
-"""Names that were public by accident before 1.0, now internal. Each still
+"""Names that were public by accident before 0.11, now internal. Each still
 answers under its old name, warning with a DeprecationWarning, until 1.0
 removes it (see the docs' Deprecated section)."""
 

@@ -75,9 +75,9 @@ func TestRunDefinesOnFirstUseAndValidates(t *testing.T) {
 		name    string
 		want    string
 	}{
-		{nil, "bad name!", `job name "bad name!" must be 1 to 120 characters of letters, digits, ".", "_", ":" or "-"`},
+		{nil, "bad name!", `job name "bad name!" must be 1 to 120 characters of letters, digits, ".", "_", ":", or "-"`},
 		{[]cronwatch.JobOption{cronwatch.Schedule("nope")}, "x", `schedule "nope" is not a cron expression or "every <duration>": `},
-		{[]cronwatch.JobOption{cronwatch.Grace("soon")}, "x", `grace "soon" is not a duration like "15m", "1h30m" or "90s"`},
+		{[]cronwatch.JobOption{cronwatch.Grace("soon")}, "x", `grace "soon" is not a duration like "15m", "1h30m", or "90s"`},
 	} {
 		_, err := k.cw.Job(c.name, c.options...)
 		if err == nil || !strings.HasPrefix(err.Error(), c.want) {

@@ -251,7 +251,7 @@ module Cronwatch
   #
   # `triage` is the triage callable's diagnosis, or nil. A nil triage is one
   # of two things, as in the SDK: never tried (no "triage" key in the JSON),
-  # or tried and nothing came of it (it raised, timed out or answered empty;
+  # or tried and nothing came of it (it raised, timed out, or answered empty;
   # `"triage": null`, and `triage_tried?` is true). A tried alert is not
   # triaged again.
   Alert = Struct.new(:type, :run, :details, :job, :definition, :title, :message, :at, :triage, keyword_init: true) do
@@ -369,7 +369,7 @@ module Cronwatch
   #
   # from_h reads a state as stored, keeping each field as it came where it
   # has the wrong type (Evaluate.normalize_state then reads it leniently),
-  # so a foreign, hand-edited or damaged row is written back unchanged by a
+  # so a foreign, hand-edited, or damaged row is written back unchanged by a
   # read that changes nothing, and affects only its own job. A stored state
   # that is not a JSON object reads as none (nil).
   #
@@ -434,7 +434,7 @@ module Cronwatch
       %w[until alert].select { |key| read.key?(key) }.to_h { |key| [key, read[key]] }.merge(read)
     end
 
-    # pendingRecovery, undelivered and version are left out when unset, as in
+    # pendingRecovery, undelivered, and version are left out when unset, as in
     # state written before they existed. The version comes after them, where
     # the SDK's spread of a normalized state puts it, then `sending` and
     # `underFloor`, each only while it holds an entry.

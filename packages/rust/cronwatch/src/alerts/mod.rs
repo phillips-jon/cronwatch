@@ -1,7 +1,7 @@
-//! The SDK's alert channels, request for request: Slack, Discord and a
-//! signed webhook; the email providers Resend, Postmark, SendGrid, Mailgun
+//! The SDK's alert channels, request for request: Slack, Discord, and a
+//! signed webhook; the email providers Resend, Postmark, SendGrid, Mailgun,
 //! and SES (signed with SigV4, no AWS SDK); Twilio for SMS; and the trackers
-//! Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic. Each is made
+//! Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, and New Relic. Each is made
 //! from an options struct and returns a [`Channel`](crate::Channel) for
 //! [`ClientBuilder::alert`](crate::ClientBuilder::alert):
 //!
@@ -17,15 +17,15 @@
 //! # }
 //! ```
 //!
-//! Every request is the SDK's (the same URL, headers and body bytes, so a
+//! Every request is the SDK's (the same URL, headers, and body bytes, so a
 //! provider sees the same alert whichever port sent it) and made the way the
 //! SDK makes it: one ten second deadline for the whole request, a redirect
 //! refused rather than followed (its 3xx is a failure, so credentials never go
 //! where it points), at most 1 MiB of an answer read, TLS verified, and an
 //! error that names the provider and the URL's origin only, with every secret
 //! the channel holds cut out of any answer it quotes. Ids are deterministic
-//! (the first 32 hex characters of SHA-256 over job, type and time), so
-//! Resend's idempotency key, Sentry's event id and Rollbar's UUID let a
+//! (the first 32 hex characters of SHA-256 over job, type, and time), so
+//! Resend's idempotency key, Sentry's event id, and Rollbar's UUID let a
 //! provider drop an alert it already took.
 //!
 //! Each options struct is `#[non_exhaustive]`, so a release can add an
@@ -104,7 +104,7 @@ pub use {
 /// The most SMS segments a Twilio message may use.
 #[cfg(feature = "alerts")]
 #[doc(hidden)]
-#[deprecated(note = "internal, outside the 1.x promise; no longer public from 1.0")]
+#[deprecated(note = "internal, outside the 1.x promise; no longer public from 0.11")]
 pub const MAX_SEGMENTS: u32 = twilio::SEGMENTS_MAX;
 
 /// Builder methods for an options struct, one per field, named after it, and

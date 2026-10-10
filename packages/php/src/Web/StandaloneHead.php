@@ -7,7 +7,7 @@ namespace Cronwatch\Web;
 /**
  * The head of a dashboard page served as a site of its own, as the SDK's
  * routes serve it: the web app manifest, the icons, app.js (the one script,
- * which registers the service worker and toggles the theme, Pwa) and the stylesheet inline.
+ * which registers the service worker and toggles the theme, Pwa) , and the stylesheet inline.
  * A host that shows the dashboard inside its own pages and loads a page's
  * assets its own way gives Dashboard a `head` instead, and this is not used.
  *

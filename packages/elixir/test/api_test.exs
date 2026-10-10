@@ -74,7 +74,7 @@ defmodule Cronwatch.APITest do
     end
   end
 
-  # Functions that were public by accident before 1.0: deprecated, still
+  # Functions that were public by accident before 0.11: deprecated, still
   # working, and removed in 1.0. The rest of @hidden_functions are called
   # across the package's modules, so they stay, hidden and internal.
   @removed_in_1_0 [

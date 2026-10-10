@@ -1,11 +1,11 @@
 defmodule Cronwatch.Alerts.Email do
   @moduledoc """
   What every email channel sends (`alerts/email.ts`): one subject, a plain
-  text body and a small HTML body, so an alert reads the same whichever
+  text body, and a small HTML body, so an alert reads the same whichever
   provider carries it.
 
   The email channels (`Cronwatch.Alerts.Resend`, `Postmark`, `SendGrid`,
-  `Mailgun` and `SES`) take these options, beside their own, either at the
+  `Mailgun`, and `SES`) take these options, beside their own, either at the
   top level or under `email:`:
 
     * `:from` (required): the sender, `"alerts@example.com"` or

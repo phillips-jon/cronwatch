@@ -1,7 +1,7 @@
 package cronwatch
 
 // conformance/format.json: alert titles and messages, numbers as
-// toLocaleString writes them, the output cap, stored definitions and
+// toLocaleString writes them, the output cap, stored definitions, and
 // expect rules.
 
 import (

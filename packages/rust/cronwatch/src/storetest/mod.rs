@@ -1,5 +1,5 @@
 //! The test every CronWatch store passes: the memory store, and
-//! `cronwatch-sqlx` on SQLite, Postgres, MySQL and MariaDB. It is the SDK's
+//! `cronwatch-sqlx` on SQLite, Postgres, MySQL, and MariaDB. It is the SDK's
 //! store-conformance.ts, step for step. Run it against a store of your own,
 //! from a test on a tokio runtime (`#[tokio::test]`):
 //!
@@ -12,7 +12,7 @@
 //!
 //! It panics, as a test's assertion does, at the first thing the store gets
 //! wrong. [`run`] is the one promised name here; the fixture helpers this
-//! module had before 1.0 are deprecated and go at 1.0.
+//! module had before 0.11 are deprecated and go at 1.0.
 #![allow(deprecated)]
 
 #[doc(hidden)]

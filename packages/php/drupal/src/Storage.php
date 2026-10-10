@@ -15,7 +15,7 @@ use Drupal\Core\Site\Settings;
 /**
  * The store in the site's own database.
  *
- * The library's MySQL (and MariaDB), Postgres or SQLite store, made from the
+ * The library's MySQL (and MariaDB), Postgres, or SQLite store, made from the
  * connection settings.php describes ($databases['default']['default'], or
  * the key named by $settings['cronwatch_database']), through a PDO
  * connection of its own. So CronWatch's writes never join a transaction
@@ -23,7 +23,7 @@ use Drupal\Core\Site\Settings;
  * tables are the library's, byte for byte, as every port writes them.
  *
  * The tables are the site's table prefix and "cronwatch_" (cronwatch_jobs,
- * cronwatch_runs and cronwatch_state on a site without a prefix), made on
+ * cronwatch_runs, and cronwatch_state on a site without a prefix), made on
  * install with the library's CREATE text and dropped on uninstall.
  */
 final class Storage {
@@ -82,17 +82,17 @@ final class Storage {
   }
 
   /**
-   * The PDO DSN, credentials and attributes for a connection.
+   * The PDO DSN, credentials, and attributes for a connection.
    *
    * @return array{string, string, ?string, ?string, array<int, mixed>}
-   *   The kind (mysql, pgsql or sqlite), the DSN, user, password and
+   *   The kind (mysql, pgsql, or sqlite), the DSN, user, password, and
    *   attributes.
    */
   public static function connection(array $info): array {
     $driver = (string) ($info['driver'] ?? '');
     $kind = self::DRIVERS[$driver] ?? NULL;
     if ($kind === NULL) {
-      throw new \RuntimeException("CronWatch keeps its tables in MySQL, MariaDB, Postgres or SQLite; this site's database driver is {$driver}. Point \$settings['cronwatch_database'] at another connection in settings.php.");
+      throw new \RuntimeException("CronWatch keeps its tables in MySQL, MariaDB, Postgres, or SQLite; this site's database driver is {$driver}. Point \$settings['cronwatch_database'] at another connection in settings.php.");
     }
     if ($kind === 'sqlite') {
       $path = (string) ($info['database'] ?? '');

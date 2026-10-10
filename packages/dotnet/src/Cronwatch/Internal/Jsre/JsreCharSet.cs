@@ -239,7 +239,7 @@ internal sealed class JsreCharSet : IJsreCharTest, IEquatable<JsreCharSet>
     /// <summary><c>\d</c>.</summary>
     public static readonly int[] Digit = ['0', '9'];
 
-    /// <summary><c>\w</c>: ASCII letters, digits and underscore, whatever the flags.</summary>
+    /// <summary><c>\w</c>: ASCII letters, digits, and underscore, whatever the flags.</summary>
     public static readonly int[] Word = ['0', '9', 'A', 'Z', '_', '_', 'a', 'z'];
 
     /// <summary>JavaScript's <c>\s</c>: WhiteSpace and LineTerminator.</summary>

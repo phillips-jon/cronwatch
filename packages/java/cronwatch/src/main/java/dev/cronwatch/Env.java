@@ -8,7 +8,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * The environment, read in one place, when used. The SDK reads {@code NODE_ENV}; Java has no
  * convention of its own, so CronWatch's own variable comes first, then {@code APP_ENV}, as the Go,
- * PHP, Rust and Elixir ports read them.
+ * PHP, Rust, and Elixir ports read them.
  */
 final class Env {
   /** Where the client's own warnings and default error handler write. */
@@ -20,7 +20,7 @@ final class Env {
 
   /**
    * The environment's name, lowercased, or {@code ""} when no variable names one. {@code
-   * development}, {@code dev}, {@code local}, {@code test} and {@code testing} count as {@code
+   * development}, {@code dev}, {@code local}, {@code test}, and {@code testing} count as {@code
    * development} and {@code prod} as {@code production}. An unset environment is not development,
    * which is the safe reading.
    */
@@ -38,7 +38,7 @@ final class Env {
 
   /**
    * {@link #environment(String)} over {@code getenv}: the first of {@code CRONWATCH_ENV}, {@code
-   * APP_ENV} and {@code fallback} whose value, trimmed as JavaScript trims, is not empty.
+   * APP_ENV}, and {@code fallback} whose value, trimmed as JavaScript trims, is not empty.
    */
   static String environment(UnaryOperator<@Nullable String> getenv, @Nullable String fallback) {
     for (String name : VARIABLES) {

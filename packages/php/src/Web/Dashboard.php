@@ -13,7 +13,7 @@ use Cronwatch\Js;
 
 /**
  * The dashboard and the small JSON API: the SDK's routes (routes/index.ts)
- * with the same URLs, JSON, auth, CSRF rules, headers and pages, byte for
+ * with the same URLs, JSON, auth, CSRF rules, headers, and pages, byte for
  * byte, so @cronwatch/mcp works against a PHP app as it does against a Node one.
  *
  * One core takes a Request and returns a Response (handle). Around it:
@@ -35,7 +35,7 @@ use Cronwatch\Js;
  *             every PHP request after it asks for the same one, and writes a sign-in link to
  *             the server log (error_log) when it makes it; with no token otherwise it answers
  *             503. Pass null to opt out and serve it open everywhere, for example behind your
- *             own auth, as in the SDK (false does the same, deprecated since 1.0; in 0.x null
+ *             own auth, as in the SDK (false does the same, deprecated since 0.11; before 0.11 null
  *             read CRONWATCH_TOKEN, which the default, FromEnv::Read, now does). /api/check
  *             also accepts the client's cronSecret as a bearer, for a platform cron.
  * basePath:   where the routes are mounted, so links resolve. Default: the script, for a
@@ -49,9 +49,9 @@ use Cronwatch\Js;
  *             precedence over trustProxy.
  * head:       for a host that shows the dashboard inside its own pages and loads their assets its
  *             own way: given the base path, it returns the HTML each page's head carries in
- *             place of the manifest, the icons, app.js and the inline stylesheet (Html::CSS is
+ *             place of the manifest, the icons, app.js, and the inline stylesheet (Html::CSS is
  *             the stylesheet, for the host to serve as a file). The app shell's manifest,
- *             service worker, app.js and offline page are then not served, since no page asks
+ *             service worker, app.js, and offline page are then not served, since no page asks
  *             for them; the icons still are. Default null: the pages are the SDK's.
  * empty:      HTML the board shows while there are no jobs, in place of how to declare one, for a
  *             host whose jobs come from elsewhere (the WordPress plugin's, from WP-Cron). Written
@@ -79,7 +79,7 @@ final class Dashboard
 
     /**
      * 'self' only for what the app shell needs: app.js (which registers the
-     * service worker and nothing else), the manifest, the worker and the
+     * service worker and nothing else), the manifest, the worker, and the
      * icons. No inline script, and the pages work without any.
      */
     public const CSP = "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
@@ -108,7 +108,7 @@ final class Dashboard
 
     /**
      * @param string|FromEnv|false|null $token the dashboard's token; the default (FromEnv::Read) reads CRONWATCH_TOKEN, as ""
-     *        or only whitespace does, and null serves it open (false does the same, deprecated since 1.0 and removed in
+     *        or only whitespace does, and null serves it open (false does the same, deprecated since 0.11 and removed in
      *        2.0); anything else (true, a number) throws a TypeError
      * @param callable(string): void|null $log where the development sign-in line goes; default error_log()
      * @param string|null $developmentTokenFile where a development token is kept between requests; default in the system's temporary directory (DevelopmentToken)
@@ -141,7 +141,7 @@ final class Dashboard
         $this->head = $head === null ? null : \Closure::fromCallable($head);
         $this->empty = $empty;
         // A request handler cannot tell a local caller from a remote one
-        // (proxies, tunnels and a server bound to every interface all look
+        // (proxies, tunnels, and a server bound to every interface all look
         // alike), so development gets a token too: made on the first request,
         // and shown only in the server log.
         $this->generated = $configured === null && !$this->optedOut && Env::isDevelopment();
@@ -298,7 +298,7 @@ final class Dashboard
             }
         }
 
-        // The app shell: the manifest, icons, service worker, app.js and the
+        // The app shell: the manifest, icons, service worker, app.js, and the
         // offline page. Served to anyone, since a browser fetches some of it
         // without cookies and none of it says anything about the jobs. Under a
         // head of the host's only the icons are, as nothing else is asked for.

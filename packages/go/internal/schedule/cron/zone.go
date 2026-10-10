@@ -75,7 +75,7 @@ func loadZone(name string) (*time.Location, error) {
 	return nil, bad
 }
 
-// fixedOffset reads "+HH", "+HHMM" or "+HH:MM" (or "-"), as Intl reads an
+// fixedOffset reads "+HH", "+HHMM", or "+HH:MM" (or "-"), as Intl reads an
 // offset time zone.
 func fixedOffset(name string) (*time.Location, bool) {
 	if len(name) < 3 || (name[0] != '+' && name[0] != '-') {

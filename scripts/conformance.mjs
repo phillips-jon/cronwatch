@@ -1,6 +1,6 @@
 /**
  * Writes conformance/*.json: cases produced by running the TypeScript SDK,
- * which every port (Ruby, Python, PHP, Go, Rust, Elixir, Java and .NET)
+ * which every port (Ruby, Python, PHP, Go, Rust, Elixir, Java, and .NET)
  * replays in its own tests to prove it behaves the same. A behaviour change
  * lands in TypeScript first, these files are regenerated, and the ports are
  * fixed until they pass. The files are test material that holds the ports
@@ -1040,7 +1040,7 @@ function healthCases() {
     { job: "j", open: { failed: 1 }, consecutiveFailures: 2, silencedUntil: null, lastAlertAt: 5 },
     { job: "j", open: {}, consecutiveFailures: 0, silencedUntil: 99, lastAlertAt: null, pendingRecovery: ["missed"] },
     { job: "j", open: { stuck: 7, slow: 8 }, consecutiveFailures: 1, silencedUntil: null, lastAlertAt: 6, pendingRecovery: ["missed", "failed"], undelivered: [] },
-    // A foreign, hand-edited or damaged state: what is not an object reads
+    // A foreign, hand-edited, or damaged state: what is not an object reads
     // as none, and each field of the wrong shape as its empty value, keeping
     // what is well formed (see normalizeState).
     5,
@@ -1567,7 +1567,7 @@ async function storeCases() {
     foreignVersion.push({ stored, counts, steps });
   }
   // nul: Postgres refuses U+0000 in TEXT and JSONB, so every store writes
-  // text without it: a run's trigger, output, error and metric names, and
+  // text without it: a run's trigger, output, error, and metric names, and
   // every key and string of a definition and a state. The six characters
   // "\u0000" (a backslash, then u0000) are text like any other, and stay.
   const literal = "\\u0000";
@@ -1622,7 +1622,7 @@ async function storeCases() {
 }
 
 /**
- * foreignRows: rows a foreign, hand-edited or damaged writer could leave,
+ * foreignRows: rows a foreign, hand-edited, or damaged writer could leave,
  * with each column's value as SQLite holds it (a JSON string is TEXT, a
  * number INTEGER or REAL, null NULL), read leniently so that one row affects
  * only its own job. `rows` gives each row and what reading it gives: a job
@@ -1633,7 +1633,7 @@ async function storeCases() {
  * client that declares nothing checks at `now`, then silences the job whose
  * state does not parse, then reads every page: the jobs it reports through
  * onError (by name; every other job is checked as usual), the alerts sent,
- * each job's health, the states as stored afterwards and each page's status.
+ * each job's health, the states as stored afterwards, and each page's status.
  */
 async function foreignRowCases() {
   const def = (name, extra = {}) => JSON.stringify({ name, ...extra });
@@ -1801,9 +1801,9 @@ async function runIdCases() {
  * not know is left alone. An unknown open condition is shown in the
  * summary and holds back the recovered message until the release that
  * knows it closes it. The seed is what another process wrote; then a
- * process that does not declare the job checks, silences and unsilences it,
+ * process that does not declare the job checks, silences, and unsilences it,
  * reads its summary, and finally declares it and finishes a run. After each
- * step: the stored job, state and runs, the alerts sent and anything
+ * step: the stored job, state, and runs, the alerts sent, and anything
  * reported to onError. The stored definition is the declaring process's own
  * once it declares the job (the last step): a declaration replaces the
  * definition, as it always does.
@@ -1947,8 +1947,8 @@ async function channelCases() {
 // A channel posts to its URL as fetch reads it, and the ports that carry
 // their own WHATWG URL reader replay these through it, with Node's new URL
 // as the oracle. Every ASCII code point, and a few past it, is put in the
-// user name, the password, the host, the path, the query and the fragment,
-// beside the host, port and dot-segment forms fetch reads its own way. A
+// user name, the password, the host, the path, the query, and the fragment,
+// beside the host, port, and dot-segment forms fetch reads its own way. A
 // special URL is `url` (the href without its user name and password), with
 // `username` and `password` as WHATWG encodes them; `other` is the scheme of
 // any other URL; `invalid` is text that is no URL. No host outside ASCII is
@@ -2256,7 +2256,7 @@ async function triageCases() {
 // The HTTP request the official Anthropic client makes for a triage, for a
 // port that speaks to the Messages API without that client: its URL, method,
 // the headers that carry meaning (the client's own user-agent and
-// x-stainless-* telemetry are left out) and the body, byte for byte.
+// x-stainless-* telemetry are left out), and the body, byte for byte.
 async function triageWire(contexts, optionSets) {
   const { default: Anthropic } = await import("@anthropic-ai/sdk");
   const kept = ["accept", "anthropic-beta", "anthropic-version", "content-type", "x-api-key"];

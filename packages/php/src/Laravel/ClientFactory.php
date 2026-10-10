@@ -19,7 +19,7 @@ use Illuminate\Contracts\Container\Container;
 
 /**
  * The client, from config/cronwatch.php: the store, the alert channels,
- * triage and the client's options. The service provider binds the client
+ * triage, and the client's options. The service provider binds the client
  * this makes as a singleton; an app that wants to build its own binds
  * Cronwatch\Cronwatch again in its own service provider's register().
  */
@@ -70,7 +70,7 @@ final class ClientFactory
      * The store config/cronwatch.php names. `ignoreCreateTables` gives the
      * store itself, for the migration, even when create_tables is off.
      * The table prefix and create_tables are read through Settings, which
-     * still takes their pre-1.0 keys under `store`.
+     * still takes their pre-0.11 keys under `store`.
      */
     public function store(bool $ignoreCreateTables = false): Store
     {
@@ -82,7 +82,7 @@ final class ClientFactory
             'database' => DatabaseStore::make($this->app->make('db'), is_string($config['connection'] ?? null) && $config['connection'] !== '' ? $config['connection'] : null, $prefix),
             'sqlite' => new SqliteStore(is_string($config['path'] ?? null) && $config['path'] !== '' ? $config['path'] : self::storagePath('cronwatch/cronwatch.db'), prefix: $prefix),
             'memory' => new MemoryStore(),
-            default => throw new \InvalidArgumentException("cronwatch.store.driver must be database, sqlite or memory, not {$driver}"),
+            default => throw new \InvalidArgumentException("cronwatch.store.driver must be database, sqlite, or memory, not {$driver}"),
         };
         if (!$ignoreCreateTables && !Settings::createTables($settings) && !$store instanceof MemoryStore) {
             return new Migrated($store);

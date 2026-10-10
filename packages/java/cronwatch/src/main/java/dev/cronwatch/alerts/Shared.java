@@ -70,7 +70,7 @@ final class Shared {
   }
 
   /**
-   * A stable 32 hex character id for one alert: the same job, type and time always give the same
+   * A stable 32 hex character id for one alert: the same job, type, and time always give the same
    * id, so a provider that deduplicates on it drops a resend of an alert it already took.
    */
   static String alertId(Alert a) {
@@ -137,7 +137,7 @@ final class Shared {
     return out == null ? "" : out;
   }
 
-  /** The title, message, triage and link as one plain text block, the way every channel reads. */
+  /** The title, message, triage, and link as one plain text block, the way every channel reads. */
   static String plainText(Alert a, String link) {
     List<String> lines = new ArrayList<>(List.of(a.title(), "", a.message()));
     if (!triage(a).isEmpty()) {

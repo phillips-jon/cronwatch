@@ -230,8 +230,8 @@ final class PgCronSource implements Source {
 
   /**
    * The options of a declared or stored definition that can be declared again, without its
-   * schedule, in the SDK's order: description, tags, grace, timeout, maxDuration, budget, floor and
-   * failuresBeforeAlert.
+   * schedule, in the SDK's order: description, tags, grace, timeout, maxDuration, budget, floor,
+   * and failuresBeforeAlert.
    */
   private static JobOptions unscheduled(Definition definition) {
     JobOptions out = JobOptions.builder();
@@ -413,7 +413,7 @@ final class PgCronSource implements Source {
       }
     }
 
-    // A name this source used for a job that has since been renamed, unscheduled or dropped from
+    // A name this source used for a job that has since been renamed, unscheduled, or dropped from
     // the jobs picked.
     Set<String> inUse = new HashSet<>(names.values());
     retired.removeAll(inUse);
@@ -446,7 +446,7 @@ final class PgCronSource implements Source {
     List<Alert> alerts = new ArrayList<>();
     // The names a run may be recorded under: this sync's, and those the client declares now, after
     // the retires above. A run copied under a retired name that was then forgotten (the
-    // dashboard's forget) has no job to go to: it is let go, never recorded and never read again.
+    // dashboard's forget) has no job to go to: it is let go, never recorded, and never read again.
     Set<String> recordable = new HashSet<>(inUse);
     for (Definition d : host.definedJobs()) {
       recordable.add(d.name());

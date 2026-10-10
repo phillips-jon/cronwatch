@@ -6,7 +6,7 @@ namespace Cronwatch.Tests;
 /// <summary>
 /// Cron expressions for the parity check and the properties: valid and not, nicknames, names,
 /// ranges, steps, lists, L, W, LW, #, ?, +, six and seven fields. The generator is the Go, Python,
-/// PHP, Rust and Java ports', over SplitMix64, so a seed gives the same expressions in every port.
+/// PHP, Rust, and Java ports', over SplitMix64, so a seed gives the same expressions in every port.
 /// </summary>
 internal sealed class CronFuzzer(ulong seed)
 {
@@ -22,7 +22,7 @@ internal sealed class CronFuzzer(ulong seed)
 
     private ulong _state = seed;
 
-    /// <summary>SplitMix64: small, seeded and the same on every platform.</summary>
+    /// <summary>SplitMix64: small, seeded, and the same on every platform.</summary>
     public ulong Next()
     {
         _state += 0x9e3779b97f4a7c15UL;

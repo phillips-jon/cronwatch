@@ -13,9 +13,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * What the rest of the module needs of the client that its public API does not offer: for the
  * dashboard and a job's handler ({@code dev.cronwatch.web}), a silence of any number of
- * milliseconds, the environment as the client reads it, the cron secret's opt-out and a run whose
+ * milliseconds, the environment as the client reads it, the cron secret's opt-out, and a run whose
  * throw is handed back rather than thrown; for the bridge, a job's definition before it is
- * declared, the store once it is ready, a stored expect rule and a job's tags. {@code Cronwatch}
+ * declared, the store once it is ready, a stored expect rule, and a job's tags. {@code Cronwatch}
  * installs the client's side when its class is initialized, which it is before any client or job
  * exists to pass here, and only that first installation counts.
  */

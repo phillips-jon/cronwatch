@@ -8,9 +8,9 @@ defmodule Cronwatch.Cron do
   # (Cronwatch.Cron.Date, internal), habits included: a day the month does not have
   # rolls over, a wall-clock time in a spring-forward gap moves forward by the
   # gap, and a time that happens twice is the earlier one. The names and the
-  # order of every step follow croner's source, as the Go, Python, PHP and Rust
+  # order of every step follow croner's source, as the Go, Python, PHP, and Rust
   # ports do, so they agree on every expression they read, every one they
-  # refuse and every fire time.
+  # refuse, and every fire time.
   #
   # Two answers are the SDK's rather than croner's, as every port's are:
   #

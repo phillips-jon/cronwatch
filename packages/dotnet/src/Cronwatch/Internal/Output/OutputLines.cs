@@ -5,7 +5,7 @@ namespace Cronwatch.Internal;
 
 /// <summary>
 /// The lines half of <c>createRecorder</c> in the SDK's <c>job.ts</c>: what a run logs, what it
-/// stores as its output and what its expect rule is checked against. Safe to share, since a job
+/// stores as its output, and what its expect rule is checked against. Safe to share, since a job
 /// may log from threads of its own.
 /// </summary>
 internal sealed class OutputLines

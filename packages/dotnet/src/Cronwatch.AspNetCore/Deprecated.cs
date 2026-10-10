@@ -9,12 +9,12 @@ using Microsoft.AspNetCore.Routing;
 namespace Cronwatch.AspNetCore;
 
 /// <summary>
-/// The former class of <c>MapCronwatch</c>, <c>UseCronwatch</c> and <c>MapCronwatchHandler</c>,
+/// The former class of <c>MapCronwatch</c>, <c>UseCronwatch</c>, and <c>MapCronwatchHandler</c>,
 /// which are in <c>Microsoft.AspNetCore.Builder</c> now (<see cref="CronwatchAspNetCoreExtensions"/>),
 /// as <c>MapHealthChecks</c> is, so they need no <c>using</c>. These are plain static methods, not
 /// extensions, so they never make a call ambiguous.
 /// </summary>
-[Obsolete("MapCronwatch, UseCronwatch and MapCronwatchHandler are in Microsoft.AspNetCore.Builder now; call them as app.MapCronwatch(...). This class still works through 1.x and goes in 2.0.")]
+[Obsolete("MapCronwatch, UseCronwatch, and MapCronwatchHandler are in Microsoft.AspNetCore.Builder now; call them as app.MapCronwatch(...). This class still works through 1.x and goes in 2.0.")]
 public static class CronwatchAspNetCore
 {
     /// <summary><c>endpoints.MapCronwatch(pattern, options)</c>.</summary>

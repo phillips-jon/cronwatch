@@ -6,6 +6,20 @@ use crate::js::{self, Value};
 use crate::schedule::format_duration;
 use crate::types::{Alert, AlertDetails, AlertType, Definition};
 
+/// format.ts `andList`: words joined as an English list, with a serial
+/// comma from three on: `a`, `a and b`, `a, b, and c`.
+pub(crate) fn and_list<S: AsRef<str>>(words: &[S]) -> String {
+    match words {
+        [] => String::new(),
+        [one] => one.as_ref().to_string(),
+        [a, b] => format!("{} and {}", a.as_ref(), b.as_ref()),
+        [rest @ .., last] => {
+            let head: Vec<&str> = rest.iter().map(AsRef::as_ref).collect();
+            format!("{}, and {}", head.join(", "), last.as_ref())
+        }
+    }
+}
+
 /// evaluate.ts `formatNumber`: a whole number grouped in thousands
 /// (`1,234`), anything else rounded to at most four decimals (`0.0123`), as
 /// `Intl.NumberFormat("en-US")` writes them. ICU starts from the shortest
@@ -277,7 +291,7 @@ pub(crate) fn compose_alert(draft: AlertDraft, def: &Definition, now: i64) -> Al
             format!("{name} is no longer scheduled")
         }
         (AlertType::Recovered, AlertDetails::Recovered { after, .. }) => {
-            let after = after.iter().map(|c| c.as_str().replacen('_', " ", 1)).collect::<Vec<_>>().join(", ");
+            let after = and_list(&after.iter().map(|c| c.as_str().replacen('_', " ", 1)).collect::<Vec<_>>());
             let at = run.map_or("just now".to_string(), |r| when_int(r.started_at, now));
             let mut line = format!("A run {at} succeeded");
             if !after.is_empty() {

@@ -14,7 +14,7 @@
 //	s.Start()
 //	cw.StartChecking(time.Minute) // checks for missed and stuck runs
 //
-// The watcher's Option adds gocron's BeforeJobRuns, AfterJobRuns, AfterJobRunsWithError
+// The watcher's Option adds gocron's BeforeJobRuns, AfterJobRuns, AfterJobRunsWithError,
 // and AfterJobRunsWithPanic listeners to every job (WithGlobalJobOptions):
 // a run starts when gocron is about to run the job and ends with its
 // outcome, an error failing it. A panic fails the run and then carries on
@@ -41,11 +41,11 @@
 //
 // A job's definition is read from Job.Schedule() (gocron 2.21 or newer) and
 // converted where it maps exactly (see Convert): a cron job, a duration
-// job, and daily, weekly and monthly jobs of an interval of 1. Anything
+// job, and daily, weekly, and monthly jobs of an interval of 1. Anything
 // else is watched without a schedule and reported once. The zone is the
 // scheduler's (gocron.WithLocation), read from a job's next run once the
 // scheduler has started, else Options.Location, else time.Local, gocron's
-// default. A job added, updated or removed later is followed: added or
+// default. A job added, updated, or removed later is followed: added or
 // updated at once, removed at the next sync (the next run of a job not
 // declared yet, or Sync), when its job is declared again without its
 // schedule so it is never reported missed.
@@ -377,7 +377,7 @@ type PanicError struct{ Value any }
 
 func (p PanicError) Error() string { return fmt.Sprint(p.Value) }
 
-// Panic is PanicError, under its name before 1.0.
+// Panic is PanicError, under its name before 0.11.
 //
 // Deprecated: Use PanicError, which follows Go's naming for error types.
 // Panic goes in 1.0.

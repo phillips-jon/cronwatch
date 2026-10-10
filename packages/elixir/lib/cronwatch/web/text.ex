@@ -2,7 +2,7 @@ defmodule Cronwatch.Web.Text do
   @moduledoc false
   # What the dashboard's pages need to write values the way the SDK's
   # templates do (routes/escape.ts and JavaScript itself): escapeHtml,
-  # escapeName, String(value), toFixed, Math.round and encodeURIComponent,
+  # escapeName, String(value), toFixed, Math.round, and encodeURIComponent;
   # and how a header's bytes are read and a secret compared. Carried over
   # from the Rust port's web/text.rs.
 
@@ -35,7 +35,7 @@ defmodule Cronwatch.Web.Text do
   @doc """
   `escapeName`: a job name shown as text, with `<wbr>` after each run of
   `_ : . / -` that something else follows, so a long name wraps at its
-  separators. Only for text, never an attribute, a URL or a title.
+  separators. Only for text, never an attribute, a URL, or a title.
   """
   @spec escape_name(String.t()) :: String.t()
   def escape_name(s), do: s |> escape_html() |> wbr([]) |> IO.iodata_to_binary()

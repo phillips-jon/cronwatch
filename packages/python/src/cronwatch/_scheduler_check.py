@@ -53,7 +53,7 @@ Runs = Callable[[int, "int | None"], list[int]]
 
 
 class ScheduleError(ValueError):
-    """A schedule that cannot be read, found or converted exactly."""
+    """A schedule that cannot be read, found, or converted exactly."""
 
 
 class NeverFires(Exception):

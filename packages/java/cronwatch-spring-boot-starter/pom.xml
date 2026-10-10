@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   dev.cronwatch:cronwatch-spring-boot-starter: auto-configuration for Spring
-  Boot 3.5 and 4. Spring, ShedLock and Quartz are optional: the app's own
-  versions are the ones that run. -Dspring-boot.version=, -Dshedlock.version=
+  Boot 3.5 and 4. Spring, ShedLock, and Quartz are optional: the app's own
+  versions are the ones that run. -Dspring-boot.version=, -Dshedlock.version=,
   and -Dquartz.version= pick the ones the tests run against (the
   java-frameworks CI job runs the oldest and the newest).
 
@@ -180,7 +180,7 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
           <compilerArgs combine.children="append">
-            <!-- Spring, ShedLock and Quartz are automatic modules the API names. -->
+            <!-- Spring, ShedLock, and Quartz are automatic modules the API names. -->
             <arg>-Xlint:-requires-transitive-automatic</arg>
             <!-- The auto-configurations name Spring's types, which every app of the starter has. -->
             <arg>-Xlint:-exports</arg>

@@ -11,9 +11,9 @@ namespace Cronwatch.Tests;
 
 /// <summary>
 /// <c>conformance/store.json</c>'s <c>foreignRows</c> on SQLite: rows another writer left (a
-/// definition, metrics or state that is not JSON or not an object, times stored as text, a queued
+/// definition, metrics, or state that is not JSON or not an object, times stored as text, a queued
 /// alert of the wrong shape) are each read leniently, and affect only their own job: a check, a
-/// silence and every page over all of them at once report only the jobs whose definitions cannot
+/// silence, and every page over all of them at once report only the jobs whose definitions cannot
 /// be read, and answer as the SDK does.
 /// </summary>
 public class ForeignRowsTests

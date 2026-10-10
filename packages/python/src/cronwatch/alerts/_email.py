@@ -1,6 +1,6 @@
 """What every email channel sends: one subject, a plain text body and a small
 HTML body, so an alert reads the same whichever provider carries it
-(alerts/email.ts). Resend, Postmark, SendGrid, Mailgun and SES each take the
+(alerts/email.ts). Resend, Postmark, SendGrid, Mailgun, and SES each take the
 same options:
 
     from_:          the sender, "alerts@example.com" or "CronWatch <alerts@example.com>"

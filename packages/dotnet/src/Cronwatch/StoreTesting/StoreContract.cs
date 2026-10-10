@@ -13,7 +13,7 @@ namespace Cronwatch.StoreTesting;
 /// public Task MyStorePassesTheContract() => StoreContract.RunAsync(new MyStore(EmptyDatabase()));
 /// </code>
 /// It throws a <see cref="StoreContractException"/> at the first thing the store gets wrong, and
-/// depends on no test framework. See <see cref="StoreReplay"/> for the SDK's recorded cases.
+/// depends on no test framework. <see cref="RunAsync"/> is the kit's one promise through 1.x.
 /// </summary>
 public static class StoreContract
 {
@@ -182,7 +182,7 @@ public static class StoreContract
             + "\"details\":{\"consecutiveFailures\":1,\"threshold\":1},\"job\":\"a\",\"definition\":{\"name\":\"a\"},"
             + "\"title\":\"a failed\",\"message\":\"boom\",\"at\":7}}]}";
         await Must("setState", () => store.SetStateAsync(State(full))).ConfigureAwait(false);
-        SameJson("pendingRecovery, undelivered and sending round-trip", JsonOf(await Get("getState", () => store.GetStateAsync("a")).ConfigureAwait(false)), full);
+        SameJson("pendingRecovery, undelivered, and sending round-trip", JsonOf(await Get("getState", () => store.GetStateAsync("a")).ConfigureAwait(false)), full);
         await Must("setState", () => store.SetStateAsync(State(plain))).ConfigureAwait(false);
 
         // compareAndSetState writes only over the version it was told to expect.

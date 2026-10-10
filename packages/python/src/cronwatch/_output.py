@@ -223,7 +223,7 @@ SECRET_PATTERNS: list[tuple[re.Pattern[str], _Replacement]] = [
         ),
         _keep_first,
     ),
-    # Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI and Google style keys.
+    # Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI, and Google style keys.
     (re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b", _FLAGS), _whole),
     (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{30,255}|github_pat_[A-Za-z0-9_]{20,255})\b", _FLAGS), _whole),
     (re.compile(r"\bxox[abposr]-[A-Za-z0-9-]{10,255}", _FLAGS), _whole),
@@ -259,8 +259,8 @@ def _from_units(text: str) -> str:
 def redact_secrets(text: str) -> str:
     """The default ``redact``: blanks values that look like secrets (key=value
     pairs with secret-ish names, Authorization headers, URL credentials, bearer
-    tokens, JWTs, PEM private keys, webhook URLs and well-known token formats)
-    before output or an error is stored, shown or sent anywhere. Matches
+    tokens, JWTs, PEM private keys, webhook URLs, and well-known token formats)
+    before output or an error is stored, shown, or sent anywhere. Matches
     exactly what the SDK's redactSecrets matches."""
     astral = not text.isascii() and any(ord(c) > 0xFFFF for c in text)
     out = _to_units(text) if astral else text

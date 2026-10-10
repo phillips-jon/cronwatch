@@ -551,7 +551,7 @@ class Cronwatch:
 
     """The client.
 
-    store:    where jobs, runs and state live. Defaults to an in-memory store that forgets on restart.
+    store:    where jobs, runs, and state live. Defaults to an in-memory store that forgets on restart.
     alerts:   where alerts go: channels (see cronwatch.alerts). Defaults to the console.
     triage:   a function taking a TriageContext and returning a short diagnosis, added to every alert but recoveries.
     sources:  where runs this process does not wrap come from. Each is synced at the start of every
@@ -560,8 +560,8 @@ class Cronwatch:
               (routes()). Defaults to $CRON_SECRET; "" or only whitespace, given or in the variable, counts as
               unset; None for none. Anything else (False, a number) raises TypeError.
     retention: how long finished runs are kept. Default "30d".
-    defaults: grace, timeout, timezone and failures_before_alert applied to every job unless it sets its own.
-    redact:   applied to every run's output and error before it is stored, shown or sent. The default
+    defaults: grace, timeout, timezone, and failures_before_alert applied to every job unless it sets its own.
+    redact:   applied to every run's output and error before it is stored, shown, or sent. The default
               (output.redact_secrets) blanks values that look like secrets. Pass your own function, or
               False to keep output exactly as logged. A function that raises or returns something other
               than a str is reported to on_error ("redact") and the default is used.
@@ -652,7 +652,7 @@ class Cronwatch:
         Options: schedule, timezone, grace, timeout, max_duration, budget,
         floor, expect, failures_before_alert, description, tags."""
         if not isinstance(name, str) or not NAME_RE.fullmatch(name):
-            raise ValueError(f'job name "{name}" must be 1 to 120 characters of letters, digits, ".", "_", ":" or "-"')
+            raise ValueError(f'job name "{name}" must be 1 to 120 characters of letters, digits, ".", "_", ":", or "-"')
         definition = self._build_definition(name, options)
         self._validate_definition(definition)
         with self._registry:
@@ -755,7 +755,7 @@ class Cronwatch:
     def check(self) -> CheckResult:
         """Look for missed and stuck runs across every job, send alerts, retry
         alerts no channel accepted, and prune old runs. Call it from start_checking(), a
-        scheduled task or by hand. Concurrent calls share one check."""
+        scheduled task, or by hand. Concurrent calls share one check."""
         self._after_fork_check()
         with self._check_lock:
             flight = self._checking
@@ -843,7 +843,7 @@ class Cronwatch:
     def routes(self, **options: Any) -> Any:
         """The dashboard and JSON API for this client: a cronwatch.web.Web, which
         is a WSGI app, with the same routes as an ASGI app in its .asgi. Takes
-        token, base_path, origin and trust_proxy (see cronwatch.web)."""
+        token, base_path, origin, and trust_proxy (see cronwatch.web)."""
         from .web import Web
 
         return Web._for(self, **options)
@@ -899,7 +899,7 @@ class Cronwatch:
 
     def close(self) -> None:
         """Stop the interval, wait for a check already under way (bounded by
-        its own channel, triage and retry timeouts; what it raises was
+        its own channel, triage, and retry timeouts; what it raises was
         reported to whoever started it), then close the store, so that check
         neither writes after the store is closed nor loses the alerts it
         would queue. The interval's thread is waited for too, so a tick that
@@ -921,7 +921,7 @@ class Cronwatch:
     # ------------------------------------------------------------ internals
 
     def _reset_process_state(self) -> None:
-        """Locks, the check in flight, the interval thread and the channel and
+        """Locks, the check in flight, the interval thread, and the channel and
         triage threads belong to one process. A forked child starts with fresh ones."""
         self._pid = os.getpid()
         self._locks = {}
@@ -1021,7 +1021,7 @@ class Cronwatch:
                     )
         expect = definition.expect
         if expect is not None and not isinstance(expect, (str, re.Pattern)) and not callable(expect):
-            raise ValueError(f'job "{name}": expect must be a string, a RegExp or a function')
+            raise ValueError(f'job "{name}": expect must be a string, a RegExp, or a function')
 
     def _ensure_ready(self) -> None:
         if self._ready:
@@ -1162,7 +1162,7 @@ class Cronwatch:
         return True
 
     def _patch_state(self, name: str, change: Callable[[JobState], None]) -> JobState:
-        """Read, change and write one job's state, in turn with every other update to it."""
+        """Read, change, and write one job's state, in turn with every other update to it."""
         self._ensure_ready()
 
         def apply(current: JobState) -> tuple[JobState, None]:
@@ -1506,7 +1506,7 @@ class Cronwatch:
 
     def _finish_run(self, definition: JobDefinition, run: Run, at: int) -> list[Alert]:
         """Evaluate a finished run (ok, failed, or timed out by a check), already
-        written, against the job's state and send what that produces. The
+        written, against the job's state, and send what that produces. The
         alerts are written with that state (see _outbox()). Never raises."""
         past: list[list[Run]] = []
 
@@ -1780,7 +1780,7 @@ class Cronwatch:
 
     def _add_triage(self, alert: Alert, timeout: float) -> None:
         """Sets the alert's triage to the diagnosis, or to None (JSON null) when
-        there is none (it raised, timed out or answered None or ""), so it is
+        there is none (it raised, timed out, or answered None or ""), so it is
         tried once per alert. While a triage that timed out is still going,
         alerts go out without one rather than start another beside it."""
         signal = AbortSignal()

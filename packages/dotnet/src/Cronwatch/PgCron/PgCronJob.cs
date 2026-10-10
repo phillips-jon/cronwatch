@@ -1,8 +1,8 @@
 namespace Cronwatch.PgCron;
 
 /// <summary>
-/// A row of <c>cron.job</c>, as <see cref="PgCronOptions.Pick"/>, <see cref="PgCronOptions.JobName"/>
-/// and <see cref="PgCronOptions.OptionsFor"/> are given it.
+/// A row of <c>cron.job</c>, as <see cref="PgCronOptions.Pick"/>,
+/// <see cref="PgCronOptions.JobName"/>, and <see cref="PgCronOptions.OptionsFor"/> are given it.
 /// </summary>
 /// <param name="JobId">The job's id.</param>
 /// <param name="JobName">Its name, or null for a job scheduled without one.</param>
@@ -17,7 +17,7 @@ public sealed record PgCronJob(long JobId, string? JobName, string Schedule, str
 /// <param name="JobId">Its job's id.</param>
 /// <param name="Status">
 /// pg_cron's status: <c>starting</c>, <c>running</c>, <c>sending</c>, <c>connecting</c>,
-/// <c>succeeded</c> or <c>failed</c>.
+/// <c>succeeded</c>, or <c>failed</c>.
 /// </param>
 /// <param name="ReturnMessage">What the command answered, or its error.</param>
 /// <param name="StartTime">

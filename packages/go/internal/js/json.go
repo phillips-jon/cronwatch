@@ -11,7 +11,7 @@ import (
 	"unicode/utf8"
 )
 
-// A JSON value is nil (null), a bool, a float64, a string, a []any or an
+// A JSON value is nil (null), a bool, a float64, a string, a []any, or an
 // *Object. Stringify also takes whole numbers of Go's integer types and
 // anything with a JSValue method.
 

@@ -1,5 +1,5 @@
 defmodule Cronwatch.Audit.StoresTest do
-  # The stores pass of the audit: JSON, the pattern engine and the stores.
+  # The stores pass of the audit: JSON, the pattern engine, and the stores.
   use ExUnit.Case, async: true
 
   alias Cronwatch.JS

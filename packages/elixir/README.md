@@ -1,8 +1,8 @@
 # cronwatch for Elixir
 
-Cron and scheduled-job monitoring that lives inside your Elixir service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget or quietly does nothing. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
+Cron and scheduled-job monitoring that lives inside your Elixir service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow, goes over budget, or quietly does nothing. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
 
-This is the Elixir port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so an Elixir process and a Node, Ruby, Python, PHP, Go, Rust, Java or .NET process can share one database, and every port reads the tables the others write. It has jobs, runs, runs that span calls, checks, silences and telemetry; the memory store and a SQL store over Ecto on SQLite, Postgres, MySQL and MariaDB; the pg_cron source, the fifteen alert channels and Claude triage; the dashboard and a job's handler, as Plugs; the Oban and Quantum integrations; and a crontab's check. [DESIGN.md](https://github.com/cronwatchdev/cronwatch/blob/main/packages/elixir/DESIGN.md) has how each part works.
+This is the Elixir port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text, and the same stored rows, so an Elixir process and a Node, Ruby, Python, PHP, Go, Rust, Java, or .NET process can share one database, and every port reads the tables the others write. It has jobs, runs, runs that span calls, checks, silences, and telemetry; the memory store and a SQL store over Ecto on SQLite, Postgres, MySQL, and MariaDB; the pg_cron source, the fifteen alert channels, and Claude triage; the dashboard and a job's handler, as Plugs; the Oban and Quantum integrations; and a crontab's check. [DESIGN.md](https://github.com/cronwatchdev/cronwatch/blob/main/packages/elixir/DESIGN.md) has how each part works.
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
@@ -45,14 +45,14 @@ and a job's function is run as a recorded run, in the calling process:
 Cronwatch.run("nightly-report", fn job ->
   path = MyApp.Reports.build()                 # Cronwatch.cancelled?(job) turns true at the timeout
   Cronwatch.log(job, "Report written: #{path}") # kept with the run, shown in alerts
-  Cronwatch.metric(job, "cost", 1.2)            # watched against budgets, floors and baselines
+  Cronwatch.metric(job, "cost", 1.2)            # watched against budgets, floors, and baselines
   {:ok, path}
 end)
 ```
 
-A raise, throw, exit, `{:error, reason}` or `:error` fails the run and is handed back as it came, so your supervisor or queue sees exactly what it would have without CronWatch. A binary the function returns, or `{:ok, binary}`, is the run's output when nothing was logged, and what `expect` checks. A process killed while running a job has its run recorded as failed at once. `isolate: true` runs the function in a task of the instance instead, and with `kill_at_timeout: true` it is stopped at the job's timeout and recorded as timed out. `Cronwatch.current/0` (and `log/1`, `metric/2`) find the run from the calling process, or from the process that started it, so a `Task` inside a job logs to it.
+A raise, throw, exit, `{:error, reason}`, or `:error` fails the run and is handed back as it came, so your supervisor or queue sees exactly what it would have without CronWatch. A binary the function returns, or `{:ok, binary}`, is the run's output when nothing was logged, and what `expect` checks. A process killed while running a job has its run recorded as failed at once. `isolate: true` runs the function in a task of the instance instead, and with `kill_at_timeout: true` it is stopped at the job's timeout and recorded as timed out. `Cronwatch.current/0` (and `log/1`, `metric/2`) find the run from the calling process, or from the process that started it, so a `Task` inside a job logs to it.
 
-The checks look for missed and stuck runs, retry alerts no channel accepted and prune old runs. `check_every` runs them on an interval; leave it out where another process checks, and call `Cronwatch.check/1` from there:
+The checks look for missed and stuck runs, retry alerts no channel accepted, and prune old runs. `check_every` runs them on an interval; leave it out where another process checks, and call `Cronwatch.check/1` from there:
 
 ```elixir
 {:ok, result} = Cronwatch.check()
@@ -88,7 +88,7 @@ The `use` is what 1.x promises; the functions `Cronwatch.StoreCase` had besides 
 
 ### Alerts and triage
 
-The SDK's channels, request for request: `Cronwatch.Alerts.Slack`, `Discord`, `Webhook` (signed), `Resend`, `Postmark`, `SendGrid`, `Mailgun`, `SES`, `Twilio`, `Sentry`, `Honeybadger`, `Datadog`, `Rollbar`, `Bugsnag` and `NewRelic`, each given as `{module, opts}` with the SDK's options in snake_case, checked when the instance starts:
+The SDK's channels, request for request: `Cronwatch.Alerts.Slack`, `Discord`, `Webhook` (signed), `Resend`, `Postmark`, `SendGrid`, `Mailgun`, `SES`, `Twilio`, `Sentry`, `Honeybadger`, `Datadog`, `Rollbar`, `Bugsnag`, and `NewRelic`, each given as `{module, opts}` with the SDK's options in snake_case, checked when the instance starts:
 
 ```elixir
 alerts: [
@@ -106,7 +106,7 @@ The webhook posts the alert with `"schema": 1` as its first field, the payload e
 
 ### pg_cron
 
-`{Cronwatch.Sources.PgCron, repo: MyApp.Repo}` in the instance's `sources:` records the runs of pg_cron jobs inside a Postgres database, as the SDK's source does; `jobs:`, `job_ids:` or `pick:` choose which.
+`{Cronwatch.Sources.PgCron, repo: MyApp.Repo}` in the instance's `sources:` records the runs of pg_cron jobs inside a Postgres database, as the SDK's source does; `jobs:`, `job_ids:`, or `pick:` choose which.
 
 ### The dashboard
 
@@ -159,7 +159,7 @@ A retry is a new run, so failing attempts open one failed alert and the one that
 
 ### Quantum
 
-`Cronwatch.Quantum` watches a Quantum 3.5 scheduler the same way: every active job is a job (named after its name), each run is a run through Quantum's telemetry, schedules are checked against the crontab package's fire times, and jobs added, deleted or deactivated at run time are followed.
+`Cronwatch.Quantum` watches a Quantum 3.5 scheduler the same way: every active job is a job (named after its name), each run is a run through Quantum's telemetry, schedules are checked against the crontab package's fire times, and jobs added, deleted, or deactivated at run time are followed.
 
 ```elixir
 integrations: [{Cronwatch.Quantum, scheduler: MyApp.Scheduler, jobs: [nightly_report: [grace: "15m"]]}]
@@ -176,11 +176,11 @@ config :my_app, MyApp.Scheduler,
 
 ### A crontab
 
-A script a crontab runs needs no integration: a release's two lines are `bin/my_app eval "MyApp.Nightly.main()"` (which starts the instance and runs the job with `Cronwatch.run/3`) and `bin/my_app eval "Cronwatch.Release.check(MyApp.Cronwatch)"`, which starts the store's repo and an instance with the options under `config :my_app, MyApp.Cronwatch`, runs one check, prints what it did and exits non-zero when it fails. From source, `mix cronwatch.check MyApp.Cronwatch` does the same. `examples/crontab` in the repository is that program on SQLite.
+A script a crontab runs needs no integration: a release's two lines are `bin/my_app eval "MyApp.Nightly.main()"` (which starts the instance and runs the job with `Cronwatch.run/3`) and `bin/my_app eval "Cronwatch.Release.check(MyApp.Cronwatch)"`, which starts the store's repo and an instance with the options under `config :my_app, MyApp.Cronwatch`, runs one check, prints what it did, and exits non-zero when it fails. From source, `mix cronwatch.check MyApp.Cronwatch` does the same. `examples/crontab` in the repository is that program on SQLite.
 
 ### Telemetry
 
-`[:cronwatch, :run, :start | :stop | :exception]`, `[:cronwatch, :check, ...]`, `[:cronwatch, :alert, :sent | :failed | :queued | :dropped]` and `[:cronwatch, :error]`; see `Cronwatch.Telemetry`. During a run, Logger metadata carries `cronwatch_job` and `cronwatch_run`.
+`[:cronwatch, :run, :start | :stop | :exception]`, `[:cronwatch, :check, ...]`, `[:cronwatch, :alert, :sent | :failed | :queued | :dropped]`, and `[:cronwatch, :error]`; see `Cronwatch.Telemetry`. During a run, Logger metadata carries `cronwatch_job` and `cronwatch_run`.
 
 ## Testing this package
 
@@ -194,7 +194,7 @@ mix credo --strict
 mix dialyzer
 ```
 
-The tests replay the repository's `conformance/` fixtures and the dashboard's (`packages/ruby/test/web/golden.json`, straight into the plug, through a `Plug.Router` under Bandit and through a Phoenix endpoint), check the croner port against croner itself in Node (3,000 expressions), and share a SQLite file with the SDK; the last two need `npm run build` at the root first, and skip, saying so, without it. The store's server tests and the pg_cron source's run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` hold URLs (`postgres://postgres:pw@127.0.0.1:5432/cw`, `mysql://root:pw@127.0.0.1:3306/cw`), and skip without them. `CRONWATCH_TEST_ELIXIR=1 npm test --workspace packages/mcp`, from the root, drives the MCP server against `webserver/`, a seeded dashboard served by Bandit (`CRONWATCH_MIX` names another `mix`, such as `"$HOME/.local/elixir/floor mix"`).
+The tests replay the repository's `conformance/` fixtures and the dashboard's (`packages/ruby/test/web/golden.json`, straight into the plug, through a `Plug.Router` under Bandit, and through a Phoenix endpoint), check the croner port against croner itself in Node (3,000 expressions), and share a SQLite file with the SDK; the last two need `npm run build` at the root first, and skip, saying so, without it. The store's server tests and the pg_cron source's run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB`, and `CRONWATCH_TEST_PGCRON` hold URLs (`postgres://postgres:pw@127.0.0.1:5432/cw`, `mysql://root:pw@127.0.0.1:3306/cw`), and skip without them. `CRONWATCH_TEST_ELIXIR=1 npm test --workspace packages/mcp`, from the root, drives the MCP server against `webserver/`, a seeded dashboard served by Bandit (`CRONWATCH_MIX` names another `mix`, such as `"$HOME/.local/elixir/floor mix"`).
 
 The Oban tests run Oban on SQLite (its Lite engine), and on Postgres too when `CRONWATCH_TEST_PG` names one (`postgres://postgres:pw@127.0.0.1:5432/cw`); `CRONWATCH_PIN_OBAN` and `CRONWATCH_PIN_QUANTUM` pin the optional dependency to a release, for testing the oldest one claimed. `examples/crontab` has a test of its own (`mix test` there) that builds its release and runs the two crontab lines on one file.
 

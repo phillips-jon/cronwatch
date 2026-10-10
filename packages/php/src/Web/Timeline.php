@@ -6,6 +6,7 @@ namespace Cronwatch\Web;
 
 use Cronwatch\Duration;
 use Cronwatch\Evaluate;
+use Cronwatch\Format;
 use Cronwatch\JobSummary;
 use Cronwatch\Js;
 use Cronwatch\ParsedSchedule;
@@ -313,11 +314,11 @@ final class Timeline
         }
         if (self::isOpen($job, 'over_budget') && $last !== null) {
             $over = self::overCeilings($job);
-            return 'went over budget' . ($over !== [] ? ' on ' . implode(' and ', $over) : '') . ' at ' . self::when($last->startedAt, $now);
+            return 'went over budget' . ($over !== [] ? ' on ' . Format::andList($over) : '') . ' at ' . self::when($last->startedAt, $now);
         }
         if (self::isOpen($job, 'under_floor') && $last !== null) {
             $under = self::underFloors($job);
-            return 'fell short' . ($under !== [] ? ' on ' . implode(' and ', $under) : '') . ' at ' . self::when($last->startedAt, $now);
+            return 'fell short' . ($under !== [] ? ' on ' . Format::andList($under) : '') . ' at ' . self::when($last->startedAt, $now);
         }
         if (self::isOpen($job, 'slow') && $last?->durationMs !== null) {
             return 'slow: took ' . Duration::format($last->durationMs);
@@ -514,7 +515,7 @@ final class Timeline
             [$box('run ok'), 'ran'],
             [$box('run bad'), 'failed'],
             [$box('run timeout'), 'timed out'],
-            [$box('run warn'), 'over budget, under floor or slow'],
+            [$box('run warn'), 'over budget, under floor, or slow'],
             [$box('run running'), 'running'],
             [$box('missed'), 'missed'],
         ];

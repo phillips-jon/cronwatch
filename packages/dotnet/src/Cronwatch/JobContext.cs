@@ -7,7 +7,7 @@ namespace Cronwatch;
 
 /// <summary>
 /// The run a job's function is given, and <see cref="CronwatchClient.Current"/> inside it: its
-/// lines, its metrics and its token. Safe to use from any number of threads at once.
+/// lines, its metrics, and its token. Safe to use from any number of threads at once.
 /// </summary>
 public sealed class JobContext
 {

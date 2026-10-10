@@ -22,8 +22,8 @@ public static class CronwatchTelemetry
     /// <summary>Runs recorded, by job and status.</summary>
     internal static readonly Counter<long> Runs = Meter.CreateCounter<long>("cronwatch.runs", description: "Runs recorded, by job and status");
 
-    /// <summary>Alerts, by channel, type and outcome.</summary>
-    internal static readonly Counter<long> Alerts = Meter.CreateCounter<long>("cronwatch.alerts", description: "Alerts, by channel, type and outcome");
+    /// <summary>Alerts, by channel, type, and outcome.</summary>
+    internal static readonly Counter<long> Alerts = Meter.CreateCounter<long>("cronwatch.alerts", description: "Alerts, by channel, type, and outcome");
 
     /// <summary>Checks run.</summary>
     internal static readonly Counter<long> Checks = Meter.CreateCounter<long>("cronwatch.checks", description: "Checks run");
@@ -32,7 +32,7 @@ public static class CronwatchTelemetry
     internal static readonly Histogram<double> RunDuration = Meter.CreateHistogram<double>("cronwatch.run.duration", unit: "ms", description: "How long runs took");
 
     // An app's activity or meter listener runs inside these calls and may throw. What it throws
-    // is its own: it must not stop a run's function, leave a run running or replace what the
+    // is its own: it must not stop a run's function, leave a run running, or replace what the
     // function answered, so each call below drops it, as a failing log line is dropped.
 
     /// <summary>Starts an activity, or answers null when none is listened to or a listener throws.</summary>

@@ -150,7 +150,7 @@ public final class RunHandle implements AutoCloseable {
 
   /**
    * Appends the lines and metrics added so far to the stored run, which must still be running and
-   * belong to this job. A read, change and write of the run's row, written only while it is still
+   * belong to this job. A read, change, and write of the run's row, written only while it is still
    * running: two processes appending to one run at the same moment can lose one's lines, but a
    * flush never undoes a finish. Problems go to the error handler.
    */
@@ -276,7 +276,7 @@ public final class RunHandle implements AutoCloseable {
   }
 
   /**
-   * Finishes the run successfully (unless an expect rule says otherwise), judges it like any other
+   * Finishes the run successfully (unless an expect rule says otherwise), judges it like any other,
    * and sends what that produces. Returns the run as recorded, or null when nothing was recorded:
    * the run was already finished (here or elsewhere), was not found, or belongs to another job,
    * which is reported to the error handler. When several processes finish one run, only the one

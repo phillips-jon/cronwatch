@@ -1,5 +1,5 @@
 """The channels beside the conformance replay (which checks every request
-byte for byte), as the SDK's alerts.test.ts, channels-hardening.test.ts and
+byte for byte), as the SDK's alerts.test.ts, channels-hardening.test.ts, and
 sigv4.test.ts have them: SigV4 against the AWS test suite, SMS fitting, the
 options each channel refuses, failures that never name a secret, and the
 default urllib path against local sockets (no redirect followed, one

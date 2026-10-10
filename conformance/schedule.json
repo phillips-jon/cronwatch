@@ -232,7 +232,7 @@
     },
     {
       "schedule": "every banana",
-      "error": "schedule interval \"banana\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "schedule interval \"banana\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "schedule": "every ",
@@ -398,7 +398,7 @@
     },
     {
       "schedule": "every 1:30",
-      "error": "schedule interval \"1:30\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "schedule interval \"1:30\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "schedule": "0 0 30 2 *",

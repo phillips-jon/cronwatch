@@ -1,6 +1,6 @@
 //! CronWatch for [tokio-cron-scheduler](https://docs.rs/tokio-cron-scheduler):
 //! its jobs declared as CronWatch jobs with their schedules, and every run
-//! recorded, so a job that fails, runs late, never runs, gets stuck or runs
+//! recorded, so a job that fails, runs late, never runs, gets stuck, or runs
 //! slow is reported.
 //!
 //! tokio-cron-scheduler names a job only by a UUID and runs a closure that

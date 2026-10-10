@@ -606,7 +606,7 @@ class ClientTest < Minitest::Test
       { max_duration: "0s" } => /maxDuration must be longer than zero/,
       { schedule: "0 2 * * *", timezone: "Mars/Olympus" } => /timezone "Mars\/Olympus" is not an IANA timezone/,
       { schedule: " " } => /schedule must be a non-empty string/,
-      { expect: 42 } => /expect must be a string, a RegExp or a function/,
+      { expect: 42 } => /expect must be a string, a RegExp, or a function/,
     }.each do |options, pattern|
       assert_match pattern, assert_raises(ArgumentError, options.inspect) { cw.job("a", **options) }.message
     end
@@ -953,7 +953,7 @@ class ClientTest < Minitest::Test
     refute_match(/opaqueTOKEN/, bearer_output)
     assert_operator bearer_output.length, :<=, cap + "[earlier output trimmed]\n".length
 
-    # Errors, recorded runs and flushed lines the same way.
+    # Errors, recorded runs, and flushed lines the same way.
     assert_raises(RuntimeError) { cw.run("thrown") { raise "#{"e" * cap} #{bearer} #{"z" * (cap - 40)}" } }
     refute_match(/opaqueTOKEN/, cw.runs("thrown").first.error)
     cw.job("imported")

@@ -5,7 +5,7 @@ namespace Cronwatch;
 /// <summary>What kind of failure a <see cref="CronwatchException"/> is.</summary>
 public enum CronwatchErrorKind
 {
-    /// <summary>Something the SDK refuses: a bad option, schedule, zone or argument, with the SDK's message.</summary>
+    /// <summary>Something the SDK refuses: a bad option, schedule, zone, or argument, with the SDK's message.</summary>
     Invalid,
 
     /// <summary>The store failed; its own exception is the <see cref="Exception.InnerException"/>.</summary>
@@ -35,7 +35,7 @@ public sealed class CronwatchException : Exception
     {
     }
 
-    /// <summary>An error of this kind, message and cause.</summary>
+    /// <summary>An error of this kind, message, and cause.</summary>
     public CronwatchException(CronwatchErrorKind kind, string message, Exception? innerException = null)
         : base(message, innerException)
     {

@@ -30,7 +30,7 @@ func escapeValue(v any) string {
 
 // escapeName is escapeName: a job name shown as text, with <wbr> after each
 // run of _ : . / - that something else follows, so a long name wraps at its
-// separators. Only for text, never an attribute, a URL or a title.
+// separators. Only for text, never an attribute, a URL, or a title.
 func escapeName(s string) string {
 	text := escapeHTML(s)
 	isSep := func(c byte) bool { return c == '_' || c == ':' || c == '.' || c == '/' || c == '-' }

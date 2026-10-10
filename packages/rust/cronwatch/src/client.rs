@@ -1,6 +1,6 @@
 //! The client (client.ts): jobs, runs, state updates. Evaluation is in
 //! evaluate.rs as pure functions; everything with a side effect is here and
-//! in run.rs, handle.rs, check.rs and deliver.rs.
+//! in run.rs, handle.rs, check.rs, and deliver.rs.
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -94,7 +94,7 @@ impl Default for ClientBuilder {
 }
 
 impl ClientBuilder {
-    /// Where jobs, runs and state live. The default is a [`MemoryStore`],
+    /// Where jobs, runs, and state live. The default is a [`MemoryStore`],
     /// which forgets on restart.
     pub fn store(mut self, store: impl Store) -> Self {
         self.store = Some(Arc::new(store));
@@ -161,7 +161,7 @@ impl ClientBuilder {
         self
     }
 
-    /// Grace, timeout, timezone and failures before alert for every job that
+    /// Grace, timeout, timezone, and failures before alert for every job that
     /// does not set its own. [`build`](Self::build) refuses any other option.
     pub fn defaults(mut self, defaults: JobOptions) -> Self {
         self.defaults = Some(defaults);
@@ -169,7 +169,7 @@ impl ClientBuilder {
     }
 
     /// Replaces the default redaction ([`redact_secrets`](crate::redact_secrets))
-    /// of every run's output and error before it is stored, shown or sent
+    /// of every run's output and error before it is stored, shown, or sent
     /// anywhere. A redact function that panics is reported to the error
     /// handler and the default is used.
     pub fn redact(mut self, redact: impl Fn(&str) -> String + Send + Sync + 'static) -> Self {
@@ -226,7 +226,7 @@ impl ClientBuilder {
                 .or_else(|| options.expect.is_some().then(|| "expect".to_string()));
             if let Some(key) = refused {
                 return Err(Error::Invalid(format!(
-                    "defaults takes grace, timeout, timezone and failuresBeforeAlert, not {key}"
+                    "defaults takes grace, timeout, timezone, and failuresBeforeAlert, not {key}"
                 )));
             }
             defaults = options.fields;
@@ -352,7 +352,7 @@ impl Client {
         ClientBuilder::default()
     }
 
-    /// Where this client keeps jobs, runs and state.
+    /// Where this client keeps jobs, runs, and state.
     pub fn store(&self) -> &Arc<dyn Store> {
         &self.inner.store
     }
@@ -401,7 +401,7 @@ impl Client {
     pub fn job(&self, name: &str, options: JobOptions) -> Result<Job, Error> {
         if !valid_name(name) {
             return Err(Error::Invalid(format!(
-                "job name {} must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\" or \"-\"",
+                "job name {} must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\", or \"-\"",
                 js::quote(name)
             )));
         }
@@ -640,7 +640,7 @@ impl Client {
     }
 
     /// Stops the interval [`start_checking`](Self::start_checking) began, waits for a check
-    /// already under way (bounded by its own channel, triage and retry
+    /// already under way (bounded by its own channel, triage, and retry
     /// timeouts; what it fails with was given to whoever started it), then
     /// closes the store, so that check neither writes after the store is
     /// closed nor loses the alerts it would queue.

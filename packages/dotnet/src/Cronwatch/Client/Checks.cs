@@ -7,7 +7,7 @@ using Cronwatch.Internal;
 
 namespace Cronwatch;
 
-/// <summary>Checks, the reads the dashboard makes, silences and the interval.</summary>
+/// <summary>Checks, the reads the dashboard makes, silences, and the interval.</summary>
 public sealed partial class CronwatchClient
 {
     private const long PruneIntervalMs = 60 * 60_000;
@@ -18,7 +18,7 @@ public sealed partial class CronwatchClient
     private TaskCompletionSource<CheckResult>? _checking;
 
     /// <summary>
-    /// Set in the check's own flow, which reaches a source's sync, a channel's send and the error
+    /// Set in the check's own flow, which reaches a source's sync, a channel's send, and the error
     /// handler, so a dispose called from there does not wait for the check it is part of.
     /// </summary>
     private readonly AsyncLocal<bool> _inCheck = new();
@@ -65,8 +65,8 @@ public sealed partial class CronwatchClient
 
     /// <summary>
     /// Waits for the check in flight to end, as the SDK's <c>close()</c> awaits it, so it never
-    /// writes to a store already disposed. Not from the check's own flow (a source, a channel or an
-    /// error handler that disposes the client), which would wait for good.
+    /// writes to a store already disposed. Not from the check's own flow (a source, a channel, or
+    /// an error handler that disposes the client), which would wait for good.
     /// </summary>
     private async Task AwaitCheckAsync()
     {
@@ -137,7 +137,7 @@ public sealed partial class CronwatchClient
             }
         }
 
-        // Each job on its own: one that cannot be evaluated is reported, shown as failing and does
+        // Each job on its own: one that cannot be evaluated is reported, shown as failing, and does
         // not stop the others.
         var jobs = new List<JobSummary>();
         var budget = new RetryBudget();

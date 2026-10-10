@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   Not published: the dashboard's golden replay (the seed of
-  packages/ruby/test/web/golden.mjs, the captures and their comparison) and
+  packages/ruby/test/web/golden.mjs, the captures, and their comparison) and
   a raw HTTP/1.1 client, which the core's replay and every adapter's tests
   share, with the replay through the JDK's own server as its own tests.
   A module of its own rather than the core's tests jar, so a build that

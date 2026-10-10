@@ -19,9 +19,9 @@ functions.
     result = await cw.check()
 
 It is the synchronous client underneath (``cw.sync``), with every store read
-and write, alert and triage done in a worker thread (asyncio.to_thread), so
+and write, alert, and triage done in a worker thread (asyncio.to_thread), so
 the event loop is never held up by the store or a channel, and async and sync
-code in one process share jobs, locks and state. The job's own coroutine runs
+code in one process share jobs, locks, and state. The job's own coroutine runs
 in the caller's task, where ``cronwatch.current()`` is its context. A plain
 function passed to ``run()`` runs in a worker thread too. ``start_checking()`` checks
 in a daemon thread, as the synchronous client's does.
@@ -49,7 +49,7 @@ __all__ = ["AsyncCronwatch", "AsyncJobHandle", "AsyncRunHandle"]
 
 
 class AsyncRunHandle:
-    """RunHandle with flush(), finish() and fail() as coroutines. log() and
+    """RunHandle with flush(), finish(), and fail() as coroutines. log() and
     metric() only add to the handle, so they stay plain calls."""
 
     def __init__(self, handle: RunHandle) -> None:

@@ -14,13 +14,13 @@ internal enum SqlDialect
     /// <summary>Postgres, as the SDK's <c>postgres()</c> store writes it.</summary>
     Postgres,
 
-    /// <summary>MySQL 8.0.13 or newer and MariaDB 10.6 or newer, the PHP, Go, Rust, Elixir and Java ports' dialect.</summary>
+    /// <summary>MySQL 8.0.13 or newer and MariaDB 10.6 or newer, the PHP, Go, Rust, Elixir, and Java ports' dialect.</summary>
     MySql,
 }
 
 /// <summary>
 /// The schema and statements of the SDK's <c>stores/sql.ts</c>, text for text, so a .NET process
-/// shares a database with a Node, Ruby, Python, PHP, Go, Rust, Elixir or Java one and
+/// shares a database with a Node, Ruby, Python, PHP, Go, Rust, Elixir, or Java one and
 /// <c>sqlite_master</c> reads the same whoever made the tables. <c>sql.ts</c> writes its
 /// statements with <c>?</c> and numbers them <c>$1</c>, <c>$2</c> for Postgres. Microsoft.Data.Sqlite
 /// binds by name only, so on SQLite they are numbered in SQLite's own form, <c>?1</c>, <c>?2</c>;
@@ -52,7 +52,7 @@ internal static class SqlText
         {
             throw new ArgumentException(
                 "cronwatch: invalid table prefix " + JsonText.Quote(prefix)
-                + ". Use lowercase letters, digits and underscores, not starting with a digit, at most "
+                + ". Use lowercase letters, digits, and underscores, not starting with a digit, at most "
                 + MaxPrefix.ToString(CultureInfo.InvariantCulture) + " characters.");
         }
         return prefix;
@@ -77,7 +77,7 @@ internal static class SqlText
     }
 
     /// <summary>
-    /// MySQL's tables (the PHP, Go, Rust, Elixir and Java ports'): <c>VARCHAR(255)</c> keys,
+    /// MySQL's tables (the PHP, Go, Rust, Elixir, and Java ports'): <c>VARCHAR(255)</c> keys,
     /// <c>BIGINT</c> times, <c>LONGTEXT</c> JSON holding the SDK's bytes (never MySQL's <c>JSON</c>
     /// type, which would rewrite them), <c>utf8mb4_bin</c> so names compare and sort by byte,
     /// <c>seq</c> for insertion order, and a plain index where the others have a partial one.

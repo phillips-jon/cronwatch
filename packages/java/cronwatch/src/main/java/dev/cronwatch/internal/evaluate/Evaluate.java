@@ -515,7 +515,7 @@ public final class Evaluate {
 
   /**
    * {@code Number(text)} for trimmed, non-empty text: decimal, {@code Infinity}, and the {@code
-   * 0x}, {@code 0o} and {@code 0b} integer forms; anything else is NaN.
+   * 0x}, {@code 0o}, and {@code 0b} integer forms; anything else is NaN.
    */
   static double stringToNumber(String text) {
     double sign = 1;
@@ -596,7 +596,7 @@ public final class Evaluate {
   }
 
   /**
-   * Called when a run finishes with status ok, failed or timeout. {@code history} is the job's
+   * Called when a run finishes with status ok, failed, or timeout. {@code history} is the job's
    * earlier runs, newest first, not including this one.
    */
   public static Evaluation onRunFinish(
@@ -840,7 +840,7 @@ public final class Evaluate {
     return openedAt == null || openedAt != alert.at();
   }
 
-  /** How a job looks at a glance. Silence wins, then stuck, failing and late. */
+  /** How a job looks at a glance. Silence wins, then stuck, failing, and late. */
   public static JobHealth jobHealth(
       Definition def, @Nullable Run lastRun, JobState state, long now) {
     List<Condition> open = openConditions(state);

@@ -31,7 +31,7 @@ test("by default the request URL's origin is the origin, as before", async () =>
   assert.doesNotMatch(signIn.headers.get("set-cookie")!, /Secure/);
 });
 
-test("origin replaces the request URL's origin for writes, sign-in and redirects", async () => {
+test("origin replaces the request URL's origin for writes, sign-in, and redirects", async () => {
   const { cw, c, send, cookie, form } = app({ origin: "https://app.example.com/ignored/path" });
   await cw.run("x", async () => {});
   const internal = await send("POST", "/cronwatch/jobs/x/silence", { ...cookie, ...form, origin: "http://10.0.0.5:8080" }, "for=1h");

@@ -11,10 +11,10 @@ use Cronwatch\Web\Response;
  * The dashboard served inside a CMS's admin (Drupal's, Craft's control
  * panel), where every page is one route of the host's and the dashboard's
  * path rides in a query parameter: `.../cronwatch/view?cw=/jobs/nightly`.
- * The host's router, its sign-in and its permissions stand in front of it.
+ * The host's router, its sign-in, and its permissions stand in front of it.
  *
  * The dashboard is given a marker as its base path, so every link, form
- * action and redirect it makes starts with the marker; rewrite() turns each
+ * action, and redirect it makes starts with the marker; rewrite() turns each
  * into the host's URL for that path (the host adds its CSRF token to a
  * form's action, or a hidden field to the form), leaves out the app shell
  * (the manifest and app.js, which registers a service worker: the admin is
@@ -33,7 +33,7 @@ final class EmbeddedDashboard
     /**
      * The dashboard's request for the page at `path` (the host's `cw`
      * parameter), from the request the host is answering: its method,
-     * headers, body and origin, and its query without the host's own keys.
+     * headers, body, origin, and its query without the host's own keys.
      * The Authorization header is left out: the host's sign-in and
      * permissions stand in front of the dashboard, which is open, so a
      * bearer the caller sends is not the dashboard's, and must not let a GET
@@ -68,7 +68,7 @@ final class EmbeddedDashboard
     }
 
     /**
-     * The dashboard's answer made to live in the host: links, forms and
+     * The dashboard's answer made to live in the host: links, forms, and
      * redirects under the marker point where `url` says, forms carry what
      * `action` adds to their URL and the `fields` given (hidden inputs,
      * already HTML), the app shell is left out, and the host may frame it.

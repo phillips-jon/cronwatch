@@ -48,7 +48,7 @@ public sealed class ResendChannel : IChannel
     private readonly ITransport? _transport;
 
     /// <summary>The channel.</summary>
-    /// <exception cref="CronwatchException">Without an API key, a sender or a recipient.</exception>
+    /// <exception cref="CronwatchException">Without an API key, a sender, or a recipient.</exception>
     public ResendChannel(ResendOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);

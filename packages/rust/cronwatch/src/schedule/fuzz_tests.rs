@@ -4,7 +4,7 @@
 //! saving, from times around the clock changes) answered by the SDK in Node
 //! (tests/testdata/schedule_fuzz.mjs, which imports packages/sdk/dist) and
 //! by this module, which must agree on every error message and every fire
-//! time. Seeded, so a failure repeats; the generator is the Go, Python and
+//! time. Seeded, so a failure repeats; the generator is the Go, Python, and
 //! PHP ports', over a random source of its own.
 
 use std::path::Path;
@@ -29,7 +29,7 @@ const DAYS: [&str; 7] = ["sun", "MON", "Tue", "wed", "thu", "fri", "sat"];
 const NICKNAMES: [&str; 10] =
     ["@yearly", "@annually", "@monthly", "@weekly", "@daily", "@midnight", "@hourly", "@HOURLY", "@reboot", "@every"];
 
-/// SplitMix64: small, seeded and the same on every platform.
+/// SplitMix64: small, seeded, and the same on every platform.
 struct Fuzzer(u64);
 
 impl Fuzzer {

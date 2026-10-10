@@ -29,7 +29,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
     private readonly bool _processExitHook;
     private int _disposed;
 
-    /// <summary>A client with the options' store, channels and rules, checked now.</summary>
+    /// <summary>A client with the options' store, channels, and rules, checked now.</summary>
     /// <exception cref="CronwatchException">Of kind <see cref="CronwatchErrorKind.Invalid"/> for a bad option, with the SDK's message.</exception>
     public CronwatchClient(CronwatchOptions? options = null)
     {
@@ -41,12 +41,12 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
             {
                 if (!Defaultable.Contains(key))
                 {
-                    throw CronwatchException.Invalid("defaults takes grace, timeout, timezone and failuresBeforeAlert, not " + key);
+                    throw CronwatchException.Invalid("defaults takes grace, timeout, timezone, and failuresBeforeAlert, not " + key);
                 }
             }
             if (d.Expect != null)
             {
-                throw CronwatchException.Invalid("defaults takes grace, timeout, timezone and failuresBeforeAlert, not expect");
+                throw CronwatchException.Invalid("defaults takes grace, timeout, timezone, and failuresBeforeAlert, not expect");
             }
             defaults = d.Fields();
         }
@@ -108,7 +108,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
     /// Declares a job (again, replacing an earlier declaration of the name) and answers its
     /// handle. The definition is written to the store at the job's first run or check.
     /// </summary>
-    /// <exception cref="CronwatchException">Of kind <see cref="CronwatchErrorKind.Invalid"/> for a bad name, schedule, zone or option, with the SDK's message.</exception>
+    /// <exception cref="CronwatchException">Of kind <see cref="CronwatchErrorKind.Invalid"/> for a bad name, schedule, zone, or option, with the SDK's message.</exception>
     public Job Job(string name, JobOptions? options = null)
     {
         JobDef def = Define(name, options ?? new JobOptions());
@@ -121,7 +121,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
         ArgumentNullException.ThrowIfNull(name);
         if (!ValidName(name))
         {
-            throw CronwatchException.Invalid("job name " + JsonText.Quote(name) + " must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\" or \"-\"");
+            throw CronwatchException.Invalid("job name " + JsonText.Quote(name) + " must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\", or \"-\"");
         }
         JsObject fields = _defaults.Copy();
         foreach (var e in options.Fields())
@@ -538,7 +538,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
     public Task<JobState> UnsilenceAsync(string name, CancellationToken cancellationToken = default) =>
         Spawn(() => PatchStateAsync(name, s => s.SilencedUntil = null)).WaitAsync(cancellationToken);
 
-    /// <summary>Forgets a job: its declaration here, and its definition, runs and state in the store.</summary>
+    /// <summary>Forgets a job: its declaration here, and its definition, runs, and state in the store.</summary>
     /// <exception cref="CronwatchException">When the store fails.</exception>
     public Task ForgetAsync(string name, CancellationToken cancellationToken = default) =>
         Spawn(() => ForgetNowAsync(name)).WaitAsync(cancellationToken);
@@ -588,7 +588,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
     }
 
     /// <summary>
-    /// Stops the interval, waits for a check under way to end (bounded by its own channel, triage
+    /// Stops the interval, waits for a check under way to end (bounded by its own channel, triage,
     /// and retry timeouts, as the SDK's <c>close()</c> awaits it), records the runs still open in
     /// this process as the process-exit hook does, waits up to five seconds for the other sends and
     /// recordings in flight, cancels what is left, and disposes the store when it is disposable.

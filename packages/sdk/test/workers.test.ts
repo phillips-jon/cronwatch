@@ -14,7 +14,7 @@ import { conformance } from "./store-conformance.js";
  * Cloudflare Workers, in workerd through Miniflare. The sample Worker is
  * bundled the way wrangler bundles one (esbuild, the workerd conditions, no
  * Node built-ins) and run without nodejs_compat, so anything in the core that
- * reached for node:, process or Buffer fails here.
+ * reached for node:, process, or Buffer fails here.
  */
 
 const HOUR = 3_600_000;

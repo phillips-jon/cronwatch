@@ -1,6 +1,6 @@
 defmodule Cronwatch.Conformance.ChannelsTest do
   @moduledoc """
-  Replays `conformance/channels.json`'s requests for Slack, Discord and the
+  Replays `conformance/channels.json`'s requests for Slack, Discord, and the
   webhook (`sends`), the errors each gives for a refused request
   (`failures`) and the error bodies' cut (`textCuts.errorBodies`), byte for
   byte, through a recording transport. The providers' sections are
@@ -76,7 +76,7 @@ defmodule Cronwatch.Conformance.ChannelsTest do
     end
   end
 
-  test "conformance/channels.json: Slack, Discord and the webhook" do
+  test "conformance/channels.json: Slack, Discord, and the webhook" do
     f = Conformance.fixture("channels")
     {alerts, first} = alerts(f)
     rec = Rec.start()

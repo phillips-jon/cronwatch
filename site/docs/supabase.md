@@ -37,7 +37,7 @@ export const cw = cronwatch({
 cw.startChecking();                       // or call cw.check() from wherever your checks run
 ```
 
-Jobs you wrap in code and pg_cron jobs live side by side in the same store, dashboard and alerts.
+Jobs you wrap in code and pg_cron jobs live side by side in the same store, dashboard, and alerts.
 
 ### Options
 
@@ -51,13 +51,13 @@ pgCron(pool, {
 });
 ```
 
-`options` takes everything a job does except the schedule and timezone: `grace`, `timeout`, `maxDuration`, `expect` (tested against pg_cron's return message, such as `"1 row"` or `"UPDATE 42"`), `failuresBeforeAlert`, `description` and `tags`.
+`options` takes everything a job does except the schedule and timezone: `grace`, `timeout`, `maxDuration`, `expect` (tested against pg_cron's return message, such as `"1 row"` or `"UPDATE 42"`), `failuresBeforeAlert`, `description`, and `tags`.
 
 ## What is read, and how it maps
 
 | pg_cron | CronWatch |
 | --- | --- |
-| `jobname` | the job name, with anything other than letters, digits, `.`, `_`, `:` and `-` turned into `-`. `pg_cron:<jobid>` for a job with no name |
+| `jobname` | the job name, with anything other than letters, digits, `.`, `_`, `:`, and `-` turned into `-`. `pg_cron:<jobid>` for a job with no name |
 | `schedule` in cron syntax | the same schedule; `$` (last day of the month) becomes `L`, and fields past the fifth are dropped, as pg_cron ignores them |
 | `schedule` as `30 seconds` | `every 30s` |
 | `active = false` | declared without a schedule, so a paused job is never reported missed (one already missed recovers as no longer scheduled); its runs are still copied |
@@ -67,7 +67,7 @@ pgCron(pool, {
 | `status` `running` and the rest | `running`, updated when pg_cron finishes it |
 | `status` `starting` (no `start_time` yet) | waited for, up to ten minutes; then copied as `running` from when it was first seen, so one that never starts is marked stuck |
 | `status` `failed` with no `start_time` | what pg_cron writes for a run a server restart cut off (`server restarted`): a failure, starting at its `end_time`, else at the job's newest run before it |
-| `start_time`, `end_time` | the run's start, finish and duration |
+| `start_time`, `end_time` | the run's start, finish, and duration |
 
 Output and errors go through the client's `redact` like any other run. The job's `command` is not copied, since commands that call HTTP endpoints often carry keys; the description says which database and role the job runs as instead.
 
@@ -82,8 +82,8 @@ Run ids starting with `pgcron:` belong to the reader: `job.start({ id })` and `j
 Nothing is read until something calls `cw.check()`. Any of these does:
 
 - **A server that is up anyway.** `cw.startChecking()` checks every minute.
-- **A cron outside the database.** Mount the routes and have Vercel cron, GitHub Actions or any scheduler call `/cronwatch/api/check` with the bearer secret (see [Dashboard and API](/docs/dashboard/)).
-- **A Supabase Edge Function.** Edge Functions run on Deno, which can import npm packages. The function builds the client, runs one check and returns its result:
+- **A cron outside the database.** Mount the routes and have Vercel cron, GitHub Actions, or any scheduler call `/cronwatch/api/check` with the bearer secret (see [Dashboard and API](/docs/dashboard/)).
+- **A Supabase Edge Function.** Edge Functions run on Deno, which can import npm packages. The function builds the client, runs one check, and returns its result:
 
 ```ts
 // supabase/functions/cronwatch-check/index.ts
@@ -149,9 +149,9 @@ Without `BYPASSRLS` the role sees an empty `cron.job` and the reader says so onc
 
 pg_cron reads cron expressions in `cron.timezone`, which is GMT unless it was changed. The reader reads the setting on every check and passes it along, so a job scheduled at `0 3 * * *` is expected at 03:00 in that zone. Reading it needs `pg_read_all_settings` (or a superuser); when it cannot be read, UTC is assumed and `onError` hears about it once. Pass `timezone` to set it yourself. Interval schedules (`30 seconds`) do not depend on it.
 
-## Run details, log_run and purging
+## Run details, log_run, and purging
 
-Failures, durations and output all come from `cron.job_run_details`, so they need `cron.log_run` on (the default). Missed runs are judged from the schedule and the newest run CronWatch has copied, not from the details table, which has two consequences:
+Failures, durations, and output all come from `cron.job_run_details`, so they need `cron.log_run` on (the default). Missed runs are judged from the schedule and the newest run CronWatch has copied, not from the details table, which has two consequences:
 
 - **Purging is fine.** pg_cron keeps every run detail forever unless something deletes them, and a cleanup job (`DELETE FROM cron.job_run_details WHERE end_time < now() - interval '7 days'`) is common and recommended. CronWatch keeps its own copy of each run, with its own `retention`, so deleting old details loses nothing as long as checks run more often than the purge. A run deleted before any check read it is simply never seen.
 - **With log_run off there is nothing to read.** pg_cron then records no runs at all, so every scheduled job would look missed. The reader notices the setting, declares the jobs without their schedules so nothing is reported falsely, and says so once through `onError`. Turn `log_run` on to watch them properly.
@@ -159,11 +159,11 @@ Failures, durations and output all come from `cron.job_run_details`, so they nee
 ## Limits
 
 - **A queued HTTP call is a success.** Jobs that call an Edge Function or a webhook with `net.http_post` succeed as soon as the request is queued; `pg_net` sends it later and keeps the response in `net._http_response`. A 500 from the function is invisible to pg_cron and so to CronWatch. Wrap the function itself with `cw.job(...).handler()` to watch what it does.
-- **A job removed or renamed in pg_cron keeps its history under its old name.** The reader tracks jobs by `jobid`. When one is unscheduled, renamed, or no longer picked by `jobs`, its old name is declared again without a schedule, so it is never reported missed again, and its description says why (`renamed to <new name>`, `no longer watched`, `no longer in cron.job`). Runs it had open are still read and finished under the old name; new runs go to the new one. A process that starts after the change (a fresh serverless function, say) notices it too, from the job id in the stored description, unless `options` replaced that description. `cw.forget(name)` removes the old name and its runs for good: a run it still had open is let go, never recorded and never read again.
-- **Removing, renaming or pausing closes missed with a recovery.** Once a name has no schedule nothing is due under it, so if it was missed, the check that drops the schedule closes missed and sends a recovered alert saying the job is no longer scheduled (`reason: "unscheduled"` in its details). Anything else open under that name, a failure say, stays open until a successful run, as usual. See [recovered](/docs/conditions/#recovered).
+- **A job removed or renamed in pg_cron keeps its history under its old name.** The reader tracks jobs by `jobid`. When one is unscheduled, renamed, or no longer picked by `jobs`, its old name is declared again without a schedule, so it is never reported missed again, and its description says why (`renamed to <new name>`, `no longer watched`, `no longer in cron.job`). Runs it had open are still read and finished under the old name; new runs go to the new one. A process that starts after the change (a fresh serverless function, say) notices it too, from the job id in the stored description, unless `options` replaced that description. `cw.forget(name)` removes the old name and its runs for good: a run it still had open is let go, never recorded, and never read again.
+- **Removing, renaming, or pausing closes missed with a recovery.** Once a name has no schedule nothing is due under it, so if it was missed, the check that drops the schedule closes missed and sends a recovered alert saying the job is no longer scheduled (`reason: "unscheduled"` in its details). Anything else open under that name, a failure say, stays open until a successful run, as usual. See [recovered](/docs/conditions/#recovered).
 - **Minimum cadence.** pg_cron's second intervals go down to 1 second, but CronWatch's default grace is ten minutes; set `options.grace` to something sensible for fast jobs.
 - **One reader per store for a given cluster.** Run ids are `pgcron:<runid>` (with the `prefix` after `pgcron:` when one is set). Two databases with pg_cron writing into one CronWatch store need different prefixes.
 - **Stuck is judged by CronWatch.** A run still `running` after the job's `timeout` (default one hour) is marked timed out and alerts as stuck. The reader keeps reading it: when pg_cron later says it succeeded, the run is recorded as it ended and stuck closes with a recovery; a late failure is recorded without counting twice.
 - **Checks read at most 5,000 run details each.** A backlog larger than that (a checker that was down for a long time over a busy job) is worked through over the following checks.
 
-Every port has the same pg_cron reader, with the same rules: see pg_cron in [Ruby](/docs/ruby/#pg-cron), [Python](/docs/python/#pg-cron), [PHP](/docs/php/#pg-cron), [Go](/docs/go/#pg-cron), [Rust](/docs/rust/#pg-cron), [Elixir](/docs/elixir/#pg-cron), [Java](/docs/java/#pg-cron) and [.NET](/docs/dotnet/#pg-cron).
+Every port has the same pg_cron reader, with the same rules: see pg_cron in [Ruby](/docs/ruby/#pg-cron), [Python](/docs/python/#pg-cron), [PHP](/docs/php/#pg-cron), [Go](/docs/go/#pg-cron), [Rust](/docs/rust/#pg-cron), [Elixir](/docs/elixir/#pg-cron), [Java](/docs/java/#pg-cron), and [.NET](/docs/dotnet/#pg-cron).

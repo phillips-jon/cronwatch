@@ -205,7 +205,7 @@ defmodule Cronwatch.Web.HTML do
     end
   end
 
-  @doc "The board: every job, the last day's timeline and the table."
+  @doc "The board: every job, the last day's timeline, and the table."
   def dashboard_page(jobs, runs_by_job, now, base, checked_at, lanes) do
     total = length(jobs)
     attention = Enum.count(jobs, &(&1.health != "healthy"))

@@ -59,7 +59,7 @@ defmodule Cronwatch.Bridge do
 
   @doc """
   The tag that names the app under an integration's tag: `<tag>:<app>`, the
-  app's name lowercased, with anything but letters, digits, `.`, `_` and `-`
+  app's name lowercased, with anything but letters, digits, `.`, `_`, and `-`
   made `-`. A name that is empty once cleaned, or longer than 48
   characters, is cut and given 8 hex characters of its MD5, so two names
   never share a tag. The PHP port's `appTag()`, character for character.
@@ -119,7 +119,7 @@ defmodule Cronwatch.Bridge do
 
   @doc """
   Whether `name` is a CronWatch job name: 1 to 120 letters, digits, `.`,
-  `_`, `:` or `-`, starting with a letter or digit.
+  `_`, `:`, or `-`, starting with a letter or digit.
   """
   @spec valid_name?(term()) :: boolean()
   def valid_name?(name), do: Cronwatch.Options.valid_name?(name)
@@ -167,13 +167,13 @@ defmodule Cronwatch.Bridge do
   defdelegate never_fires(why), to: Cronwatch.Bridge.Check
 
   # The options a job keeps when it is declared again without its schedule,
-  # as the PHP, Go and Rust ports keep them.
+  # as the PHP, Go, and Rust ports keep them.
   @kept ["tags", "grace", "timeout", "maxDuration", "budget", "floor", "failuresBeforeAlert"]
 
   @doc """
   The options that declare a job again without its schedule: its
   description followed by ` (no longer scheduled)` (`A scheduled task` when
-  it had none), its tags, grace, timeout, maxDuration, budget, floor and
+  it had none), its tags, grace, timeout, maxDuration, budget, floor, and
   failuresBeforeAlert.
   """
   @spec unscheduled(Object.t()) :: keyword()

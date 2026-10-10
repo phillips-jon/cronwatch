@@ -43,7 +43,7 @@ final class Origin
     /**
      * scheme://host[:port] for text that is a scheme and a bare host (what
      * trustProxy builds from the forwarded headers), or null when it carries a
-     * path, credentials, a query or a fragment, or is not an http or https URL.
+     * path, credentials, a query, or a fragment, or is not an http or https URL.
      */
     public static function bare(string $value): ?string
     {
@@ -53,7 +53,7 @@ final class Origin
 
     /**
      * [origin, whether anything past the host would show in the URL: a path
-     * other than "/", credentials, a query or a fragment], "not-http" for
+     * other than "/", credentials, a query, or a fragment], "not-http" for
      * another scheme, or null for text that is not a URL.
      *
      * @return array{string, bool}|string|null

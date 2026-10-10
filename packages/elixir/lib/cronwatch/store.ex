@@ -1,6 +1,6 @@
 defmodule Cronwatch.Store do
   @moduledoc """
-  Where jobs, runs and state live: the SDK's `Store`, as a behaviour.
+  Where jobs, runs, and state live: the SDK's `Store`, as a behaviour.
 
   A store is given to an instance as `{module, opts}`. The instance calls
   `c:new/2` once, when it starts, with the options and its own name; what
@@ -10,7 +10,7 @@ defmodule Cronwatch.Store do
   the instance before anything else. `c:init/1` is called once before first
   use, to create tables.
 
-  Every callback answers `{:ok, value}` or `{:error, reason}`; a raise, throw
+  Every callback answers `{:ok, value}` or `{:error, reason}`; a raise, throw,
   or exit in one is taken as its error. Names are the SDK's in snake_case.
   The three conditional writes are optional: without `c:update_run_if/3` or
   `c:compare_and_set_state/3` the client falls back to a read and a write,
@@ -47,13 +47,13 @@ defmodule Cronwatch.Store do
   @doc "Every job, by name in byte order."
   @callback list_jobs(handle()) :: {:ok, [StoredJob.t()]} | {:error, reason()}
 
-  @doc "Removes a job, its runs and its state."
+  @doc "Removes a job, its runs, and its state."
   @callback delete_job(handle(), name :: String.t()) :: :ok | {:error, reason()}
 
   @doc "Inserts a run; refuses an id already stored."
   @callback insert_run(handle(), Run.t()) :: :ok | {:error, reason()}
 
-  @doc "Writes a run's status, finish, duration, error, output and metrics. A run that is gone stays gone."
+  @doc "Writes a run's status, finish, duration, error, output, and metrics. A run that is gone stays gone."
   @callback update_run(handle(), Run.t()) :: :ok | {:error, reason()}
 
   @doc """
@@ -114,7 +114,7 @@ defmodule Cronwatch.Store do
   @type t :: {module(), handle()}
 
   @doc false
-  # Calls a store callback, turning a raise, throw or exit into its error.
+  # Calls a store callback, turning a raise, throw, or exit into its error.
   def call({module, handle}, fun, args) do
     apply(module, fun, [handle | args])
   rescue

@@ -15,7 +15,7 @@ use crate::js::{Object, Value};
 use crate::schedule::format_duration;
 use crate::types::{Definition, JobState, Metrics, Run, RunStatus, StoredJob, run_duration};
 
-/// `scripts/conformance.mjs`'s `Sim`: one job, its runs and its state.
+/// `scripts/conformance.mjs`'s `Sim`: one job, its runs, and its state.
 struct Sim {
     def: Definition,
     stored: StoredJob,

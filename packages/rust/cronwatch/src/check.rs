@@ -1,4 +1,4 @@
-//! Checks, reads and the interval (client.ts `check()`, `jobs()`,
+//! Checks, reads, and the interval (client.ts `check()`, `jobs()`,
 //! `silence()`, `start()`).
 
 use std::sync::atomic::Ordering;
@@ -106,7 +106,7 @@ impl Client {
         }
 
         // Each job on its own: one that cannot be evaluated is reported, shown
-        // as failing (see `unevaluable_summary`) and does not stop the others.
+        // as failing (see `unevaluable_summary`), and does not stop the others.
         let mut jobs = Vec::new();
         let mut spent = Duration::ZERO;
         for job in self.stored_jobs().await? {
@@ -296,7 +296,7 @@ impl Client {
         self.patch_state(name, |s| s.silenced_until = None).await
     }
 
-    /// Reads, changes and writes one job's state, in turn with every other
+    /// Reads, changes, and writes one job's state, in turn with every other
     /// update to it.
     async fn patch_state(&self, name: &str, change: impl Fn(&mut JobState)) -> Result<JobState, Error> {
         self.ensure_ready().await?;

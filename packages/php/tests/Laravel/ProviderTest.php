@@ -26,8 +26,8 @@ use Orchestra\Testbench\Attributes\DefineEnvironment;
 /**
  * The client the service provider binds, from config/cronwatch.php: its
  * store in the app's database through a connection of its own (SQLite
- * here, and MySQL, MariaDB and Postgres when CRONWATCH_TEST_MYSQL,
- * CRONWATCH_TEST_MARIADB and CRONWATCH_TEST_PG are set), the migration, the
+ * here, and MySQL, MariaDB, and Postgres when CRONWATCH_TEST_MYSQL,
+ * CRONWATCH_TEST_MARIADB, and CRONWATCH_TEST_PG are set), the migration, the
  * alert channels, and the environment.
  */
 final class ProviderTest extends TestCase
@@ -106,7 +106,7 @@ final class ProviderTest extends TestCase
         $this->assertCount(1, $cw->runs('after-migrate'));
     }
 
-    /** A config/cronwatch.php published before 1.0, with the keys 1.0 renamed. */
+    /** A config/cronwatch.php published before 0.11, with the keys 0.11 renamed. */
     protected function keysBefore10($app): void
     {
         $app['config']->set('cronwatch.store', ['driver' => 'database', 'prefix' => 'old_', 'create_tables' => false, 'migrations' => true]);
@@ -330,7 +330,7 @@ final class ProviderTest extends TestCase
             foreach (['null', '(null)', 'Null', 'empty', '(empty)', 'true', '(true)'] as $word) {
                 putenv("CRON_SECRET={$word}");
                 $_SERVER['CRON_SECRET'] = $_ENV['CRON_SECRET'] = $word;
-                // What env('CRON_SECRET') in config/cronwatch.php gives: null, "" or true.
+                // What env('CRON_SECRET') in config/cronwatch.php gives: null, "", or true.
                 $this->app['config']->set('cronwatch.cron_secret', \Illuminate\Support\Env::get('CRON_SECRET'));
                 $cw = $this->app->make(ClientFactory::class)->client();
                 $this->assertNull($cw->cronSecret, "CRON_SECRET={$word} is no secret");

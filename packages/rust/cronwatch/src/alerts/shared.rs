@@ -51,7 +51,7 @@ pub(crate) fn hmac_sha256(key: &[u8], data: &str) -> Vec<u8> {
     m.finalize().into_bytes().to_vec()
 }
 
-/// A stable 32 hex character id for one alert: the same job, type and time
+/// A stable 32 hex character id for one alert: the same job, type, and time
 /// always give the same id, so a provider that deduplicates on it drops a
 /// resend of an alert it already took.
 pub(crate) fn alert_id(a: &Alert) -> String {
@@ -97,7 +97,7 @@ pub(crate) fn link_for(link: &Option<LinkFn>, a: &Alert) -> String {
     link.as_ref().map(|f| f(a)).unwrap_or_default()
 }
 
-/// The title, message, triage and link as one plain text block, the way
+/// The title, message, triage, and link as one plain text block, the way
 /// every channel reads.
 pub(crate) fn plain_text(a: &Alert, link: &str) -> String {
     let mut lines = vec![a.title.as_str(), "", a.message.as_str()];

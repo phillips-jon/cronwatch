@@ -4,10 +4,10 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * What went wrong outside a job: an option, a name, a schedule or a run id the SDK refuses (with
+ * What went wrong outside a job: an option, a name, a schedule, or a run id the SDK refuses (with
  * the SDK's message, word for word), a store that failed (its own exception as the cause), or
  * something else. Unchecked. A read ({@code jobs()}, {@code jobSummary()}, {@code runs()}) and
- * {@code check()} throw it when the store fails; {@code run}, {@code start}, {@code flush} and
+ * {@code check()} throw it when the store fails; {@code run}, {@code start}, {@code flush}, and
  * {@code finish} never do.
  */
 public final class CronwatchException extends RuntimeException {
@@ -15,7 +15,7 @@ public final class CronwatchException extends RuntimeException {
 
   /** What kind of failure it is. */
   public enum Kind {
-    /** An option, a name, a schedule or a run id the SDK refuses. */
+    /** An option, a name, a schedule, or a run id the SDK refuses. */
     INVALID,
     /** The store failed; the cause is its exception. */
     STORE,

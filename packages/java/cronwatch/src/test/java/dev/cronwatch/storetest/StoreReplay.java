@@ -26,7 +26,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Replays the store cases of the repository's {@code conformance/store.json}, which the SDK's
  * memory store answered, against a store: prune scripts, {@code compareAndSetState} steps, {@code
- * updateRunIf} steps and text written without NUL ({@link #run}), and states another process wrote
+ * updateRunIf} steps, and text written without NUL ({@link #run}), and states another process wrote
  * with a version that is not a whole number ({@link #foreignVersions}). The caller reads the
  * fixture and passes its text. It is the port's own test, beside {@link StoreContract}, not part of
  * the published kit:
@@ -81,8 +81,8 @@ public final class StoreReplay {
   }
 
   /**
-   * Replays the prune, {@code compareAndSetState} and {@code updateRunIf} cases against stores from
-   * {@code fresh}, each of which must be empty; each is closed when its cases are done.
+   * Replays the prune, {@code compareAndSetState}, and {@code updateRunIf} cases against stores
+   * from {@code fresh}, each of which must be empty; each is closed when its cases are done.
    *
    * @return how many cases were replayed
    * @throws AssertionError at the first case the store answers differently from the SDK's
@@ -213,7 +213,7 @@ public final class StoreReplay {
 
   /**
    * The {@code nul} steps: text is written without U+0000, which Postgres refuses (a run's trigger,
-   * output, error and metric names, and every key and string of a definition and a state).
+   * output, error, and metric names, and every key and string of a definition and a state).
    */
   private static int nul(JsObject fix, Supplier<? extends Store> fresh) {
     Store store = fresh.get();
@@ -281,7 +281,7 @@ public final class StoreReplay {
   /**
    * Replays the {@code foreignVersion} cases against {@code store}, which holds its states as JSON
    * text: for each, job {@code v} is deleted, {@code writeRaw} puts the case's state text in the
-   * state table as it is (a state another process wrote, its version {@code 1.5}, {@code "x"} or
+   * state table as it is (a state another process wrote, its version {@code 1.5}, {@code "x"}, or
    * {@code 2.0}), and each compare-and-set step must be refused or written as the SDK's was: the
    * version counts as {@link JobState#countedVersion} reads it. The store is not closed.
    *

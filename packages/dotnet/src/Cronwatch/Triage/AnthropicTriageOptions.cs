@@ -20,7 +20,7 @@ public sealed class AnthropicTriageOptions
     /// <summary>The model. Default <c>claude-opus-5</c>.</summary>
     public string Model { get; init; } = AnthropicTriage.DefaultModel;
 
-    /// <summary>How hard the model thinks: <c>low</c>, <c>medium</c> or <c>high</c>. Default <c>medium</c>; a stack trace rarely needs more.</summary>
+    /// <summary>How hard the model thinks: <c>low</c>, <c>medium</c>, or <c>high</c>. Default <c>medium</c>; a stack trace rarely needs more.</summary>
     public string Effort { get; init; } = AnthropicTriage.DefaultEffort;
 
     /// <summary>The most tokens a diagnosis may use. Default 800; any other value (0 included) is sent as given.</summary>
@@ -48,7 +48,7 @@ public sealed class AnthropicTriageOptions
     /// <summary>Sends the request. Default: the client's transport.</summary>
     public ITransport? Transport { get; init; }
 
-    /// <summary>Names what is set, never the API key, the context or the base URL.</summary>
+    /// <summary>Names what is set, never the API key, the context, or the base URL.</summary>
     public override string ToString() =>
         "AnthropicTriageOptions(apiKey " + (string.IsNullOrEmpty(ApiKey) ? "from ANTHROPIC_API_KEY" : "set")
         + ", model " + Model

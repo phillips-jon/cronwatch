@@ -26,7 +26,7 @@ final class Cli
         Usage: cronwatch check [--bootstrap <file>] [--quiet]
 
         Checks every job for missed and stuck runs, sends alerts, retries
-        undelivered ones and prunes old runs. Run it from cron every few minutes.
+        undelivered ones, and prunes old runs. Run it from cron every few minutes.
 
         The bootstrap file returns the app's Cronwatch client, its jobs declared
         (or a callable returning it). Default: CRONWATCH_BOOTSTRAP, else

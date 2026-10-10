@@ -48,7 +48,7 @@ public sealed record Capture(
     public byte[]? BodyBytes => Body == null ? null : Encoding.UTF8.GetBytes(Body);
 }
 
-/// <summary>A seeded client, its clock and what it reported.</summary>
+/// <summary>A seeded client, its clock, and what it reported.</summary>
 public sealed class Seeded(CronwatchClient client, Func<long> now, IReadOnlyList<string> errors) : IAsyncDisposable
 {
     /// <summary>The client.</summary>
@@ -67,7 +67,7 @@ public sealed class Seeded(CronwatchClient client, Func<long> now, IReadOnlyList
 /// <summary>
 /// The replay of <c>packages/ruby/test/web/golden.json</c>, the SDK routes' answers to a fixed
 /// seed (written by <c>golden.mjs</c>), shared by every adapter's test: the seed step for step,
-/// the captures, and the comparison of status, headers and body byte for byte. Run ids are random
+/// the captures, and the comparison of status, headers, and body byte for byte. Run ids are random
 /// on both sides, so each becomes <c>&lt;id:N&gt;</c> in order of first appearance. The other
 /// ports replay the same file.
 /// </summary>
@@ -121,8 +121,8 @@ public static partial class Golden
     }
 
     /// <summary>
-    /// <c>GET /api</c>'s answer names the library, its language and its version, which differ from
-    /// port to port: golden.json holds <c>&lt;library&gt;</c>, <c>&lt;language&gt;</c> and
+    /// <c>GET /api</c>'s answer names the library, its language, and its version, which differ from
+    /// port to port: golden.json holds <c>&lt;library&gt;</c>, <c>&lt;language&gt;</c>, and
     /// <c>&lt;version&gt;</c> in their place, and this port puts in its own.
     /// </summary>
     private static string About(string body)

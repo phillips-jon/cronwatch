@@ -4243,7 +4243,7 @@
                   }
                 },
                 "title": "agent recovered",
-                "message": "A run 2026-01-05 16:30:00 UTC (now) succeeded after: slow, over budget.\nRan 1s.",
+                "message": "A run 2026-01-05 16:30:00 UTC (now) succeeded after: slow and over budget.\nRan 1s.",
                 "at": 1767630601000
               }
             ],
@@ -5601,7 +5601,7 @@
                   "maxDuration": "5s"
                 },
                 "title": "j recovered",
-                "message": "A run 2026-01-05 11:30:00 UTC (now) succeeded after: failed, slow.\nRan 1s.",
+                "message": "A run 2026-01-05 11:30:00 UTC (now) succeeded after: failed and slow.\nRan 1s.",
                 "at": 1767612601000
               }
             ],
@@ -5846,7 +5846,7 @@
                   }
                 },
                 "title": "j recovered",
-                "message": "A run 2026-01-05 11:30:00 UTC (now) succeeded after: slow, over budget.\nRan 500ms.",
+                "message": "A run 2026-01-05 11:30:00 UTC (now) succeeded after: slow and over budget.\nRan 500ms.",
                 "at": 1767612600500
               }
             ],
@@ -8345,7 +8345,7 @@
                   "name": "import"
                 },
                 "title": "import recovered",
-                "message": "A run 2026-01-06 22:30:00 UTC (now) succeeded after: failed, under floor.\nRan 1s.",
+                "message": "A run 2026-01-06 22:30:00 UTC (now) succeeded after: failed and under floor.\nRan 1s.",
                 "at": 1767738601000
               }
             ],
@@ -9141,7 +9141,7 @@
                   }
                 },
                 "title": "j recovered",
-                "message": "A run 2026-01-05 11:30:00 UTC (now) succeeded after: slow, over budget, under floor.\nRan 500ms.",
+                "message": "A run 2026-01-05 11:30:00 UTC (now) succeeded after: slow, over budget, and under floor.\nRan 500ms.",
                 "at": 1767612600500
               }
             ],
@@ -14361,7 +14361,7 @@
                   "grace": "1m"
                 },
                 "title": "j recovered",
-                "message": "A run 2026-01-05 10:11:00 UTC (now) succeeded after: missed, failed.\nRan 3s.",
+                "message": "A run 2026-01-05 10:11:00 UTC (now) succeeded after: missed and failed.\nRan 3s.",
                 "at": 1767607862500
               }
             ],

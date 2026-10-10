@@ -96,7 +96,7 @@ final class Plugin
         self::eachSite($networkWide, [self::class, 'activateSite']);
     }
 
-    /** One site's part of activation: its tables, its settings and its check event. */
+    /** One site's part of activation: its tables, its settings, and its check event. */
     public static function activateSite(): void
     {
         global $wpdb;
@@ -183,7 +183,7 @@ final class Plugin
         if ($settings['webhook_url'] !== '') {
             $channels[] = new Webhook($settings['webhook_url'], [], $settings['webhook_secret'] !== '' ? $settings['webhook_secret'] : null, new WpHttp());
         }
-        // Discord, the email providers, Twilio and the error trackers, each once its required fields are set.
+        // Discord, the email providers, Twilio, and the error trackers, each once its required fields are set.
         array_push($channels, ...ChannelSettings::channels(
             fn (string $key): string => (string) ($settings[$key] ?? ''),
             $link,
@@ -295,7 +295,7 @@ final class Plugin
     }
 
     /**
-     * What a check starts with, for the check event, `wp cronwatch check` and
+     * What a check starts with, for the check event, `wp cronwatch check`, and
      * the dashboard's "Run check now": every event in the cron array declared
      * as a job, and names no longer in it declared again without their
      * schedule (so an event that went away with its plugin is never reported

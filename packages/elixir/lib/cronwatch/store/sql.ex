@@ -3,7 +3,7 @@ defmodule Cronwatch.Store.SQL do
   # Internal: not the package's API, and it can change in any release.
   #
   # The SQL store's schema and statements, by dialect. SQLite's and Postgres's
-  # are `stores/sql.ts`'s text for text, so a Node, Ruby, Python, PHP, Go, Rust
+  # are `stores/sql.ts`'s text for text, so a Node, Ruby, Python, PHP, Go, Rust,
   # and Elixir process can share one database and `sqlite_master` reads the same
   # whoever made the tables.
   #
@@ -13,9 +13,9 @@ defmodule Cronwatch.Store.SQL do
   # written `$n::text::jsonb` and a JSON column is read `col::text`. The schema
   # does not differ.
   #
-  # MySQL (and MariaDB) has a dialect of its own, the PHP, Go and Rust ports'
+  # MySQL (and MariaDB) has a dialect of its own, the PHP, Go, and Rust ports'
   # (`packages/go/sqlstore/sql.go`), since it has no `ON CONFLICT`, no partial
-  # index and no `TEXT` primary key: the same tables, columns and values, with
+  # index, and no `TEXT` primary key: the same tables, columns, and values, with
   # the JSON columns as `LONGTEXT` holding the SDK's JSON byte for byte, never
   # MySQL's `JSON` type, which would rewrite it. It needs MySQL 8.0.13 or
   # MariaDB 10.6 or newer.
@@ -33,7 +33,7 @@ defmodule Cronwatch.Store.SQL do
   def default_prefix, do: @default_prefix
 
   @doc """
-  Checks a table prefix: lowercase letters, digits and underscores, not
+  Checks a table prefix: lowercase letters, digits, and underscores, not
   starting with a digit, at most 47 characters. Uppercase is refused rather
   than folded, since Postgres lowercases unquoted names. The message is the
   SDK's, word for word.
@@ -50,7 +50,7 @@ defmodule Cronwatch.Store.SQL do
   def table_prefix(prefix), do: {:error, prefix_error(inspect(prefix))}
 
   defp prefix_error(quoted) do
-    "cronwatch: invalid table prefix #{quoted}. Use lowercase letters, digits and underscores, " <>
+    "cronwatch: invalid table prefix #{quoted}. Use lowercase letters, digits, and underscores, " <>
       "not starting with a digit, at most #{@max_prefix} characters."
   end
 
@@ -99,7 +99,7 @@ defmodule Cronwatch.Store.SQL do
     |> Enum.reject(&(String.trim(&1) == ""))
   end
 
-  # MySQL's tables (the PHP, Go and Rust ports'): VARCHAR(255) keys, BIGINT
+  # MySQL's tables (the PHP, Go, and Rust ports'): VARCHAR(255) keys, BIGINT
   # times, LONGTEXT JSON, utf8mb4_bin so names compare and sort by byte, seq
   # for insertion order, and a plain index where the others have a partial
   # one.
@@ -234,13 +234,13 @@ defmodule Cronwatch.Store.SQL do
             AND started_at < (SELECT MAX(r.started_at) FROM #{p}runs r WHERE r.job = #{p}runs.job)\
       """,
       # Takes back a run only while it is of one job and in one status (the
-      # PHP, Go and Rust ports' deleteRunIf).
+      # PHP, Go, and Rust ports' deleteRunIf).
       delete_run_if: "DELETE FROM #{p}runs WHERE id = ? AND job = ? AND status = ?"
     }
     |> Map.new(fn {k, v} -> {k, if(pg, do: number(v), else: v)} end)
   end
 
-  # MySQL's statements, the PHP, Go and Rust ports' text.
+  # MySQL's statements, the PHP, Go, and Rust ports' text.
   defp mysql_statements(p) do
     # The version inside a state's JSON text, read as on SQLite and Postgres:
     # a whole number from 0 to 2^53 - 1, else 0. MySQL's JSON_EXTRACT answers

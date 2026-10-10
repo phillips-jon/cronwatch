@@ -359,7 +359,7 @@ impl Job {
     /// then resumed. Dropping the returned future while `f` runs records the
     /// run as failed; dropping it after `f` returned leaves the recording to
     /// finish in a task of its own. The returned future is `Send` when `f`'s
-    /// future, `T` and `E` are, so it can be spawned.
+    /// future, `T`, and `E` are, so it can be spawned.
     pub async fn run<F, Fut, T, E>(&self, f: F) -> Result<T, E>
     where
         F: FnOnce(JobContext) -> Fut,

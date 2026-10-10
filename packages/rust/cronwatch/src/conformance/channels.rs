@@ -1,6 +1,6 @@
 //! Replays `conformance/channels.json`, the requests the SDK's channels make
 //! (`scripts/conformance.mjs` drives them with a stub fetch): every request's
-//! URL, headers (name, value and position) and body, byte for byte, for
+//! URL, headers (name, value, and position) and body, byte for byte, for
 //! thirteen sample alerts and each channel's option sets; the error each
 //! gives for a refused request; Twilio's partial delivery; and the text
 //! cuts.

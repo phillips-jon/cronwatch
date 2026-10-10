@@ -27,7 +27,7 @@ public sealed record Run
     /// <summary>How long it took, or null while it runs.</summary>
     public long? DurationMs { get; init; }
 
-    /// <summary>The error, <c>Name: message</c> and frames, or null.</summary>
+    /// <summary>The error, <c>Name: message</c>, and frames, or null.</summary>
     public string? Error { get; init; }
 
     /// <summary>What it logged, or the string it returned, capped; or null.</summary>

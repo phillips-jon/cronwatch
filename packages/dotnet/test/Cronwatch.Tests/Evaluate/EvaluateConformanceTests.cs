@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Cronwatch.Tests;
 
-/// <summary>What the evaluate, format and health replays share: reading their fixtures' values.</summary>
+/// <summary>What the evaluate, format, and health replays share: reading their fixtures' values.</summary>
 internal static class EvaluateCases
 {
     public static Definition Definition(object? v) => Cronwatch.Definition.Of(v as JsObject ?? new JsObject());
@@ -29,7 +29,7 @@ internal static class EvaluateCases
 /// </summary>
 public class EvaluateConformanceTests
 {
-    /// <summary><c>scripts/conformance.mjs</c>'s <c>Sim</c>: one job, its runs and its state.</summary>
+    /// <summary><c>scripts/conformance.mjs</c>'s <c>Sim</c>: one job, its runs, and its state.</summary>
     private sealed class Sim
     {
         private Definition _def;

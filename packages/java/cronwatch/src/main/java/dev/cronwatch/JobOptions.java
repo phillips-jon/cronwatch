@@ -26,7 +26,7 @@ import org.jspecify.annotations.Nullable;
  * }</pre>
  *
  * <p>Durations take the SDK's text ({@code "15m"}, {@code "1h30m"}, stored as written), a {@link
- * Duration} or milliseconds (stored as a number). Options are checked when the job is declared
+ * Duration}, or milliseconds (stored as a number). Options are checked when the job is declared
  * ({@link Cronwatch#job}), with the SDK's messages. A {@code JobOptions} is not safe for use from
  * several threads at once; {@link Cronwatch#job} copies it.
  */
@@ -57,7 +57,8 @@ public final class JobOptions {
   /**
    * When the job is supposed to run: a five or six field cron expression ({@code "0 2 * * *"}), a
    * nickname ({@code "@hourly"}), or an interval ({@code "every 5m"}). Leave it out for a job with
-   * no fixed cadence: failures, duration and budgets are still watched, but nothing is ever missed.
+   * no fixed cadence: failures, duration, and budgets are still watched, but nothing is ever
+   * missed.
    */
   public JobOptions schedule(String expression) {
     return put("schedule", expression);
@@ -65,7 +66,7 @@ public final class JobOptions {
 
   /**
    * The IANA zone the cron expression is read in. The default is the JVM's ({@code TZ}, {@code
-   * /etc/localtime} or {@code -Duser.timezone}). Vercel and GitHub Actions run their crons in UTC.
+   * /etc/localtime}, or {@code -Duser.timezone}). Vercel and GitHub Actions run their crons in UTC.
    */
   public JobOptions timezone(String zone) {
     return put("timezone", zone);
@@ -236,7 +237,7 @@ public final class JobOptions {
 
   /**
    * Sets any field of the stored definition, as a JSON value ({@code null}, a Boolean, a Number, a
-   * String, a List or a {@link JsObject}), for a field this release has no setter for.
+   * String, a List, or a {@link JsObject}), for a field this release has no setter for.
    */
   public JobOptions field(String key, @Nullable Object value) {
     Json.stringify(value);

@@ -8,7 +8,7 @@ namespace Cronwatch.Tests;
 
 /// <summary>
 /// <c>conformance/health.json</c>: health, summaries, percentiles, state normalization, silence,
-/// which queued alerts a retry drops, a run's duration and a state's version.
+/// which queued alerts a retry drops, a run's duration, and a state's version.
 /// </summary>
 public class HealthConformanceTests
 {

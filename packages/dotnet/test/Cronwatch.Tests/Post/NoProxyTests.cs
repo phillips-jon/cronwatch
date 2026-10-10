@@ -21,7 +21,7 @@ public class NoProxyTests
     [Fact]
     public async Task The_default_transport_uses_no_proxy_even_when_the_process_has_one()
     {
-        // HTTPS_PROXY, HTTP_PROXY and the system's settings reach HttpClient only through
+        // HTTPS_PROXY, HTTP_PROXY, and the system's settings reach HttpClient only through
         // HttpClient.DefaultProxy, which is read when a handler that uses a proxy first sends. So
         // setting DefaultProxy stands for setting the variables, without changing the process's
         // environment under tests running at once; this collection runs alone, and it is put back.

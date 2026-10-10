@@ -27,7 +27,7 @@ if Code.ensure_loaded?(Plug.Conn) do
       * `:run` - `{module, function, args}` (required), called as
         `module.function(context, conn, ...args)`, since a router's options
         cannot hold an anonymous function. A raise, throw, exit,
-        `{:error, reason}` or `:error` fails the run, as for any run. A
+        `{:error, reason}`, or `:error` fails the run, as for any run. A
         `%Plug.Conn{}` it returns is the answer (sent as it is, or with the
         status it set), and a status of 400 or more fails the run with
         `HTTP <status> <reason>`.

@@ -24,7 +24,7 @@ module Cronwatch
   #
   #   Cronwatch::Scheduler.sources = [Cronwatch::Scheduler::SidekiqCron.new("config/cron.yml")]
   module Scheduler
-    # A schedule that cannot be read, found or converted exactly.
+    # A schedule that cannot be read, found, or converted exactly.
     class Error < ArgumentError; end
 
     # One recurring entry as the scheduler's config gives it. `schedule` is
@@ -232,7 +232,7 @@ module Cronwatch
       end
 
       # The IANA name for a zone given as SolidQueue.time_zone= takes it: an
-      # IANA name, a Rails name or an ActiveSupport::TimeZone.
+      # IANA name, a Rails name, or an ActiveSupport::TimeZone.
       def iana_zone(zone)
         return zone.tzinfo.name if zone.respond_to?(:tzinfo)
         return zone.to_s if Zone.valid?(zone.to_s)
@@ -442,7 +442,7 @@ module Cronwatch
           return { schedule: nil } if found.flat_map { |source| read_entries(source, :elsewhere_entries) }.any?(&of_class)
 
           raise Error, "cronwatch: #{name} uses schedule: :from_scheduler, but no enabled entry in " \
-                       "#{found.map(&:label).join(" or ")} has class #{name}"
+                       "#{Format.and_list(found.map(&:label), "or")} has class #{name}"
         end
         if matches.length > 1
           raise Error, "cronwatch: #{name} uses schedule: :from_scheduler, but it is scheduled #{matches.length} times " \
@@ -469,7 +469,7 @@ module Cronwatch
       # ...), for every job it declares, and except: keys to leave out.
       def declare_from_scheduler!(except: [], **options)
         bad = options.keys & %i[schedule timezone name]
-        raise ArgumentError, "cronwatch: declare_from_scheduler! takes #{bad.join(" and ")} from the scheduler" if bad.any?
+        raise ArgumentError, "cronwatch: declare_from_scheduler! takes #{Format.and_list(bad)} from the scheduler" if bad.any?
 
         @lock.synchronize { @pending = { except: Array(except).map(&:to_s), options: options.freeze }.freeze }
         declare_pending! if Monitored.ready?
@@ -609,7 +609,7 @@ module Cronwatch
         elsif entry.command
           unless Client::NAME_RE.match?(entry.key)
             raise Error, "cronwatch: #{entry.label}: the key #{entry.key.inspect} cannot be a job name; " \
-                         "use letters, digits, \".\", \"_\", \":\" or \"-\", or leave it out with except:"
+                         "use letters, digits, \".\", \"_\", \":\", or \"-\", or leave it out with except:"
           end
 
           [entry.key, :command]

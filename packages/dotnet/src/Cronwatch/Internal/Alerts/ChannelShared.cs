@@ -35,7 +35,7 @@ internal static class ChannelShared
     public static byte[] HmacSha256(byte[] key, string data) => HMACSHA256.HashData(key, Js.Utf8(data));
 
     /// <summary>
-    /// A stable 32 hex character id for one alert: the same job, type and time always give the
+    /// A stable 32 hex character id for one alert: the same job, type, and time always give the
     /// same id, so a provider that deduplicates on it drops a resend of an alert it already took.
     /// </summary>
     public static string AlertId(Alert a) => Sha256Hex(a.Job + "\n" + a.Type.Value + "\n" + Js.FormatLong(a.At))[..32];
@@ -81,7 +81,7 @@ internal static class ChannelShared
     /// <summary>The link option's answer for this alert, <c>""</c> for none.</summary>
     public static string Link(Func<Alert, string?>? link, Alert a) => link == null ? "" : link(a) ?? "";
 
-    /// <summary>The title, message, triage and link as one plain text block, the way every channel reads.</summary>
+    /// <summary>The title, message, triage, and link as one plain text block, the way every channel reads.</summary>
     public static string PlainText(Alert a, string link)
     {
         var lines = new List<string> { a.Title, "", a.Message };
@@ -120,7 +120,7 @@ internal static class ChannelShared
 
     private const string HexDigits = "0123456789ABCDEF";
 
-    /// <summary>The text's UTF-8 with each byte but ASCII letters, digits and <paramref name="safe"/> as <c>%XX</c>.</summary>
+    /// <summary>The text's UTF-8 with each byte but ASCII letters, digits, and <paramref name="safe"/> as <c>%XX</c>.</summary>
     public static string Percent(string text, string safe, bool plus)
     {
         var b = new StringBuilder(text.Length);

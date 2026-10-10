@@ -1,6 +1,6 @@
 ---
 title: Java schedulers
-description: Watch Spring's @Scheduled methods with no code changes, ShedLock, Quartz and JobRunr: jobs declared from the scheduler's own schedules, checked against its fire times, every run and retry recorded in the thread that runs it, and the check running once per cluster. Plus a plain crontab.
+description: Watch Spring's @Scheduled methods with no code changes, ShedLock, Quartz, and JobRunr: jobs declared from the scheduler's own schedules, checked against its fire times, every run and retry recorded in the thread that runs it, and the check running once per cluster. Plus a plain crontab.
 order: 3.96
 group: Java
 ---
@@ -20,15 +20,15 @@ A program a crontab runs needs no integration: see [a crontab](#a-crontab) below
 
 ## What every integration does
 
-- **Jobs are declared from the scheduler.** Each method, job or recurring job the scheduler runs on a schedule is a CronWatch job with that schedule, in that entry's zone, so a job that stops running is reported missed without you writing a cron expression twice. Each cron is checked against the scheduler's own fire times: Spring, Quartz and JobRunr each read some expressions differently from CronWatch (like cron, and croner in the SDK), so an expression the two read differently is reported once to the error handler and its job watched without a schedule. Its failures, duration, budgets and floors still alert, but it is never reported missed. A fixed rate or interval is `every <interval>`, and a job with several schedules is one job without a schedule.
+- **Jobs are declared from the scheduler.** Each method, job, or recurring job the scheduler runs on a schedule is a CronWatch job with that schedule, in that entry's zone, so a job that stops running is reported missed without you writing a cron expression twice. Each cron is checked against the scheduler's own fire times: Spring, Quartz, and JobRunr each read some expressions differently from CronWatch (like cron, and croner in the SDK), so an expression the two read differently is reported once to the error handler and its job watched without a schedule. Its failures, duration, budgets, and floors still alert, but it is never reported missed. A fixed rate or interval is `every <interval>`, and a job with several schedules is one job without a schedule.
 - **Jobs gone lose their schedule.** A job taken out of the scheduler, in this process or since an earlier deploy, is declared again without its schedule, so it keeps its history and is never reported missed; a missed alert already open closes with a recovery.
-- **Jobs belong to an app.** Every job is tagged with the integration (`spring-scheduled`, `quartz`, `jobrunr`, the same names its runs carry as their trigger) and the app (`quartz:billing`), and the app is in its runs' ids, so two apps sharing a store never take each other's jobs for gone. The app is the integration's `app` option (`cronwatch.app` in the starter), else `CRONWATCH_APP_ID`, else `spring.application.name` in the starter, else the main class. Every instance of one app needs the same. Job names are the scheduler's own, with no prefix; [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names) has the rule every integration follows.
+- **Jobs belong to an app.** Every job is tagged with the integration (`spring-scheduled`, `quartz`, `jobrunr`, the same names its runs carry as their trigger) and the app (`quartz:billing`), and the app is in its runs' ids, so two apps sharing a store never take each other's jobs for gone. The app is the integration's `app` option (`cronwatch.app` in the starter), else `CRONWATCH_APP_ID`, else `spring.application.name` in the starter, else the main class. Every instance of one app needs the same. Job names are the scheduler's own, with no prefix; [Triggers, tags, and job names](/docs/dashboard/#triggers-tags-and-job-names) has the rule every integration follows.
 - **Each run is a run in the scheduler's own thread.** The run is opened just before the job's code runs, in the thread that runs it, and closed just after, so `Cronwatch.current()` works inside the job with no code, and `cronwatch_job` and `cronwatch_run` are in the MDC. A job that throws fails its run, and the scheduler's own error handling does what it did before.
 - **Options per job.** Default options come first, then the schedule, then each job's own options, so a schedule given to one job replaces the scheduler's.
 
 ### Retries
 
-For Quartz and JobRunr, every attempt is a run of its own. An attempt that fails is a failed run with its cause, so failing attempts open one failed alert and the attempt that succeeds closes it with a recovery; `failuresBeforeAlert(3)` counts failed attempts in a row. A Quartz refire (`refireImmediately`) is a new run. A `@Scheduled` method under ShedLock that did not get the lock did not run: its run is taken back, so nothing is judged, no alert is sent and the failures in a row are left as they were. Taking a run back needs a store with `deleteRunIf`, which `MemoryStore` and `SqlStore` have.
+For Quartz and JobRunr, every attempt is a run of its own. An attempt that fails is a failed run with its cause, so failing attempts open one failed alert and the attempt that succeeds closes it with a recovery; `failuresBeforeAlert(3)` counts failed attempts in a row. A Quartz refire (`refireImmediately`) is a new run. A `@Scheduled` method under ShedLock that did not get the lock did not run: its run is taken back, so nothing is judged, no alert is sent, and the failures in a row are left as they were. Taking a run back needs a store with `deleteRunIf`, which `MemoryStore` and `SqlStore` have.
 
 ### The check
 
@@ -53,19 +53,19 @@ implementation("dev.cronwatch:cronwatch-spring-boot-starter:{{JAVA_VERSION}}")
 
 ```properties
 # application.properties
-# store: auto, memory or jdbc (the app's DataSource)
+# store: auto, memory, or jdbc (the app's DataSource)
 cronwatch.store=auto
 cronwatch.retention=30d
 cronwatch.defaults.grace=10m
 cronwatch.check-every=1m
-# check-mode: auto, local, shedlock, quartz or none
+# check-mode: auto, local, shedlock, quartz, or none
 cronwatch.check-mode=auto
 # app: by default $CRONWATCH_APP_ID, else spring.application.name
 cronwatch.app=billing
 cronwatch.jobs[NightlyReports.build].grace=15m
 ```
 
-**The client.** A `Store` bean is the store, else `SqlStore` over your app's one `DataSource`, with `cronwatch.table-prefix` naming its tables, else the memory store. That is `cronwatch.store=auto`, the default: a database `SqlStore` does not know falls back to memory, but one that is only down fails the start. `memory` and `jdbc` choose outright. Every `Channel` bean is a channel (else the console), and a `Triage` bean, `Source` beans and an `ErrorHandler` bean are used when your app has them. When neither `CRONWATCH_ENV` nor `APP_ENV` is set, the environment is the app's active profile (`dev` and `local` are development, `prod` production). The client is closed when the context closes. An app's own `Cronwatch` bean replaces the starter's, and `cronwatch.enabled=false` turns the starter off. The other properties: `cronwatch.cron-secret`, `cronwatch.deliver` (`now` or `at-check`), `cronwatch.redact` and `cronwatch.shutdown-hook`, each defaulting as the builder does, and `cronwatch.defaults.timeout`, `.timezone` and `.failures-before-alert`.
+**The client.** A `Store` bean is the store, else `SqlStore` over your app's one `DataSource`, with `cronwatch.table-prefix` naming its tables, else the memory store. That is `cronwatch.store=auto`, the default: a database `SqlStore` does not know falls back to memory, but one that is only down fails the start. `memory` and `jdbc` choose outright. Every `Channel` bean is a channel (else the console), and a `Triage` bean, `Source` beans, and an `ErrorHandler` bean are used when your app has them. When neither `CRONWATCH_ENV` nor `APP_ENV` is set, the environment is the app's active profile (`dev` and `local` are development, `prod` production). The client is closed when the context closes. An app's own `Cronwatch` bean replaces the starter's, and `cronwatch.enabled=false` turns the starter off. The other properties: `cronwatch.cron-secret`, `cronwatch.deliver` (`now` or `at-check`), `cronwatch.redact` and `cronwatch.shutdown-hook`, each defaulting as the builder does, and `cronwatch.defaults.timeout`, `.timezone`, and `.failures-before-alert`.
 
 ```java
 @Configuration
@@ -79,7 +79,7 @@ class Alerts {
 
 ### @Scheduled
 
-With `@EnableScheduling`, every `@Scheduled` method is watched with no code changes (`cronwatch.scheduled.enabled=false` turns it off). Each invocation is a run (trigger `spring-scheduled`; runs recorded before 1.0 carry `scheduled`), recorded from the `Observation` Spring makes of it, in the thread that runs the method, so `Cronwatch.current()` works inside it; a method that throws fails its run and Spring's error handler does what it did before.
+With `@EnableScheduling`, every `@Scheduled` method is watched with no code changes (`cronwatch.scheduled.enabled=false` turns it off). Each invocation is a run (trigger `spring-scheduled`; runs recorded before 0.11 carry `scheduled`), recorded from the `Observation` Spring makes of it, in the thread that runs the method, so `Cronwatch.current()` works inside it; a method that throws fails its run and Spring's error handler does what it did before.
 
 ```java
 @Component
@@ -94,7 +94,7 @@ class NightlyReports {
 
 **Names.** A job is named `SimpleClassName.method` after the bean's own class (not its proxy's), the full class name when two classes' simple names would give one name. `@CronwatchJob` names it and gives its options (`name`, `description`, `grace`, `timeout`, `maxDuration`, `expect`, `tags`, `failuresBeforeAlert`), and `cronwatch.jobs[<name>].*` properties are given after them.
 
-**Schedules.** A `cron` is declared as written, in the annotation's zone (else the JVM's), and checked against Spring's own reading of it. Spring runs a job whose day of the month and day of the week are both given only when both match, where CronWatch (croner) runs it when either does, so an expression the two read differently is reported once and watched without a schedule. A `fixedRate` is `every <rate>`; so is a `fixedDelay`, whose runs start a delay after the last one ended, so give such a job a grace as long as its longest run. A method with several `@Scheduled` annotations is one job without a schedule. A method that returns a `Mono`, a `Flux` or a Kotlin flow, or suspends, is observed by Spring around its subscription rather than its work, so it is reported and watched without runs.
+**Schedules.** A `cron` is declared as written, in the annotation's zone (else the JVM's), and checked against Spring's own reading of it. Spring runs a job whose day of the month and day of the week are both given only when both match, where CronWatch (croner) runs it when either does, so an expression the two read differently is reported once and watched without a schedule. A `fixedRate` is `every <rate>`; so is a `fixedDelay`, whose runs start a delay after the last one ended, so give such a job a grace as long as its longest run. A method with several `@Scheduled` annotations is one job without a schedule. A method that returns a `Mono`, a `Flux`, or a Kotlin flow, or suspends, is observed by Spring around its subscription rather than its work, so it is reported and watched without runs.
 
 ### ShedLock
 
@@ -200,8 +200,8 @@ A program a crontab runs needs no integration: the job's line wraps its work in 
 */5  *  *   *   *    java -cp app.jar com.example.CronwatchMain check
 ```
 
-`CronwatchMain` is a `main` of your own that calls `CronwatchCli.main(Nightly::cronwatch, args)` with the factory for your client; `check` runs one check, prints what it did and exits non-zero when it fails. [From a crontab](/docs/java/#from-a-crontab) on the Java page has both sides.
+`CronwatchMain` is a `main` of your own that calls `CronwatchCli.main(Nightly::cronwatch, args)` with the factory for your client; `check` runs one check, prints what it did, and exits non-zero when it fails. [From a crontab](/docs/java/#from-a-crontab) on the Java page has both sides.
 
 ## Writing an integration
 
-The integrations above are built on `dev.cronwatch.bridge`: `SchedulerBridge` (the app's tag, a scheduler's fire times checked against CronWatch's, a job declared again without its schedule) and `Watch` (a scheduler's entries declared as jobs, one per name, tagged with the integration and the app). It is public for integration authors, but outside the 1.x promise: it changes when an integration needs it to, in any release, so pin the exact CronWatch version an integration of your own is built on. `Bridge`, `SchedulerBridge`'s name before 1.0, still works, deprecated.
+The integrations above are built on `dev.cronwatch.bridge`: `SchedulerBridge` (the app's tag, a scheduler's fire times checked against CronWatch's, a job declared again without its schedule) and `Watch` (a scheduler's entries declared as jobs, one per name, tagged with the integration and the app). It is public for integration authors, but outside the 1.x promise: it changes when an integration needs it to, in any release, so pin the exact CronWatch version an integration of your own is built on. `Bridge`, `SchedulerBridge`'s name before 0.11, still works, deprecated.

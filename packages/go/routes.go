@@ -69,7 +69,7 @@ type routesConfig struct {
 // ?token=<token> and a cookie is set, or sign in through the form on the
 // sign-in page. The default is CRONWATCH_TOKEN; a token, given here or in
 // the variable, that is empty or only whitespace counts as unset, and any
-// other is used as it is. With no token in development (CRONWATCH_ENV, APP_ENV or
+// other is used as it is. With no token in development (CRONWATCH_ENV, APP_ENV, or
 // GO_ENV naming it), the routes make a random one and print a sign-in link
 // to Stdout on their first request; with no token otherwise they answer
 // 503. /api/check also takes the client's cron secret as a bearer, so a
@@ -189,7 +189,7 @@ func (c *Client) Routes(options ...RoutesOption) (*Routes, error) {
 		}
 	}
 	// A handler cannot tell a local caller from a remote one (proxies,
-	// tunnels and a server listening on every interface all look alike), so
+	// tunnels, and a server listening on every interface all look alike), so
 	// development gets a token too: made here, and shown only in the log.
 	rt.generated = configured == "" && !cfg.open && environment() == "development"
 	rt.token = configured
@@ -615,7 +615,7 @@ func (rt *Routes) serve(r *http.Request, pathname, path, rawQuery, base string, 
 		})
 	}
 
-	// The app shell: the manifest, icons, service worker, app.js and the
+	// The app shell: the manifest, icons, service worker, app.js, and the
 	// offline page. Served to anyone, since a browser fetches some of it
 	// without cookies and none of it says anything about the jobs.
 	if method == http.MethodGet || method == http.MethodHead {

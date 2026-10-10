@@ -1,7 +1,7 @@
 // conformance/client.json unknownFields, replayed over each store: what a
 // newer release wrote (a definition or state key, a run status, a trigger,
 // an open condition this release does not know) survives a check, a
-// silence, an unsilence and a run, and the alerts carry the definition as
+// silence, an unsilence, and a run, and the alerts carry the definition as
 // stored. Postgres runs when CRONWATCH_TEST_PG is set.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";

@@ -2,7 +2,7 @@
 
 module Cronwatch
   # A run's output and error on their way to the store: redaction, the cap,
-  # NUL and encoding. `redact_secrets` is public, the default `redact:` and
+  # NUL, and encoding. `redact_secrets` is public, the default `redact:` and
   # the one to call from a redact of your own; the rest is @api private.
   module Output
     # Output is capped so a chatty job cannot fill the store. The tail is kept.
@@ -31,7 +31,7 @@ module Cronwatch
         ci("credential"),
       ].join("|").freeze
 
-      # "=", ":" or a hash rocket, between a name and its value.
+      # "=", ":", or a hash rocket, between a name and its value.
       ASSIGN = "(?:=>|[=:])"
 
       # They apply in this order, each to the text the ones before it left.
@@ -59,7 +59,7 @@ module Cronwatch
         # Incoming webhook URLs carry their secret in the path.
         [Regexp.new("(?a)(\\b#{ci("hooks.slack.com")}/(?:#{ci("services")}|#{ci("workflows")}|#{ci("triggers")})/)[A-Za-z0-9/_-]{1,255}"), true],
         [Regexp.new("(?a)(\\b#{ci("discord")}(?:#{ci("app")})?#{ci(".com/api/")}(?:[Vv][0-9]{1,2}/)?#{ci("webhooks/")})[A-Za-z0-9/_-]{1,255}"), true],
-        # Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI and Google style keys.
+        # Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI, and Google style keys.
         [/(?a)\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/, false],
         [/(?a)\b(?:gh[pousr]_[A-Za-z0-9]{30,255}|github_pat_[A-Za-z0-9_]{20,255})\b/, false],
         [/(?a)\bxox[abposr]-[A-Za-z0-9-]{10,255}/, false],
@@ -113,7 +113,7 @@ module Cronwatch
     # Text as valid UTF-8, whatever it was read as: bytes that are not UTF-8
     # (binary output, a C extension's message) become U+FFFD, and text in
     # another encoding is converted. JavaScript strings cannot hold anything
-    # else, and the store, the alerts and the redaction all expect UTF-8.
+    # else, and the store, the alerts, and the redaction all expect UTF-8.
     def utf8(text)
       text = text.to_s
       return text if text.encoding == Encoding::UTF_8 && text.valid_encoding?
@@ -213,8 +213,8 @@ module Cronwatch
 
     # The default `redact`: blanks values that look like secrets (key=value
     # pairs with secret-ish names, Authorization headers, URL credentials,
-    # bearer tokens, JWTs, PEM private keys, webhook URLs and well-known token
-    # formats) before output or an error is stored, shown or sent anywhere. Matches exactly what the SDK's redactSecrets matches.
+    # bearer tokens, JWTs, PEM private keys, webhook URLs, and well-known token
+    # formats) before output or an error is stored, shown, or sent anywhere. Matches exactly what the SDK's redactSecrets matches.
     def redact_secrets(text)
       astral = !text.ascii_only? && Secrets::ASTRAL.match?(text)
       out = astral ? Secrets.to_units(text) : text

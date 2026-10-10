@@ -25,11 +25,11 @@ enum Backend {
     Mysql(MySqlPool),
 }
 
-/// Keeps CronWatch's jobs, runs and state in the app's own database through
+/// Keeps CronWatch's jobs, runs, and state in the app's own database through
 /// sqlx, with the app's pool: the SDK's tables (stores/sql.ts), the same
-/// names, columns and statements, and the SDK's JSON in the JSON columns byte
+/// names, columns, and statements, and the SDK's JSON in the JSON columns byte
 /// for byte, so a Rust process shares a database with a Node, Ruby, Python,
-/// PHP or Go one.
+/// PHP, or Go one.
 ///
 /// On SQLite it holds one connection of the pool for its statements, in
 /// turn, as the SDK's store and the Go port's do: an in-memory database is
@@ -62,7 +62,7 @@ impl SqlStore {
     }
 
     /// A store over the app's SQLite pool, with the tables named
-    /// `cronwatch_jobs`, `cronwatch_runs` and `cronwatch_state`. Nothing is
+    /// `cronwatch_jobs`, `cronwatch_runs`, and `cronwatch_state`. Nothing is
     /// read or written until the client's first use calls `init`.
     #[cfg(feature = "sqlite")]
     pub fn sqlite(pool: SqlitePool) -> SqlStore {
@@ -91,7 +91,7 @@ impl SqlStore {
         SqlStore::new(Dialect::Mysql, Backend::Mysql(pool))
     }
 
-    /// Starts every table name with `prefix`: lowercase letters, digits and
+    /// Starts every table name with `prefix`: lowercase letters, digits, and
     /// underscores, not starting with a digit. Default `cronwatch_`. Anything
     /// else is refused with the SDK's message.
     pub fn prefix(mut self, prefix: &str) -> Result<SqlStore, cronwatch::Error> {
@@ -232,7 +232,7 @@ fn run_of(row: &Row) -> Result<Run, BoxError> {
 // Parameters in statement order, so every dialect binds the same values.
 // Postgres refuses U+0000 in TEXT and JSONB, and a refused write loses the
 // whole row, so every dialect writes text without it (stores/sql.ts): a
-// run's trigger, output, error and metric names (Run::without_nul), and
+// run's trigger, output, error, and metric names (Run::without_nul), and
 // every key and string of a definition and a state. Identifiers are written
 // as given; the client refuses one with a NUL before it gets here.
 
@@ -337,7 +337,7 @@ impl Store for SqlStore {
         Box::pin(async move { self.query(&self.sql.list_jobs, Vec::new()).await?.iter().map(job_of).collect() })
     }
 
-    /// Removes the job, its runs and its state in one transaction.
+    /// Removes the job, its runs, and its state in one transaction.
     fn delete_job<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<(), BoxError>> {
         Box::pin(async move {
             let statements = [&*self.sql.delete_runs, &*self.sql.delete_state, &*self.sql.delete_job];

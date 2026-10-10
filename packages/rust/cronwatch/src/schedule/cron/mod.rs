@@ -5,11 +5,11 @@
 //! spring-forward gap moves forward by the gap, and a time that happens
 //! twice is the earlier one. The names and the order of every step follow
 //! croner's source, as the Go port's `internal/schedule/cron`, the Python
-//! port's `_cron.py` and the PHP port's `src/Cron` do, so the five agree on
-//! every expression they read, every one they refuse and every fire time.
+//! port's `_cron.py`, and the PHP port's `src/Cron` do, so the five agree on
+//! every expression they read, every one they refuse, and every fire time.
 //!
 //! Where it differs from croner, as the SDK's `parseSchedule` does since
-//! 1.0, so the SDK and every port agree:
+//! 0.11, so the SDK and every port agree:
 //!
 //! - A date no month has (`0 0 30 2 *`) makes croner, which walks by
 //!   recursion a year at a time, answer nothing or run out of stack. This

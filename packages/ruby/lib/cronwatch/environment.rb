@@ -5,7 +5,7 @@ module Cronwatch
   # first of CRONWATCH_ENV, APP_ENV, then the app's own (Rails.env when Rails
   # is loaded, else RAILS_ENV, then RACK_ENV) that holds more than spaces,
   # trimmed and lowercased, with "prod" read as "production" and "dev",
-  # "local", "test" and "testing" as "development". None set is neither,
+  # "local", "test", and "testing" as "development". None set is neither,
   # which is the safe reading. The SDK reads NODE_ENV where this reads the
   # app's own.
   #
@@ -60,7 +60,7 @@ module Cronwatch
     end
 
     # A secret from the environment (CRONWATCH_TOKEN, CRON_SECRET): nil when
-    # the variable is unset, empty or only whitespace, so a blank value counts
+    # the variable is unset, empty, or only whitespace, so a blank value counts
     # as not set and the routes fail closed. Any other value is used as it
     # is, untrimmed.
     def secret(variable)
@@ -104,10 +104,10 @@ module Cronwatch
     end
 
     # Whether development was named by the app rather than by its server,
-    # for the dashboard's own token (Cronwatch::Web). Puma, Unicorn, Thin
+    # for the dashboard's own token (Cronwatch::Web). Puma, Unicorn, Thin,
     # and rackup set RACK_ENV to "development" when nothing names an
     # environment, so under one of them, in production too, RACK_ENV alone
-    # reads "development". There it takes CRONWATCH_ENV, APP_ENV, Rails.env
+    # reads "development". There it takes CRONWATCH_ENV, APP_ENV, Rails.env,
     # or RAILS_ENV to say development; any other value of RACK_ENV that reads
     # as development ("test", "dev") still counts, as no server sets it.
     def stated_development?

@@ -466,7 +466,7 @@ func failuresBeforeAlert(def Definition) float64 {
 	return math.Max(1, n)
 }
 
-// onRunFinish is called when a run finishes with status ok, failed or
+// onRunFinish is called when a run finishes with status ok, failed, or
 // timeout. history is the job's earlier runs, newest first, not including
 // this one.
 func onRunFinish(def Definition, run Run, state JobState, history []Run, now int64) (evaluation, error) {
@@ -766,7 +766,7 @@ func staleAlert(alert Alert, state JobState) bool {
 }
 
 // jobHealth is how a job looks at a glance. Silence wins, then stuck,
-// failing and late.
+// failing, and late.
 func jobHealth(def Definition, lastRun *Run, state JobState, now int64) (JobHealth, error) {
 	open := openConditions(state)
 	if isSilenced(state, now) {

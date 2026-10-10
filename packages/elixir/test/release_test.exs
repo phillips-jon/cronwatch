@@ -34,7 +34,7 @@ defmodule Cronwatch.ReleaseTest do
     %{path: path}
   end
 
-  test "a check starts the repo and the instance, checks once and stops them", %{path: path} do
+  test "a check starts the repo and the instance, checks once, and stops them", %{path: path} do
     out = capture_io(fn -> assert {:ok, _} = Release.check(:release_test_cw, halt: false) end)
     assert out == "cronwatch: checked 1 job, sent 0 alerts\n"
     assert Process.whereis(Repo) == nil, "the repo it started is stopped"

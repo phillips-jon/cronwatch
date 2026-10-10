@@ -28,7 +28,7 @@ internal static class QuartzSupport
         public List<string> Types() => Alerts.Select(a => a.Type.Value).ToList();
     }
 
-    /// <summary>A test's client, what it sent and what it reported.</summary>
+    /// <summary>A test's client, what it sent, and what it reported.</summary>
     public sealed record Made(CronwatchClient Cw, IStore Store, Capture Alerts, ConcurrentQueue<string> Errors) : IAsyncDisposable
     {
         public ValueTask DisposeAsync() => Cw.DisposeAsync();

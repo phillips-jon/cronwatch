@@ -423,7 +423,7 @@ final class Parser {
       }
       case '1', '2', '3', '4', '5', '6', '7', '8', '9', 'c', 'k', 'p', 'P' ->
           // JavaScript reads these as a backreference, a control character, a named
-          // backreference or a property; read as the plain letter they would match something
+          // backreference, or a property; read as the plain letter they would match something
           // else, so they are refused.
           throw new IllegalArgumentException("jsre: \\" + c + " is not supported");
       case 'x', 'u' -> {

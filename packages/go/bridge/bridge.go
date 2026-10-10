@@ -1,5 +1,5 @@
 // Package bridge is what the scheduler integrations share: the robfigcron,
-// gocron, river and asynq modules beside this one, each a module of its
+// gocron, river, and asynq modules beside this one, each a module of its
 // own. It uses the standard library only, so it lives in the core module.
 // An app does not need it; a scheduler integration of your own can.
 //
@@ -8,7 +8,7 @@
 //     gone again without its schedule, so it is never reported missed.
 //   - CheckFires checks a schedule converted from a scheduler's own against
 //     the scheduler's own fire times.
-//   - FieldText, EveryText and Zone write what a scheduler holds as the
+//   - FieldText, EveryText, and Zone write what a scheduler holds as the
 //     schedule text CronWatch reads.
 //
 // Which jobs are this app's is told by two tags, the integration's
@@ -67,7 +67,7 @@ var (
 )
 
 // ValidName reports whether name is a CronWatch job name: 1 to 120
-// letters, digits, ".", "_", ":" or "-", starting with a letter or digit.
+// letters, digits, ".", "_", ":", or "-", starting with a letter or digit.
 func ValidName(name string) bool { return validName.MatchString(name) }
 
 // FuncName is a job name from a function's name as the runtime writes it
@@ -91,7 +91,7 @@ func FuncName(full string) (string, error) {
 
 // AppTag is the tag that names the app under an integration's tag:
 // "<tag>:<app>", the app's name lowercased, with anything but letters,
-// digits, ".", "_" and "-" made "-". A name that is empty once cleaned, or
+// digits, ".", "_", and "-" made "-". A name that is empty once cleaned, or
 // longer than 48 characters, is cut and given 8 hex characters of its MD5,
 // so two names never share a tag. The PHP port's appTag(), character for
 // character.

@@ -187,7 +187,7 @@ func (h *jobHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // copyResponse answers with a response the function returned: its headers,
-// status and body.
+// status, and body.
 func copyResponse(w http.ResponseWriter, res *http.Response) {
 	defer func() {
 		if res.Body != nil {

@@ -10,7 +10,7 @@ module Cronwatch
     # get_job, list_jobs, delete_job, insert_run, update_run, update_run_if
     # (optional: without it the client reads the run, then writes it), get_run,
     # list_runs, last_run, running_runs, get_state, set_state, compare_and_set_state
-    # (optional: without it the client falls back to set_state), prune and close
+    # (optional: without it the client falls back to set_state), prune, and close
     # (optional). They take and return the types in types.rb.
     class Memory
       def initialize

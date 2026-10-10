@@ -8,7 +8,7 @@ use Cronwatch\JobState;
 
 /**
  * Keeps everything in one SQLite file through PDO (stores/sqlite.ts): the
- * same tables, statements and JSON as the SDK's store, so a Node, a Python
+ * same tables, statements, and JSON as the SDK's store, so a Node, a Python,
  * and a PHP process can share the file. WAL mode, so the app's reads never
  * block on a run being written. The right choice for a single server.
  *
@@ -18,7 +18,7 @@ use Cronwatch\JobState;
  * The directory is created when missing and the file made private (0600).
  * ":memory:" works too. Without a path the file is data/cronwatch.db in the
  * app's root, beside its vendor directory (see defaultPath()). `prefix`
- * names the tables: lowercase letters, digits and underscores, default
+ * names the tables: lowercase letters, digits, and underscores, default
  * "cronwatch_".
  */
 final class SqliteStore extends PdoStore

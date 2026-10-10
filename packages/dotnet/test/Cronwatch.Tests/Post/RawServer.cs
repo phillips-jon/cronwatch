@@ -87,7 +87,7 @@ internal sealed class RawServer : IAsyncDisposable
     /// <summary>An HTTPS server presenting <paramref name="certificate"/>.</summary>
     public static RawServer StartTls(X509Certificate2 certificate, Func<Seen, Stream, CancellationToken, Task> answer) => new(answer, certificate);
 
-    /// <summary>An answer of a status, headers and a body, framed with its length.</summary>
+    /// <summary>An answer of a status, headers, and a body, framed with its length.</summary>
     public static Func<Seen, Stream, CancellationToken, Task> Answer(int status, string body = "", params string[] headers) =>
         async (_, stream, ct) =>
         {

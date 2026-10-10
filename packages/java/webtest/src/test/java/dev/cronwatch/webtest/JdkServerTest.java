@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The dashboard and a job's handler behind the JDK's own server ({@link WebServer}): the base path
- * found from the context, an encoded slash and a {@code HEAD} passed through, a request that ended
+ * found from the context, an encoded slash, and a {@code HEAD} passed through, a request that ended
  * before its answer not reported, and a handler reading its body over the wire.
  */
 class JdkServerTest {

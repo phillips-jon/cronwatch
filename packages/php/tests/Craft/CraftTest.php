@@ -31,7 +31,7 @@ use PHPUnit\Framework\TestCase;
  * with the plugin installed from fixtures, which hides what needs testing
  * here (the library's own connection to Craft's tables, a command or queue
  * run in a process of its own, the error handler ending a command, the
- * Control Panel's routes, CSRF and permissions).
+ * Control Panel's routes, CSRF, and permissions).
  *
  * The tests share one install and run in order; the last uninstalls the plugin.
  */

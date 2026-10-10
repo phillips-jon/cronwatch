@@ -111,7 +111,7 @@ def state_version(state: JobState | None) -> int:
     """The version a stored state counts as for compare_and_set_state: its
     `version` when that is a whole number from 0 to MAX_DURATION_MS (2^53 - 1),
     else 0, as when it is absent. The SQL stores read it the same way, so a
-    foreign row's 1.5, "x" or -1 is written over by the next update instead of
+    foreign row's 1.5, "x", or -1 is written over by the next update instead of
     refusing every compare-and-set of its job for good."""
     version = None if state is None else state.version
     if isinstance(version, bool) or not isinstance(version, (int, float)):
@@ -126,7 +126,7 @@ def failure_count(state: JobState | None) -> int:
     `consecutive_failures` when that is a whole number, held at
     MAX_DURATION_MS (2^53 - 1), and 0 when it is negative or not a whole
     number. A foreign row's count past 2^53, or at a 64-bit limit, stays at
-    the top, and a 1.5, "3" or -1 counts as none."""
+    the top, and a 1.5, "3", or -1 counts as none."""
     count = None if state is None else state.consecutive_failures
     if isinstance(count, bool) or not isinstance(count, (int, float)):
         return 0
@@ -156,7 +156,7 @@ def normalize_state(state: JobState | Mapping[str, Any] | Any, job: str) -> JobS
     by an older version lacks the newer fields. `sending` and `under_floor`
     are the exceptions: each is there only while it holds something.
 
-    Read leniently, since a foreign, hand-edited or damaged row must affect
+    Read leniently, since a foreign, hand-edited, or damaged row must affect
     only its own job, and the next write puts it right: a state that is not
     an object (a JobState, or its JSON as a mapping) reads as none; `open`
     keeps only its entries whose value is a number; `silenced_until` and
@@ -453,7 +453,7 @@ def on_run_start(state: JobState) -> JobState:
 
 
 def on_run_finish(definition: JobDefinition, run: Run, state: JobState, history: Sequence[Run], now: int) -> Evaluation:
-    """Called when a run finishes with status ok, failed or timeout. `history`
+    """Called when a run finishes with status ok, failed, or timeout. `history`
     is the job's earlier runs, newest first, not including this one."""
     following = _clone_state(state)
     alerts: list[AlertDraft] = []
@@ -610,7 +610,7 @@ _MISSING = object()
 
 
 def job_health(definition: JobDefinition, last_run: Run | None, state: JobState, now: int) -> JobHealth:
-    """How a job looks at a glance. Silence wins, then stuck, failing and late."""
+    """How a job looks at a glance. Silence wins, then stuck, failing, and late."""
     opened = open_conditions(state)
     if is_silenced(state, now):
         return JobHealth.SILENCED

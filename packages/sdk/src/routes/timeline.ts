@@ -14,6 +14,7 @@
  */
 import { FIRST_DATE_MS, LAST_DATE_MS, formatDuration } from "../duration.js";
 import { graceMs, isStuck, timeoutMs } from "../evaluate.js";
+import { andList } from "../format.js";
 import { expectation, firesBetween, parseSchedule, type ParsedSchedule } from "../schedule.js";
 import type { JobSummary, Run } from "../types.js";
 import { escapeHtml as h, escapeName } from "./escape.js";
@@ -200,11 +201,11 @@ export function laneNote(job: JobSummary, missed: number | null, now: number): s
   if (job.open.includes("stuck")) return "stuck";
   if (job.open.includes("over_budget") && last) {
     const over = overCeilings(job);
-    return `went over budget${over.length ? ` on ${over.join(" and ")}` : ""} at ${when(last.startedAt, now)}`;
+    return `went over budget${over.length ? ` on ${andList(over)}` : ""} at ${when(last.startedAt, now)}`;
   }
   if (job.open.includes("under_floor") && last) {
     const under = underFloors(job);
-    return `fell short${under.length ? ` on ${under.join(" and ")}` : ""} at ${when(last.startedAt, now)}`;
+    return `fell short${under.length ? ` on ${andList(under)}` : ""} at ${when(last.startedAt, now)}`;
   }
   if (job.open.includes("slow") && last?.durationMs != null) return `slow: took ${formatDuration(last.durationMs)}`;
   if (job.open.includes("failed")) return "failing";
@@ -360,7 +361,7 @@ function legend(): string {
     [box("run ok"), "ran"],
     [box("run bad"), "failed"],
     [box("run timeout"), "timed out"],
-    [box("run warn"), "over budget, under floor or slow"],
+    [box("run warn"), "over budget, under floor, or slow"],
     [box("run running"), "running"],
     [box("missed"), "missed"],
   ];

@@ -2,13 +2,13 @@
 // nothing can wrap them (sources/pgcron.ts). As a source, on every check
 // it reads cron.job and declares each job with its schedule, then copies
 // new rows of cron.job_run_details in as runs (ids "pgcron:<runid>"), so
-// the usual evaluation raises missed, failed, stuck and slow alerts.
+// the usual evaluation raises missed, failed, stuck, and slow alerts.
 //
 //	source := pgcron.New(db, pgcron.Options{Prefix: "db:"}) // the app's *sql.DB, any Postgres driver
 //	cw, err := cronwatch.New(cronwatch.WithStore(store), cronwatch.WithSources(source))
 //	cw.StartChecking(time.Minute)
 //
-// A job that is renamed, unscheduled or no longer picked keeps its old
+// A job that is renamed, unscheduled, or no longer picked keeps its old
 // name's runs and history, and that name is declared again without a
 // schedule, so it is never reported missed. Its description says why.
 //
@@ -82,7 +82,7 @@ type Options struct {
 	// or OptionsFor that panics, is reported once and fails only that job,
 	// which keeps its last declaration until the callback works again.
 	JobName func(Job) string
-	// Options are job options (Grace, Timeout, MaxDuration, Expect and the
+	// Options are job options (Grace, Timeout, MaxDuration, Expect, and the
 	// rest) for every job; OptionsFor gives them per job. The schedule and
 	// timezone always come from pg_cron.
 	Options    []cronwatch.JobOption
@@ -648,7 +648,7 @@ func (s *Source) Sync(ctx context.Context, host cronwatch.SourceHost) ([]cronwat
 		definitions[j.JobID] = definition
 	}
 
-	// A name this source used for a job that has since been renamed, unscheduled or dropped from the jobs picked.
+	// A name this source used for a job that has since been renamed, unscheduled, or dropped from the jobs picked.
 	inUse := map[string]bool{}
 	for _, name := range names {
 		inUse[name] = true
@@ -713,7 +713,7 @@ func (s *Source) Sync(ctx context.Context, host cronwatch.SourceHost) ([]cronwat
 		}
 		// A run copied under a name retired since (a rename, a job no
 		// longer picked) and then forgotten (the dashboard's forget) has no
-		// job to go to: it is let go, never recorded and never read again.
+		// job to go to: it is let go, never recorded, and never read again.
 		if !ok || (canTell && !inUse[name] && !declares.Declares(name)) {
 			delete(s.pending, row.RunID)
 			delete(s.held, row.RunID)

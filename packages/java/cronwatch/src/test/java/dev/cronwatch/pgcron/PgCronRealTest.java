@@ -37,7 +37,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * The pg_cron source against a real pg_cron, as the SDK's {@code pgcron.test.ts} and the Go, Rust
+ * The pg_cron source against a real pg_cron, as the SDK's {@code pgcron.test.ts} and the Go, Rust,
  * and Elixir ports run it, when {@code CRONWATCH_TEST_PGCRON} is the URL of a Postgres with pg_cron
  * preloaded ({@code cron.database_name} naming that database). Waits are polls, held to 30 seconds
  * each.

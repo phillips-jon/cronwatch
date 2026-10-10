@@ -11,7 +11,7 @@ import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
 import org.jspecify.annotations.Nullable;
 
-/** What the evaluate, format and health replays share: reading their fixtures' values. */
+/** What the evaluate, format, and health replays share: reading their fixtures' values. */
 final class Cases {
   private Cases() {}
 

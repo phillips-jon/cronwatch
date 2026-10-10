@@ -11,7 +11,7 @@
 # integration authors and outside the 1.x promise. A package new since the
 # baseline has nothing to compare against; a package that is gone fails.
 #
-#   scripts/go-apidiff.sh            needs git tags, go and apidiff on PATH
+#   scripts/go-apidiff.sh            needs git tags, go, and apidiff on PATH
 #
 # An incompatible change waits for a major release (site/docs/stability.md).
 # The one written exception: river and asynq follow River and Asynq, both

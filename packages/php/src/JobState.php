@@ -47,7 +47,7 @@ final class JobState
     /**
      * A state as stored. A foreign or hand-edited row may hold anything, so
      * the fields are read leniently: a time that is not a number, a
-     * condition name that is not a string or a queued alert that is not an
+     * condition name that is not a string, or a queued alert that is not an
      * object reads as absent, so one odd value never makes the job
      * unevaluable, or its silence impossible to change.
      */
@@ -84,7 +84,7 @@ final class JobState
 
     /**
      * A stored state as decoded, read leniently (see fromJson()), or null when
-     * it is not an object at all (a foreign row's 5, "x" or [], or text that
+     * it is not an object at all (a foreign row's 5, "x", or [], or text that
      * did not parse): no state, which Evaluate::normalizeState() reads as a
      * fresh one.
      */
@@ -109,7 +109,7 @@ final class JobState
     }
 
     /**
-     * pendingRecovery, undelivered and version are left out when unset, as in
+     * pendingRecovery, undelivered, and version are left out when unset, as in
      * state written before they existed, and sending and underFloor when they
      * hold nothing. The version comes after the others, then sending and
      * underFloor, where the SDK's spread of a normalized state puts them. Fields this release does not

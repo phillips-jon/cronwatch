@@ -1,25 +1,25 @@
 ---
-title: Schedules, grace and timeouts
+title: Schedules, grace, and timeouts
 description: Cron expressions, intervals, timezones, and exactly how a missed or stuck run is decided.
 order: 4
 group: Reference
 ---
 
-# Schedules, grace and timeouts
+# Schedules, grace, and timeouts
 
-Every port applies these rules the same way: TypeScript, Ruby, Python, PHP, Go, Rust, Elixir, Java and .NET. The examples use the TypeScript names; each language's page has its own spelling (`cw.check()` is `client.check` in Ruby, for one). In Rails, a job can take its schedule and timezone from Solid Queue or sidekiq-cron instead; see [Schedule the job](/docs/rails/#schedule-the-job).
+Every port applies these rules the same way: TypeScript, Ruby, Python, PHP, Go, Rust, Elixir, Java, and .NET. The examples use the TypeScript names; each language's page has its own spelling (`cw.check()` is `client.check` in Ruby, for one). In Rails, a job can take its schedule and timezone from Solid Queue or sidekiq-cron instead; see [Schedule the job](/docs/rails/#schedule-the-job).
 
 ## Schedule syntax
 
 | Form | Example | Notes |
 |---|---|---|
-| Cron, five fields | `0 2 * * *` | minute hour day month weekday, standard syntax with `*/n`, ranges and lists |
+| Cron, five fields | `0 2 * * *` | minute hour day month weekday, standard syntax with `*/n`, ranges, and lists |
 | Cron, six fields | `0 */30 * * * *` | a leading seconds field |
 | Nickname | `@yearly` (or `@annually`), `@monthly`, `@weekly`, `@daily` (or `@midnight`), `@hourly` | each fires at the start of its period: `@weekly` is Sunday at 00:00, `@yearly` January 1st. `@reboot` is not a schedule and is refused |
 | Interval | `every 15m`, `every 6h`, `every 2d` | at least one second (`every 500ms` throws); counted from the last run's start, or from registration before the first run |
-| None | | watched for failures, duration and budgets; never missed |
+| None | | watched for failures, duration, and budgets; never missed |
 
-Two schedules that never make sense are settled the same way in every language. A one-time date in place of a cron expression (`2026-12-01T00:00:00`, or anything else with a colon after its first character) is refused when the job is declared: CronWatch watches jobs that repeat. A cron that names a date no month has (`0 0 30 2 *`, `0 0 31 4,6,9,11 *`) is accepted and never fires, so the job is never due and never missed; its runs are still watched for failures, duration and budgets.
+Two schedules that never make sense are settled the same way in every language. A one-time date in place of a cron expression (`2026-12-01T00:00:00`, or anything else with a colon after its first character) is refused when the job is declared: CronWatch watches jobs that repeat. A cron that names a date no month has (`0 0 30 2 *`, `0 0 31 4,6,9,11 *`) is accepted and never fires, so the job is never due and never missed; its runs are still watched for failures, duration, and budgets.
 
 Durations everywhere use the same units: `ms`, `s`, `m`, `h`, `d`, `w`, and compounds like `1h30m`. A number is milliseconds. A duration string is at most 64 characters; a longer one is refused.
 

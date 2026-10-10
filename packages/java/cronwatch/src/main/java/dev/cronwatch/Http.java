@@ -58,7 +58,7 @@ final class Http {
     return status == null ? null : failureText(status);
   }
 
-  /** The HTTP status of a dashboard, JDK or Spring answer, or null. */
+  /** The HTTP status of a dashboard, JDK, or Spring answer, or null. */
   static @Nullable Integer status(@Nullable Object value) {
     if (value == null) {
       return null;

@@ -33,7 +33,7 @@ class ActiveRecordStoreOptionsTest < Minitest::Test
 
   def test_the_message_matches_the_sdk
     error = assert_raises(ArgumentError) { Cronwatch::Stores::ActiveRecord.new(prefix: "Cw_") }
-    assert_equal 'cronwatch: invalid table prefix "Cw_". Use lowercase letters, digits and underscores, ' \
+    assert_equal 'cronwatch: invalid table prefix "Cw_". Use lowercase letters, digits, and underscores, ' \
                  "not starting with a digit, at most 47 characters.", error.message
   end
 

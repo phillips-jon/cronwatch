@@ -1,6 +1,6 @@
 """Schedules: "0 2 * * *" (cron, five or six fields), "@hourly", or "every
-5m". Due times, deadlines and what a run covers, as schedule.ts has them.
-Fire times come from the port of croner in _cron.py, so a Node, a Ruby and a
+5m". Due times, deadlines, and what a run covers, as schedule.ts has them.
+Fire times come from the port of croner in _cron.py, so a Node, a Ruby, and a
 Python process sharing one store agree on every due time."""
 
 from __future__ import annotations

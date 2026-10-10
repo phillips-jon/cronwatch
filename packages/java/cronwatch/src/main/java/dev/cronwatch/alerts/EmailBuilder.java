@@ -5,9 +5,9 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * What every email channel's options builder takes beyond a channel's: the sender, the recipients
- * and a subject prefix. Resend, Postmark, SendGrid, Mailgun and SES send the same mail: one
- * subject, a plain text body and a small HTML body.
+ * What every email channel's options builder takes beyond a channel's: the sender, the recipients,
+ * and a subject prefix. Resend, Postmark, SendGrid, Mailgun, and SES send the same mail: one
+ * subject, a plain text body, and a small HTML body.
  *
  * @param <B> the builder itself
  */

@@ -1,7 +1,7 @@
 //! Replays `conformance/client.json`, the first fixture driven through the
 //! client's public API rather than a pure function (the SDK's replay is
 //! `packages/sdk/test/unknown-fields.test.ts`): the run ids `start`,
-//! `resume` and `record_run` take (`runIds`), and what a client keeps of
+//! `resume`, and `record_run` take (`runIds`), and what a client keeps of
 //! stored data a newer release wrote (`unknownFields`). Shared by the core's
 //! tests, over the memory store, and `cronwatch-sqlx`'s, over SQLite and the
 //! servers, through `#[path]`.
@@ -138,7 +138,7 @@ fn stored_job(job: &StoredJob) -> Value {
 /// `unknownFields`: seeds `store` with what a newer release wrote (a
 /// definition and a state with keys this release does not know, a run whose
 /// status it does not know, a trigger it does not know, an open condition it
-/// does not know), then checks, silences, unsilences, reads the summary and
+/// does not know), then checks, silences, unsilences, reads the summary, and
 /// declares and runs the job, comparing after each step what the store
 /// reads back and what was sent as JSON values. Answers how many steps ran.
 pub async fn replay_unknown_fields(store: Arc<dyn Store>) -> usize {

@@ -95,10 +95,10 @@ function frontmatter(text) {
 }
 
 /**
- * Minimal, safe syntax colouring for TypeScript, Ruby, shell, YAML and JSON blocks.
+ * Minimal, safe syntax colouring for TypeScript, Ruby, shell, YAML, and JSON blocks.
  * Strings and comments are found in one left-to-right pass, so a // or # inside
  * a string (a URL, say) stays part of the string. A comment marker only counts
- * at the start of a line or after whitespace: // in code, # in Ruby, shell and YAML.
+ * at the start of a line or after whitespace: // in code, # in Ruby, shell, and YAML.
  * Ruby also gets its keywords, symbols (:name, and name: as a key) in the
  * string colour, and constants (Cronwatch::ActiveJob) in ink.
  */
@@ -127,7 +127,7 @@ function highlight(code, lang) {
 
 /**
  * The heading ids given so far on the page being rendered. A repeated
- * heading gets its slug with -1, -2 and so on, as GitHub numbers them, so
+ * heading gets its slug with -1, -2, and so on, as GitHub numbers them, so
  * every #fragment names one section. markdown() starts each page afresh.
  */
 let headingIds = new Set();
@@ -275,7 +275,7 @@ const need = (re, text, what) => {
 
 /**
  * The dashboard page as cw.routes() served it for the demo jobs, taken
- * apart: the hour labels, grid and now line of its last-24-hours timeline,
+ * apart: the hour labels, grid, and now line of its last-24-hours timeline,
  * each lane's marks and note, its legend, and the rows of its jobs table.
  * The landing page redraws these under its own stylesheet, because its CSP
  * allows no style attributes and the dashboard places things with them.
@@ -597,7 +597,7 @@ function demoContent() {
   return out;
 }
 
-/* ---- Terms, privacy and the contact form. ---- */
+/* ---- Terms, privacy, and the contact form. ---- */
 
 /** A page with its mono label down the left, the way the landing sets a section. */
 function solo(label, inner) {
@@ -685,10 +685,10 @@ const GO_SRC = `${GITHUB}/tree/main`;
 const GO_MODULES = [
   {
     path: "cronwatch.dev/go", dir: "packages/go", docs: "/docs/go/",
-    what: "The Go port of CronWatch, package <code>cronwatch</code>: jobs, runs and checks, the memory store, the dashboard and job handlers as <code>http.Handler</code>s, with no requirements of its own.",
+    what: "The Go port of CronWatch, package <code>cronwatch</code>: jobs, runs, and checks, the memory store, the dashboard and job handlers as <code>http.Handler</code>s, with no requirements of its own.",
     packages: [
-      { name: "sqlstore", docs: "/docs/go/#stores", what: "The <code>database/sql</code> store: SQLite, Postgres and MySQL over the app's own <code>*sql.DB</code> and driver." },
-      { name: "alerts", docs: "/docs/go/#alerts", what: "The alert channels: Slack, Discord, a signed webhook, email, SMS and error trackers, on <code>net/http</code> alone." },
+      { name: "sqlstore", docs: "/docs/go/#stores", what: "The <code>database/sql</code> store: SQLite, Postgres, and MySQL over the app's own <code>*sql.DB</code> and driver." },
+      { name: "alerts", docs: "/docs/go/#alerts", what: "The alert channels: Slack, Discord, a signed webhook, email, SMS, and error trackers, on <code>net/http</code> alone." },
       { name: "triage", docs: "/docs/go/#triage", what: "Claude triage of each alert, over plain HTTP." },
       { name: "pgcron", docs: "/docs/go/#pg-cron", what: "The pg_cron source: pg_cron's jobs and runs read through the app's <code>*sql.DB</code>." },
       { name: "storetest", docs: "/docs/go/#stores", what: "The store contract test, for a store of your own." },
@@ -772,7 +772,7 @@ function clip(text, max = 300) {
 }
 
 /**
- * The search index: for each docs page, its title, route and group, then one
+ * The search index: for each docs page, its title, route, and group, then one
  * entry per section, [heading, anchor, excerpt], starting with the text
  * before the first heading (with an empty heading and anchor). Taken from
  * the rendered HTML, so every anchor is the id the page really has.
@@ -827,7 +827,7 @@ function build() {
   const promptHtml = escape(versioned(readFileSync(path.join(SRC, "prompt.txt"), "utf8")));
   landing = landing.replace(/\{\{PROMPT\}\}/g, () => promptHtml);
   for (const [key, value] of Object.entries(demoContent())) landing = landing.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), () => value);
-  const landingDescription = "Cron monitoring as a library for TypeScript, Ruby, Python, PHP, Go, Rust, Elixir, Java and .NET. Every run recorded in your own database, and an alert when one is missed, fails or gets stuck.";
+  const landingDescription = "Cron monitoring as a library for TypeScript, Ruby, Python, PHP, Go, Rust, Elixir, Java, and .NET. Every run recorded in your own database, and an alert when one is missed, fails, or gets stuck.";
   // Structured data for search engines. A JSON-LD block is data, not script:
   // browsers never run it, so the CSP's script-src does not apply. < is
   // escaped so nothing in it can close the element.
@@ -894,7 +894,7 @@ function build() {
     writeFileSync(path.join(dir, "index.html"), layout({ title: page.meta.title, description: page.meta.description ?? "", body, path: page.route, kind: "docs" }));
   }
 
-  // The 50x page serves 500, 502, 503 and 504 alike, so it shows no code.
+  // The 50x page serves 500, 502, 503, and 504 alike, so it shows no code.
   const lost = (code, heading, line, note) => `
 <section class="lost">
 ${code ? `  <p class="code" aria-hidden="true">${code}</p>\n` : ""}  <h1>${heading}</h1>
@@ -962,7 +962,7 @@ if (WATCHING) {
     }, 80);
   };
   for (const dir of [SRC, DOCS, PAGES]) watch(dir, { recursive: true }, rebuild);
-  console.log("watching src/, docs/ and pages/");
+  console.log("watching src/, docs/, and pages/");
 }
 
 if (args.includes("--serve")) {

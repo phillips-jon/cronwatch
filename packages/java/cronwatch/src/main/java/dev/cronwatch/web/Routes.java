@@ -37,11 +37,11 @@ import org.jspecify.annotations.Nullable;
 /**
  * The dashboard and its small JSON API, the SDK's {@code cw.routes()} ({@code routes/index.ts}),
  * framework-free: {@link #handle} takes a {@link Request} and answers a {@link Response}, with the
- * same URLs, JSON, status codes, headers, cookie, redirects, cross-site rule and token rules as the
- * SDK's routes, so {@code @cronwatch/mcp} works against a Java app as it does against a Node one.
- * Every framework is an adapter over {@link #handle}: {@link WebServer} for the JDK's own server,
- * {@code cronwatch-servlet} for a servlet container, and the Spring Boot starter for Spring MVC and
- * WebFlux. Safe to share between threads.
+ * same URLs, JSON, status codes, headers, cookie, redirects, cross-site rule, and token rules as
+ * the SDK's routes, so {@code @cronwatch/mcp} works against a Java app as it does against a Node
+ * one. Every framework is an adapter over {@link #handle}: {@link WebServer} for the JDK's own
+ * server, {@code cronwatch-servlet} for a servlet container, and the Spring Boot starter for Spring
+ * MVC and WebFlux. Safe to share between threads.
  *
  * <pre>{@code
  * Routes routes = cw.routes(RoutesOptions.builder().token(System.getenv("CRONWATCH_TOKEN")).build());
@@ -74,7 +74,8 @@ public final class Routes implements Endpoint {
   private static final int COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 
   // 'self' only for what the app shell needs: app.js (which registers the service worker and
-  // the theme toggle), the manifest, the worker and the icons. No inline script, and the pages work
+  // the theme toggle), the manifest, the worker, and the icons. No inline script, and the pages
+  // work
   // without any.
   private static final String PAGE_CSP =
       "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:;"
@@ -127,7 +128,7 @@ public final class Routes implements Endpoint {
       String read = System.getenv("CRONWATCH_TOKEN");
       configured = read == null || Js.isBlank(read) ? "" : read;
     }
-    // A handler cannot tell a local caller from a remote one (proxies, tunnels and a server
+    // A handler cannot tell a local caller from a remote one (proxies, tunnels, and a server
     // listening on every interface all look alike), so development gets a token too: made here,
     // and shown only in the log.
     boolean generate =
@@ -149,7 +150,7 @@ public final class Routes implements Endpoint {
    *     SDK's message
    * @deprecated use {@code cw.routes(options)}, the one way to mount the dashboard; removed in 2.0
    */
-  @Deprecated(since = "1.0", forRemoval = true)
+  @Deprecated(since = "0.11", forRemoval = true)
   public static Routes of(Cronwatch cw, RoutesOptions options) {
     return new Routes(cw, options);
   }
@@ -544,7 +545,7 @@ public final class Routes implements Endpoint {
       System.out.println(developmentSignInLine(shown, base, token));
     }
 
-    // The app shell: the manifest, icons, service worker, app.js and the offline page. Served to
+    // The app shell: the manifest, icons, service worker, app.js, and the offline page. Served to
     // anyone, since a browser fetches some of it without cookies and none of it says anything about
     // the jobs.
     if (method.equals("GET") || method.equals("HEAD")) {

@@ -287,7 +287,7 @@ class WebRoutesTest < Minitest::Test
   end
 
   # Ruby only: mounted in Rails (`mount Cronwatch.client.routes => "/cronwatch"`) the
-  # mount point arrives as SCRIPT_NAME, and links, cookies and redirects use it.
+  # mount point arrives as SCRIPT_NAME, and links, cookies, and redirects use it.
   def test_mounted_under_a_script_name_links_and_redirects_use_the_mount_point
     cw, = make
     cw.run("m") { nil }
@@ -382,10 +382,10 @@ class WebRoutesTest < Minitest::Test
     assert_equal clock.now + (5 * MIN), res.json["job"]["silencedUntil"]
     res = post.call("{\"for\":\"5m\xFF\"}")
     assert_equal 400, res.status
-    assert_equal "silence duration \"5m\u{FFFD}\" is not a duration like \"15m\", \"1h30m\" or \"90s\"", res.json["error"]
+    assert_equal "silence duration \"5m\u{FFFD}\" is not a duration like \"15m\", \"1h30m\", or \"90s\"", res.json["error"]
     res = post.call('{"for":null}')
     assert_equal 400, res.status
-    assert_equal 'silence duration "null" is not a duration like "15m", "1h30m" or "90s"', res.json["error"]
+    assert_equal 'silence duration "null" is not a duration like "15m", "1h30m", or "90s"', res.json["error"]
     res = post.call('{"for":[null,"2h"]}')
     assert_equal 400, res.status
     assert_match(/silence duration ",2h"/, res.json["error"])

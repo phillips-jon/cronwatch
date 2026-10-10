@@ -45,7 +45,7 @@ final class CliTest extends TestCase
         file_put_contents("{$this->dir}/{$name}", $php);
     }
 
-    /** @return array{int, string, string} the exit status, standard output and standard error */
+    /** @return array{int, string, string} the exit status, standard output, and standard error */
     private function cli(array $argv): array
     {
         $out = fopen('php://memory', 'w+');

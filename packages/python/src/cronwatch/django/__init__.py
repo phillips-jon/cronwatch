@@ -16,18 +16,18 @@ command for cron. Needs Django 5.2 or newer (`pip install "cronwatch-sdk[django]
     */5 * * * * cd /app && python manage.py cronwatch_check
 
 The client's options are CRONWATCH's STORE, ALERTS, TRIAGE, SOURCES,
-CRON_SECRET, RETENTION, DEFAULTS, REDACT, DELIVER and ON_ERROR (cronwatch.Cronwatch's
+CRON_SECRET, RETENTION, DEFAULTS, REDACT, DELIVER, and ON_ERROR (cronwatch.Cronwatch's
 options, upper case); with any of them set, cronwatch.django.client() makes the
 process's client from them on first use (cronwatch.configure), so
 cronwatch.client() hands out the same one. CLIENT instead names a client the
 app made itself (the client or a dotted path to it). With none of them, the
 dashboard and the command use cronwatch.client(), whatever the app configured.
-The dashboard's options are TOKEN, BASE_PATH, ORIGIN and TRUST_PROXY (see
+The dashboard's options are TOKEN, BASE_PATH, ORIGIN, and TRUST_PROXY (see
 cronwatch.web); the base path defaults to where the URLs are included, and the
 request's origin is Django's (request.scheme and request.get_host(), so
 SECURE_PROXY_SSL_HEADER and USE_X_FORWARDED_HOST apply).
 
-DEBUG is the environment when CRONWATCH_ENV, APP_ENV and ENVIRONMENT are all
+DEBUG is the environment when CRONWATCH_ENV, APP_ENV, and ENVIRONMENT are all
 unset, the way the SDK reads NODE_ENV: on, it is development (the dashboard
 makes a token and prints its sign-in link when TOKEN and $CRONWATCH_TOKEN are
 unset); off, it is production (no token is made: the dashboard answers 503).
@@ -132,7 +132,7 @@ def client() -> cronwatch.Cronwatch:
     otherwise one made from CRONWATCH's client options on first use (and made
     the process's client), otherwise cronwatch.client(). Called on every
     dashboard request and task, so a client already made is returned before
-    anything else is read: the STORE, ALERTS and SOURCES factories run once,
+    anything else is read: the STORE, ALERTS, and SOURCES factories run once,
     when it is made, never again on a later call."""
     global _client
     made: cronwatch.Cronwatch | None = _client
@@ -161,7 +161,7 @@ class DjangoWeb(Web):
 
 def routes() -> Web:
     """The dashboard (a cronwatch.web.Web) made from CRONWATCH's TOKEN,
-    BASE_PATH, ORIGIN and TRUST_PROXY, once; its client is client()."""
+    BASE_PATH, ORIGIN, and TRUST_PROXY, once; its client is client()."""
     global _routes
     with _lock:
         if _routes is None:

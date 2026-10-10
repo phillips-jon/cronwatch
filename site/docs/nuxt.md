@@ -108,7 +108,7 @@ Off the Node presets, what Nitro does with `scheduledTasks` depends on the prese
 
 - **Cloudflare Workers (`cloudflare_module`).** Nitro 2 runs the tasks whose cron matches when a Cron Trigger calls the Worker's `scheduled` handler, but it does not declare the triggers: list the same expressions under `triggers.crons` in your wrangler config yourself. Nitro 3 writes them into the wrangler config for you.
 - **Vercel.** Nitro 2 does nothing with `scheduledTasks` there. Nitro 3 turns them into Vercel Cron Jobs that call `/_vercel/cron`; set `CRON_SECRET` in the project, since without it anyone who knows that route can start the tasks (see [Nitro's Vercel page](https://nitro.build/deploy/providers/vercel)). On the Hobby plan Vercel runs a cron at most once a day; see [Next.js and Vercel](/docs/nextjs/#on-the-hobby-plan).
-- **Other serverless presets** (Netlify, AWS Lambda and the like) do not run them.
+- **Other serverless presets** (Netlify, AWS Lambda, and the like) do not run them.
 
 Where Nitro does run the tasks, the task above records its runs as it does on a server. Two things still change, because nothing runs between requests: the plugin's `cw.startChecking()` never gets to check, so have the platform's scheduler call `/cronwatch/api/check` with `CRON_SECRET` as the bearer and drop the plugin; and there is no disk for SQLite, so use the Postgres store, or on Cloudflare the D1 store (see [Cloudflare Workers](/docs/cloudflare/)).
 

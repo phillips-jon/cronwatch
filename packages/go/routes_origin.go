@@ -51,7 +51,7 @@ func configuredOrigin(value string) (string, error) {
 }
 
 // bareOrigin is scheme://host[:port] for text that is a scheme and a bare
-// host, or false when it carries a path, credentials, a query or a
+// host, or false when it carries a path, credentials, a query, or a
 // fragment, or is not an http or https URL.
 func bareOrigin(value string) (string, bool) {
 	origin, extra, err := readOrigin(value)
@@ -62,7 +62,7 @@ func bareOrigin(value string) (string, bool) {
 }
 
 // readOrigin is the origin of value, and whether anything past the host
-// would show in the URL (a path other than "/", credentials, a query or a
+// would show in the URL (a path other than "/", credentials, a query, or a
 // fragment).
 func readOrigin(value string) (origin string, extra bool, err error) {
 	text := strings.TrimFunc(value, func(r rune) bool { return r <= 0x20 })

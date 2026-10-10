@@ -25,7 +25,7 @@ import org.jspecify.annotations.Nullable;
  * non-capturing groups, lookahead, fixed-length lookbehind, alternation, greedy quantifiers, and
  * the flags {@code g} and {@code i}. The {@code i} flag folds as JavaScript's Canonicalize without
  * {@code u}. What it does not implement it refuses rather than read as something else: lazy
- * quantifiers, named groups, backreferences, {@code \c}, {@code \p{...}}, {@code \\u{...}} and
+ * quantifiers, named groups, backreferences, {@code \c}, {@code \p{...}}, {@code \\u{...}}, and
  * legacy octal escapes.
  *
  * <p>A compiled pattern is read-only, so one may be shared by every thread; each match keeps its

@@ -62,7 +62,7 @@ function job(jobid: number, jobname: string | null, schedule: string, active = t
   return { jobid, jobname, schedule, database: "postgres", username: "postgres", active };
 }
 
-test("pg_cron: a jobs, jobName or options callback that fails fails only its job, reported once", async () => {
+test("pg_cron: a jobs, jobName, or options callback that fails fails only its job, reported once", async () => {
   const c = clock();
   const cron = fakeCron();
   cron.jobs.push(job(1, "one", "0 * * * *"), job(2, "two", "0 * * * *"), job(3, "three", "0 * * * *"), job(4, "four", "0 * * * *"));
@@ -566,7 +566,7 @@ test("pg_cron against a real pg_cron", { skip: NO_PGCRON, timeout: 90_000 }, asy
   }
 });
 
-test("pg_cron against a real pg_cron: restart rows, a crowded job, first sight and a rename", { skip: NO_PGCRON, timeout: 60_000 }, async () => {
+test("pg_cron against a real pg_cron: restart rows, a crowded job, first sight, and a rename", { skip: NO_PGCRON, timeout: 60_000 }, async () => {
   const pool = new pg.Pool({ connectionString: PGCRON });
   const tag = `cwrow${process.pid}`;
   const names = { busy: `${tag}-busy`, quiet: `${tag}-quiet`, hist: `${tag}-hist` };

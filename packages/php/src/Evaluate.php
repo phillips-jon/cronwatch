@@ -58,7 +58,7 @@ final class Evaluate
      * The version a stored state counts as for compareAndSetState
      * (stateVersion): a whole number from 0 to MAX_DURATION_MS (2^53 - 1),
      * else 0, as when it is absent. The SQL stores read it the same way, so a
-     * foreign row's 1.5, "x" or -1 is written over by the next update instead
+     * foreign row's 1.5, "x", or -1 is written over by the next update instead
      * of refusing every compare-and-set of its job for good.
      */
     public static function stateVersion(?JobState $state): int
@@ -102,9 +102,9 @@ final class Evaluate
      * by an older version lacks the newer fields. `sending` is the exception:
      * it is there only while it holds an alert (see holdAlerts).
      *
-     * Read leniently, since a foreign, hand-edited or damaged row must affect
+     * Read leniently, since a foreign, hand-edited, or damaged row must affect
      * only its own job, and the next write puts it right: a state that is not
-     * an object (a decoded 5, "x" or [], or null) reads as none; the fields
+     * an object (a decoded 5, "x", [], or null) reads as none; the fields
      * inside are read as JobState::fromJson() reads them.
      */
     public static function normalizeState(mixed $state, string $job): JobState
@@ -536,7 +536,7 @@ final class Evaluate
     }
 
     /**
-     * Called when a run finishes with status ok, failed or timeout. `history`
+     * Called when a run finishes with status ok, failed, or timeout. `history`
      * is the job's earlier runs, newest first, not including this one.
      *
      * @param list<Run> $history
@@ -728,7 +728,7 @@ final class Evaluate
         return !Js::isNumber($at) || !array_key_exists($alert->type, $state->open) || $state->open[$alert->type] != $at;
     }
 
-    /** How a job looks at a glance. Silence wins, then stuck, failing and late. */
+    /** How a job looks at a glance. Silence wins, then stuck, failing, and late. */
     public static function jobHealth(JobDefinition $def, ?Run $lastRun, JobState $state, int|float $now): string
     {
         $open = self::openConditions($state);

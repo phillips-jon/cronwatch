@@ -12,7 +12,7 @@ namespace Cronwatch.Internal;
 /// channels refuse one: spaces and control characters around the value and tabs or line breaks in
 /// it are dropped, slashes after the scheme may be missing or backslashes, credentials are
 /// ignored, the host is lowercased (percent escapes decoded, IPv4 numbers written out, IPv6
-/// compressed) and a default port is left out. Not <see cref="Uri"/> or
+/// compressed), and a default port is left out. Not <see cref="Uri"/> or
 /// <see cref="IdnMapping"/>, which read hosts their own way, and never DNS.
 /// </summary>
 internal static class Origins
@@ -56,7 +56,7 @@ internal static class Origins
 
     /// <summary>
     /// <c>scheme://host[:port]</c> for text that is an http or https URL whose path is <c>/</c>
-    /// with no credentials, query or fragment, as the SDK's <c>forwardedOrigin</c> takes a
+    /// with no credentials, query, or fragment, as the SDK's <c>forwardedOrigin</c> takes a
     /// forwarded host, or null.
     /// </summary>
     public static string? Bare(string value)

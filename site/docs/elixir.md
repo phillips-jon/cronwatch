@@ -7,7 +7,7 @@ group: Elixir
 
 # Elixir
 
-The `cronwatch` package is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow, over budget and under floor by the same rules, sends the same alert text, and writes the same rows, so an Elixir process can share one database with a Node, Ruby, Python, PHP, Go, Rust, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers the package itself: a Phoenix app, a worker, a release a crontab runs. Oban and Quantum have a page of their own: [Elixir schedulers](/docs/elixir-schedulers/).
+The `cronwatch` package is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow, over budget, and under floor by the same rules, sends the same alert text, and writes the same rows, so an Elixir process can share one database with a Node, Ruby, Python, PHP, Go, Rust, Java, or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers the package itself: a Phoenix app, a worker, a release a crontab runs. Oban and Quantum have a page of their own: [Elixir schedulers](/docs/elixir-schedulers/).
 
 ```elixir
 # mix.exs
@@ -51,7 +51,7 @@ children = [
 ]
 ```
 
-One instance per app, started once. Its options are checked when it starts, so a bad option, schedule or job fails the app's boot with the SDK's message rather than the first run. It is named `Cronwatch`; `name: MyApp.OtherCronwatch` starts a second one, and every function then takes `instance: MyApp.OtherCronwatch`. With no options it keeps everything in memory and writes alerts through `Logger`.
+One instance per app, started once. Its options are checked when it starts, so a bad option, schedule, or job fails the app's boot with the SDK's message rather than the first run. It is named `Cronwatch`; `name: MyApp.OtherCronwatch` starts a second one, and every function then takes `instance: MyApp.OtherCronwatch`. With no options it keeps everything in memory and writes alerts through `Logger`.
 
 The options are the SDK's in snake_case. Durations take the SDK's text (`"15m"`, `"1h30m"`), milliseconds (`:timer.minutes(15)`, `900_000`), or anything `to_timeout/1` takes (`%Duration{minute: 15}`, `[minute: 15]`); text is stored as written, the rest as its milliseconds. Functions that read or write the store answer `{:ok, value}` or `{:error, %Cronwatch.Error{}}`, each with a `!` variant that raises.
 
@@ -63,14 +63,14 @@ Jobs are declared in the instance's `jobs:`, when it starts, or with `Cronwatch.
 Cronwatch.run("nightly-report", fn job ->
   path = MyApp.Reports.build()                  # Cronwatch.cancelled?(job) turns true at the timeout
   Cronwatch.log(job, "Report written: #{path}")  # kept with the run, shown in alerts
-  Cronwatch.metric(job, "cost", 1.2)             # watched against budgets, floors and baselines
+  Cronwatch.metric(job, "cost", 1.2)             # watched against budgets, floors, and baselines
   {:ok, path}
 end)
 ```
 
-The function runs in the calling process, where your app's context lives: the Ecto sandbox in tests, Logger metadata, an OpenTelemetry span, an Oban worker's own process. `run/3` answers what the function answered. A raise, throw, exit, `{:error, reason}` or `:error` fails the run and is handed back as it came (raised again with its stacktrace, or returned), so your supervisor or queue sees exactly what it would have without CronWatch; anything else succeeds. `{:error, reason}` failing the run is Elixir's convention, not the SDK's, so a job that succeeds with an `{:error, _}` result should wrap it. The store failing never stops a job: store errors go to the error handler (`on_error`, `Logger.error` by default), and the job's own outcome is returned.
+The function runs in the calling process, where your app's context lives: the Ecto sandbox in tests, Logger metadata, an OpenTelemetry span, an Oban worker's own process. `run/3` answers what the function answered. A raise, throw, exit, `{:error, reason}`, or `:error` fails the run and is handed back as it came (raised again with its stacktrace, or returned), so your supervisor or queue sees exactly what it would have without CronWatch; anything else succeeds. `{:error, reason}` failing the run is Elixir's convention, not the SDK's, so a job that succeeds with an `{:error, _}` result should wrap it. The store failing never stops a job: store errors go to the error handler (`on_error`, `Logger.error` by default), and the job's own outcome is returned.
 
-A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit. A name `run/3` has not seen is declared on first use, and job options among `run/3`'s options declare it again. Options are kept in the order given, and a stored definition keeps that order, so an Elixir process writes the same JSON a Node process does for the same options in the same order.
+A name is 1 to 120 letters, digits, `.`, `_`, `:`, or `-`, starting with a letter or digit. A name `run/3` has not seen is declared on first use, and job options among `run/3`'s options declare it again. Options are kept in the order given, and a stored definition keeps that order, so an Elixir process writes the same JSON a Node process does for the same options in the same order.
 
 A binary the function returns, or `{:ok, binary}`, is the run's output when nothing was logged, and what `expect` checks. A `%Plug.Conn{}` it returns with a status of 400 or more fails the run with `HTTP <status> <reason>`, and so does a `%Req.Response{}` (or `{:ok, %Req.Response{}}`) when Req is loaded, so a job that calls an API and returns its answer fails when the API does.
 
@@ -128,11 +128,11 @@ defmodule MyApp.Nightly do
 end
 ```
 
-`Cronwatch.Release.check/2` starts what the check needs and nothing else (the store's repo, with at most two connections, and an instance with the options under `config :my_app, MyApp.Cronwatch`), without the app's endpoint or queues; it runs one check, prints what it did (`cronwatch: checked 3 jobs, sent 1 alert`) and exits non-zero when the check fails. It sends what it finds whatever the configuration's `deliver` says, so job nodes given `deliver: :check` have their alerts sent by this line. Called where the instance is already running (`bin/my_app rpc` into the live node), it checks that instance, starts and stops nothing, and never halts the node; when that instance has `deliver: :check`, the line says the alerts were queued, and a warning on standard error says another process must send them. From source, `mix cronwatch.check MyApp.Cronwatch` does the same (`--otp-app` names the application whose configuration holds the options). [`examples/crontab`](https://github.com/cronwatchdev/cronwatch/tree/main/packages/elixir/examples/crontab) in the repository is this program on SQLite, with a test that runs its release's two lines on one file.
+`Cronwatch.Release.check/2` starts what the check needs and nothing else (the store's repo, with at most two connections, and an instance with the options under `config :my_app, MyApp.Cronwatch`), without the app's endpoint or queues; it runs one check, prints what it did (`cronwatch: checked 3 jobs, sent 1 alert`), and exits non-zero when the check fails. It sends what it finds whatever the configuration's `deliver` says, so job nodes given `deliver: :check` have their alerts sent by this line. Called where the instance is already running (`bin/my_app rpc` into the live node), it checks that instance, starts and stops nothing, and never halts the node; when that instance has `deliver: :check`, the line says the alerts were queued, and a warning on standard error says another process must send them. From source, `mix cronwatch.check MyApp.Cronwatch` does the same (`--otp-app` names the application whose configuration holds the options). [`examples/crontab`](https://github.com/cronwatchdev/cronwatch/tree/main/packages/elixir/examples/crontab) in the repository is this program on SQLite, with a test that runs its release's two lines on one file.
 
 ## The dashboard
 
-`Cronwatch.Web` is the dashboard and JSON API as a Plug, the same pages and endpoints as the TypeScript routes, byte for byte: the board's counts by health, a timeline of the last day with a lane per job, the table of every job, and for each job its last seven days, runs and definition, all drawn on the server with no script. In Phoenix, forward to it outside the `:browser` pipeline, since it has its own cross-site check and cookie and Phoenix's CSRF protection would refuse its forms:
+`Cronwatch.Web` is the dashboard and JSON API as a Plug, the same pages and endpoints as the TypeScript routes, byte for byte: the board's counts by health, a timeline of the last day with a lane per job, the table of every job, and for each job its last seven days, runs, and definition, all drawn on the server with no script. In Phoenix, forward to it outside the `:browser` pipeline, since it has its own cross-site check and cookie and Phoenix's CSRF protection would refuse its forms:
 
 ```elixir
 # lib/my_app_web/router.ex
@@ -145,13 +145,13 @@ A plain `Plug.Router` forwards to it the same way. Its base path is where the ro
 
 Its options:
 
-- `token:` the token. Left out (or `""`, or only whitespace), it is `CRONWATCH_TOKEN`, read on each request, which also counts as unset when it is empty or only whitespace; `{:system, "VAR"}` reads another variable, also on each request, so a release never bakes in its build machine's value. Send it as `Authorization: Bearer <token>` (an `Authorization` header of another scheme, such as a proxy's Basic auth, is left alone), or open the dashboard once with `?token=<token>`, or enter it in the sign-in form, which posts it to `<base>/signin`, and a cookie keeps the browser signed in. Any other value (`true`, a number, an atom) is refused when the options are read. Without a token, in development, the dashboard makes one and prints a sign-in link on its first request (naming the host only when `origin` is set or the request's host is loopback); anywhere else it answers 503. The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `MIX_ENV` set to more than spaces, trimmed and lowercased, and `development`, `dev`, `local`, `test` and `testing` count as development, as in every CronWatch library (see [Development](/docs/dashboard/#development)).
+- `token:` the token. Left out (or `""`, or only whitespace), it is `CRONWATCH_TOKEN`, read on each request, which also counts as unset when it is empty or only whitespace; `{:system, "VAR"}` reads another variable, also on each request, so a release never bakes in its build machine's value. Send it as `Authorization: Bearer <token>` (an `Authorization` header of another scheme, such as a proxy's Basic auth, is left alone), or open the dashboard once with `?token=<token>`, or enter it in the sign-in form, which posts it to `<base>/signin`, and a cookie keeps the browser signed in. Any other value (`true`, a number, an atom) is refused when the options are read. Without a token, in development, the dashboard makes one and prints a sign-in link on its first request (naming the host only when `origin` is set or the request's host is loopback); anywhere else it answers 503. The environment is the first of `CRONWATCH_ENV`, `APP_ENV`, and `MIX_ENV` set to more than spaces, trimmed and lowercased, and `development`, `dev`, `local`, `test`, and `testing` count as development, as in every CronWatch library (see [Development](/docs/dashboard/#development)).
 - `token: false`: serve it to anyone, for a mount behind your own auth, such as a `pipe_through` that signs in your admins.
-- `origin: "https://app.example.com"`: the public origin, pinned whatever a request says, for the cross-site check on writes, the cookie's `Secure` flag, redirects and the sign-in line. Anything but an http or https URL is refused.
+- `origin: "https://app.example.com"`: the public origin, pinned whatever a request says, for the cross-site check on writes, the cookie's `Secure` flag, redirects, and the sign-in line. Anything but an http or https URL is refused.
 - `trust_proxy: true`: take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host`. Only behind a proxy that sets or overwrites both.
 - `instance:` the instance to show, `Cronwatch` by default.
 
-Phoenix reads a forwarded plug's options when the router compiles, so the token, the environment and the instance are read on each request instead. A request body is read only when a route wants one, at most 1 MiB (413 past it); behind a Phoenix endpoint, the fields its `Plug.Parsers` already read are used. The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `GET /api` answers `{"ok":true,"library":"cronwatch","language":"elixir","version":...,"api":1}`, and a silence or unsilence over the API answers the job's summary after it, as `job`. `/api/check` also accepts the instance's cron secret as a bearer, so an outside cron can run the check over HTTP. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app).
+Phoenix reads a forwarded plug's options when the router compiles, so the token, the environment, and the instance are read on each request instead. A request body is read only when a route wants one, at most 1 MiB (413 past it); behind a Phoenix endpoint, the fields its `Plug.Parsers` already read are used. The token rules, cookie, cross-site rule, and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `GET /api` answers `{"ok":true,"library":"cronwatch","language":"elixir","version":...,"api":1}`, and a silence or unsilence over the API answers the job's summary after it, as `job`. `/api/check` also accepts the instance's cron secret as a bearer, so an outside cron can run the check over HTTP. The dashboard is installable as a web app, with its manifest, icons, and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app).
 
 ## Jobs a URL starts
 
@@ -164,13 +164,13 @@ forward "/cron/nightly", Cronwatch.Handler, job: "nightly-report", run: {MyApp.R
 
 A router's options cannot hold an anonymous function, so `run:` is `{module, function, args}`, called as `MyApp.Reports.nightly(job, conn)` with the run's context and the `conn` before the args. The job is the one the instance declares under `job:`, or declared with no options on the first request; declare it in `jobs:` to give it a schedule.
 
-The secret is `secret:` (a binary, or `{:system, "VAR"}` read on each request), else the instance's `cron_secret` (`CRON_SECRET` by default, read on each request), compared in constant time; `""` or a string of only whitespace counts as unset, and any value but a string, `{:system, "VAR"}` or `false` is refused when the options are read. A wrong or missing bearer is answered 401 and runs nothing. With no secret at all, outside development, the handler answers 503 and reports it once to the error handler, rather than let anyone on the internet run the job; `secret: false` (or the instance's `cron_secret: false`) opts out on purpose, for an endpoint your platform already protects.
+The secret is `secret:` (a binary, or `{:system, "VAR"}` read on each request), else the instance's `cron_secret` (`CRON_SECRET` by default, read on each request), compared in constant time; `""` or a string of only whitespace counts as unset, and any value but a string, `{:system, "VAR"}`, or `false` is refused when the options are read. A wrong or missing bearer is answered 401 and runs nothing. With no secret at all, outside development, the handler answers 503 and reports it once to the error handler, rather than let anyone on the internet run the job; `secret: false` (or the instance's `cron_secret: false`) opts out on purpose, for an endpoint your platform already protects.
 
 A run is answered 200 or 500 with `{"ok","job","run","status","durationMs"}`, and the error's first line as `"error"` for a caller who sent the secret. A function that returns a `%Plug.Conn{}` answers the request itself: it is sent as it is, and a status of 400 or more fails the run. The function runs in the request's process, so a request whose client goes away and whose process the server ends records a failed run; start the work under your own `Task.Supervisor` if it should outlive the request.
 
 ## Stores
 
-`Cronwatch.Store.Memory` is the default. Nothing survives a restart, so a miss cannot be noticed across one, and each node has its own. When the environment is production (the first of `CRONWATCH_ENV`, `APP_ENV` and `MIX_ENV` that is set reads `production` or `prod`), the instance warns once that it is using it.
+`Cronwatch.Store.Memory` is the default. Nothing survives a restart, so a miss cannot be noticed across one, and each node has its own. When the environment is production (the first of `CRONWATCH_ENV`, `APP_ENV`, and `MIX_ENV` that is set reads `production` or `prod`), the instance warns once that it is using it.
 
 `Cronwatch.Store.Ecto` keeps the same three tables as the SDK's SQL stores in your database, through the Ecto repo you already have. The repo's adapter picks the dialect:
 
@@ -184,9 +184,9 @@ A run is answered 200 or 500 with `{"ok","job","run","status","durationMs"}`, an
 store: {Cronwatch.Store.Ecto, repo: MyApp.Repo, prefix: "app_cron_"}
 ```
 
-The tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) are made on the instance's first use, byte for byte as the SDK makes them. `prefix:` names them: lowercase letters, digits and underscores, not starting with a digit, at most 47 characters. An app that keeps its schema in migrations can run `Cronwatch.Store.Ecto.create_statements/1` from one. `dynamic_repo:` takes a repo started with `name: nil` (its pid) or under another name. A store call made inside your own `Repo.transaction/1` runs on a connection of its own, so a run recorded inside a transaction that rolls back stays recorded. Nothing uses Ecto's schemas: every statement is the SDK's, run with `Ecto.Adapters.SQL.query/4`.
+The tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) are made on the instance's first use, byte for byte as the SDK makes them. `prefix:` names them: lowercase letters, digits, and underscores, not starting with a digit, at most 47 characters. An app that keeps its schema in migrations can run `Cronwatch.Store.Ecto.create_statements/1` from one. `dynamic_repo:` takes a repo started with `name: nil` (its pid) or under another name. A store call made inside your own `Repo.transaction/1` runs on a connection of its own, so a run recorded inside a transaction that rolls back stays recorded. Nothing uses Ecto's schemas: every statement is the SDK's, run with `Ecto.Adapters.SQL.query/4`.
 
-A store of your own implements the `Cronwatch.Store` behaviour: `new/2`, `init`, `upsert_job`, `get_job`, `list_jobs`, `delete_job`, `insert_run`, `update_run`, `get_run`, `list_runs`, `last_run`, `running_runs`, `get_state`, `set_state`, `prune` and `close`, with epoch milliseconds for every time, and an optional `child_spec/1` when it needs a process, which the instance supervises. Three optional callbacks are what keep nodes sharing a store from judging a run twice or losing each other's updates: `update_run_if`, `compare_and_set_state` and `delete_run_if` (which takes back an attempt a queue gave back without failing; see [Elixir schedulers](/docs/elixir-schedulers/#retries)). They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says. `Cronwatch.StoreCase` is the contract the built-in stores pass, as an ExUnit case template:
+A store of your own implements the `Cronwatch.Store` behaviour: `new/2`, `init`, `upsert_job`, `get_job`, `list_jobs`, `delete_job`, `insert_run`, `update_run`, `get_run`, `list_runs`, `last_run`, `running_runs`, `get_state`, `set_state`, `prune`, and `close`, with epoch milliseconds for every time, and an optional `child_spec/1` when it needs a process, which the instance supervises. Three optional callbacks are what keep nodes sharing a store from judging a run twice or losing each other's updates: `update_run_if`, `compare_and_set_state`, and `delete_run_if` (which takes back an attempt a queue gave back without failing; see [Elixir schedulers](/docs/elixir-schedulers/#retries)). They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says. `Cronwatch.StoreCase` is the contract the built-in stores pass, as an ExUnit case template:
 
 ```elixir
 defmodule MyApp.StoreTest do
@@ -216,9 +216,9 @@ end
  ]}
 ```
 
-Giving `alerts:` replaces the default console channel, and `alerts: []` sends nothing. Every alert goes to every channel at once, each in a task of its own with 15 seconds to finish; a send past its time is killed, its socket with it, and a channel that fails or raises goes to the error handler (as `alert channel <name>`) and never holds up the others. An alert is stored with the state that opens its condition before it is sent, so one whose node dies mid-send is sent by a later check, once, or twice if a channel took it just before the node died (see [Limits](/docs/limits/)). Stopping the instance waits for a check under way before the store and the rest of the instance stop. `Cronwatch.Alerts.fun(name, f)` wraps a function of the alert (or of the alert and a `Cronwatch.ChannelContext`) answering `:ok` or `{:error, reason}`; a channel of your own implements the `Cronwatch.Channel` behaviour (`init/1`, `name/1` and `send/3`). `Cronwatch.Alerts.Console` writes through `Logger`, `Logger.info` for a recovery and `Logger.error` for anything else, so the line carries your Logger's format and metadata.
+Giving `alerts:` replaces the default console channel, and `alerts: []` sends nothing. Every alert goes to every channel at once, each in a task of its own with 15 seconds to finish; a send past its time is killed, its socket with it, and a channel that fails or raises goes to the error handler (as `alert channel <name>`) and never holds up the others. An alert is stored with the state that opens its condition before it is sent, so one whose node dies mid-send is sent by a later check, once, or twice if a channel took it just before the node died (see [Limits](/docs/limits/)). Stopping the instance waits for a check under way before the store and the rest of the instance stop. `Cronwatch.Alerts.fun(name, f)` wraps a function of the alert (or of the alert and a `Cronwatch.ChannelContext`) answering `:ok` or `{:error, reason}`; a channel of your own implements the `Cronwatch.Channel` behaviour (`init/1`, `name/1`, and `send/3`). `Cronwatch.Alerts.Console` writes through `Logger`, `Logger.info` for a recovery and `Logger.error` for anything else, so the line carries your Logger's format and metadata.
 
-### Email, SMS and error trackers
+### Email, SMS, and error trackers
 
 ```elixir
 email = [from: "CronWatch <alerts@example.com>", to: ["ops@example.com"]]
@@ -248,9 +248,9 @@ email = [from: "CronWatch <alerts@example.com>", to: ["ops@example.com"]]
 {Cronwatch.Alerts.NewRelic, account_id: 1234567, api_key: System.fetch_env!("NEW_RELIC_LICENSE_KEY")}
 ```
 
-The options are the SDK's in snake_case: `subject_prefix` and `link` among the email options; `message_stream` (Postmark); `region` (`"eu"` for SendGrid, Mailgun and New Relic, the AWS region for SES); `session_token` and `configuration_set_name` (SES); `api_key_sid`, `api_key_secret`, `messaging_service_sid` and `segments` (Twilio, 1 to 10, default 3); `environment` (Sentry, Honeybadger and Rollbar, `"production"` by default); `release` (Sentry); `headers` (the webhook, extra request headers as `{name, value}` pairs, in the order sent); `endpoint` (Honeybadger, Bugsnag); `host` (Datadog); `release_stage` (Bugsnag); `event_type` (New Relic); and `recovered` and `link` wherever the SDK has them, with the SDK's defaults (`recovered: false` leaves a Sentry or Rollbar channel's recoveries out). No channel's options print a credential with `inspect`, so a crash report or an `IO.inspect` of your config does not leak one.
+The options are the SDK's in snake_case: `subject_prefix` and `link` among the email options; `message_stream` (Postmark); `region` (`"eu"` for SendGrid, Mailgun, and New Relic, the AWS region for SES); `session_token` and `configuration_set_name` (SES); `api_key_sid`, `api_key_secret`, `messaging_service_sid`, and `segments` (Twilio, 1 to 10, default 3); `environment` (Sentry, Honeybadger, and Rollbar, `"production"` by default); `release` (Sentry); `headers` (the webhook, extra request headers as `{name, value}` pairs, in the order sent); `endpoint` (Honeybadger, Bugsnag); `host` (Datadog); `release_stage` (Bugsnag); `event_type` (New Relic); and `recovered` and `link` wherever the SDK has them, with the SDK's defaults (`recovered: false` leaves a Sentry or Rollbar channel's recoveries out). No channel's options print a credential with `inspect`, so a crash report or an `IO.inspect` of your config does not leak one.
 
-Each sends exactly the request the SDK's does: the same URL, headers and body, byte for byte (the package's tests replay the SDK's recorded requests), with the same idempotency key, event id or UUID for one alert, so a provider that deduplicates drops a resend whichever language sent it. SES is signed with SigV4, with no AWS SDK. Each request has one ten second deadline for connecting, sending and reading the answer, reads at most 1 MiB of it, follows no redirect (so credentials never reach another address), always verifies TLS against the system's roots, and reads no proxy from the environment. A refused request names only the URL's origin, never its path, with the channel's keys cut out. `transport:` on a channel, triage or the instance takes a `Cronwatch.Transport` of your own, for your Finch pool, a proxy or Req's retries; the behaviour's docs have one over Req in a dozen lines. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
+Each sends exactly the request the SDK's does: the same URL, headers, and body, byte for byte (the package's tests replay the SDK's recorded requests), with the same idempotency key, event id, or UUID for one alert, so a provider that deduplicates drops a resend whichever language sent it. SES is signed with SigV4, with no AWS SDK. Each request has one ten second deadline for connecting, sending, and reading the answer, reads at most 1 MiB of it, follows no redirect (so credentials never reach another address), always verifies TLS against the system's roots, and reads no proxy from the environment. A refused request names only the URL's origin, never its path, with the channel's keys cut out. `transport:` on a channel, triage, or the instance takes a `Cronwatch.Transport` of your own, for your Finch pool, a proxy, or Req's retries; the behaviour's docs have one over Req in a dozen lines. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
 
 A webhook posts the [alert payload](/docs/alerts/#the-alert-payload) with `"schema": 1` as its first field, the same bytes every port sends; its JSON Schema is [cronwatch.dev/schemas/webhook/1.json](/schemas/webhook/1.json). A receiver reads the fields, not `title` and `message`, whose wording is not promised. The webhook signs its body with `X-CronWatch-Signature: sha256=<hex>`. `Cronwatch.Alerts.Webhook.signature(secret, body)` is that hex, for a receiver in Elixir, over the raw body as it arrived:
 
@@ -274,7 +274,7 @@ It still records and evaluates every run, but queues each alert in the store ins
 
 ## pg_cron
 
-pg_cron runs jobs inside Postgres, where nothing can wrap them. `Cronwatch.Sources.PgCron` reads what pg_cron records instead: on every check it reads `cron.job`, declares each job with its schedule, and copies new rows of `cron.job_run_details` in as runs, so a job that stops running is missed, a failed run alerts and a run that never ends is stuck.
+pg_cron runs jobs inside Postgres, where nothing can wrap them. `Cronwatch.Sources.PgCron` reads what pg_cron records instead: on every check it reads `cron.job`, declares each job with its schedule, and copies new rows of `cron.job_run_details` in as runs, so a job that stops running is missed, a failed run alerts, and a run that never ends is stuck.
 
 ```elixir
 {Cronwatch,
@@ -283,11 +283,11 @@ pg_cron runs jobs inside Postgres, where nothing can wrap them. `Cronwatch.Sourc
  check_every: :timer.minutes(1)}
 ```
 
-It reads through a Postgres Ecto repo on the database pg_cron runs in (its `cron.database_name`), or through `query:`, a function of the SQL and its parameters, for a connection that is not a repo. Settings are read from `pg_settings`, so a setting the role may not read never fails the check or your transaction. Its options: `jobs`, `job_ids` and `pick` to choose jobs; `prefix`, `job_name`, and `options` (job options for every job, or a function answering them per job; the schedule and zone always come from pg_cron); and `timezone` (by default the server's `cron.timezone`, else UTC). The rules for renamed jobs, runs cut off by a restart and history seen for the first time are the SDK's; see [Supabase and pg_cron](/docs/supabase/).
+It reads through a Postgres Ecto repo on the database pg_cron runs in (its `cron.database_name`), or through `query:`, a function of the SQL and its parameters, for a connection that is not a repo. Settings are read from `pg_settings`, so a setting the role may not read never fails the check or your transaction. Its options: `jobs`, `job_ids`, and `pick` to choose jobs; `prefix`, `job_name`, and `options` (job options for every job, or a function answering them per job; the schedule and zone always come from pg_cron); and `timezone` (by default the server's `cron.timezone`, else UTC). The rules for renamed jobs, runs cut off by a restart, and history seen for the first time are the SDK's; see [Supabase and pg_cron](/docs/supabase/).
 
 ## Redaction
 
-Before a run's output and error are stored, shown or sent anywhere, they are redacted. The default blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks: the patterns are the SDK's, run by an engine with JavaScript's semantics, so every case the SDK's tests hold gives the same bytes. An `expect` rule is checked before redaction, so it still sees what was logged. Redaction runs before the cap, so the cut never keeps the rest of a secret whose label it cut off.
+Before a run's output and error are stored, shown, or sent anywhere, they are redacted. The default blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google, and API key formats), exactly what the SDK's default blanks: the patterns are the SDK's, run by an engine with JavaScript's semantics, so every case the SDK's tests hold gives the same bytes. An `expect` rule is checked before redaction, so it still sees what was logged. Redaction runs before the cap, so the cut never keeps the rest of a secret whose label it cut off.
 
 ```elixir
 redact: false  # keep output as logged
@@ -311,7 +311,7 @@ A function given to `redact:` replaces the default; call `Cronwatch.redact_secre
 | Option | Default | |
 |---|---|---|
 | `model` | `"claude-opus-5"` | any current model id |
-| `effort` | `"medium"` | `"low"`, `"medium"` or `"high"` |
+| `effort` | `"medium"` | `"low"`, `"medium"`, or `"high"` |
 | `max_tokens` | 800 | a diagnosis is a paragraph |
 | `context` | | a sentence about the app, so advice is specific |
 | `fallbacks` | `true` | `false` stops routing a policy refusal to Anthropic's default fallback model inside the same request, if your account or gateway rejects the beta |
@@ -323,11 +323,11 @@ There is no Anthropic package to add: the Messages API is one POST, and it sends
 
 ## Telemetry
 
-The instance emits `:telemetry` events, which Phoenix LiveDashboard, `telemetry_metrics` and OpenTelemetry's handlers read:
+The instance emits `:telemetry` events, which Phoenix LiveDashboard, `telemetry_metrics`, and OpenTelemetry's handlers read:
 
 | Event | |
 |---|---|
-| `[:cronwatch, :run, :start]`, `:stop`, `:exception` | a span around each run's function, with the job, run id and trigger, and the run's status on `:stop` |
+| `[:cronwatch, :run, :start]`, `:stop`, `:exception` | a span around each run's function, with the job, run id, and trigger, and the run's status on `:stop` |
 | `[:cronwatch, :check, :start]`, `:stop`, `:exception` | each check, with its counts on `:stop` |
 | `[:cronwatch, :alert, :sent]`, `:failed`, `:queued`, `:dropped` | each alert per channel |
 | `[:cronwatch, :error]` | whatever the error handler hears |
@@ -348,14 +348,14 @@ The instance's options:
 | `check_every` | | check on an interval |
 | `cron_secret` | `$CRON_SECRET` | the bearer job handlers take and the dashboard's check endpoint accepts beside the token. `false` for none |
 | `retention` | `"30d"` | how long finished runs are kept. Each job's newest run is always kept |
-| `defaults` | | `grace`, `timeout`, `timezone` and `failures_before_alert` for every job that does not set its own; any other option is refused |
+| `defaults` | | `grace`, `timeout`, `timezone`, and `failures_before_alert` for every job that does not set its own; any other option is refused |
 | `redact` | secret patterns | a function, or `false`; see [Redaction](#redaction) |
 | `deliver` | `:now` | `:check` queues alerts for another instance's check to send |
 | `transport` | the built-in client | for every channel and triage without one of their own |
 | `on_error` | `Logger.error` | a function of the error and where, for failures outside jobs: the store, a channel, triage |
 | `clock` | the system clock | a function answering epoch milliseconds; for tests |
 
-A job's options: `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA, matched without regard to case; the zone `$TZ` or `/etc/localtime` names by default, else UTC), `grace` (`"10m"`), `timeout` (`"1h"`) and `max_duration` (see below), `budget` (a keyword list of metric and ceiling, `[cost: 2]`), `floor` (a keyword list of metric and floor, `[rows: 1]`), `expect`, `failures_before_alert` (1), `description` and `tags`, with the rules in the [TypeScript API reference](/docs/api/).
+A job's options: `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA, matched without regard to case; the zone `$TZ` or `/etc/localtime` names by default, else UTC), `grace` (`"10m"`), `timeout` (`"1h"`) and `max_duration` (see below), `budget` (a keyword list of metric and ceiling, `[cost: 2]`), `floor` (a keyword list of metric and floor, `[rows: 1]`), `expect`, `failures_before_alert` (1), `description`, and `tags`, with the rules in the [TypeScript API reference](/docs/api/).
 
 `timeout` and `max_duration` both measure a run's length. `timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure) and the job is stuck. `max_duration` is for a run that finished: one that succeeded but took longer is slow, and stays a success. So set `timeout` well above `max_duration`: `max_duration: "10m", timeout: "1h"` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
 
@@ -364,7 +364,7 @@ The functions, each taking `instance:` among its options:
 | Function | |
 |---|---|
 | `job(name, options)` | declare a job and get its handle |
-| `run(job_or_name, fun, options)` | run as a recorded run; `trigger`, `isolate`, `kill_at_timeout` and `discard_when` among the options |
+| `run(job_or_name, fun, options)` | run as a recorded run; `trigger`, `isolate`, `kill_at_timeout`, and `discard_when` among the options |
 | `current()`, `log/1,2`, `metric/2,3`, `cancelled?/1` | the run in progress |
 | `check()` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune |
 | `start_checking(every: d)`, `stop()` | check on an interval, for an instance started without `check_every`; a second call while it runs is ignored |
@@ -379,7 +379,7 @@ The functions, each taking `instance:` among its options:
 
 ### What 1.x promises
 
-The package's API is what this page and the README name, and nothing else; every module and function HexDocs leaves out is internal and can change in any release. That includes the port's own machinery: its JavaScript values and regular expressions, the croner port, durations and schedules, zones, the output cap and redaction's parts, the stored definition's serializer, the SQL statements and the alert channels' shared request. Three things are public but outside the promise:
+The package's API is what this page and the README name, and nothing else; every module and function HexDocs leaves out is internal and can change in any release. That includes the port's own machinery: its JavaScript values and regular expressions, the croner port, durations and schedules, zones, the output cap and redaction's parts, the stored definition's serializer, the SQL statements, and the alert channels' shared request. Three things are public but outside the promise:
 
 - `Cronwatch.Bridge` (with `Bridge.Watch` and `Bridge.Entry`) is what the Oban and Quantum integrations are built on. It is for integration authors, changes whenever an integration needs something, and a scheduler integration of your own builds on it at its own risk.
 - `Cronwatch.StoreCase` promises only `use Cronwatch.StoreCase, store: ..., fixture: ...`, which runs the whole contract; the tests it defines can grow in any release.
@@ -392,12 +392,12 @@ These still work, marked deprecated. A rename of documented API works through 1.
 | Deprecated | Use | Goes in | |
 |---|---|---|---|
 | `Cronwatch.start()` and `Cronwatch.start(every: d)` | `Cronwatch.start_checking(every: d)` | 2.0 | `start(job, options)`, which opens a run, is unchanged. `start/0` is marked `@deprecated`, so the compiler warns; a keyword list given to `start/1` warns when it is called |
-| `Cronwatch.StoreCase.contract/1`, `replay_fixture/2`, `make/1`, `scenarios/0`, `new_run/4` and `canonical/1` | `use Cronwatch.StoreCase, store: ..., fixture: ...` | 1.0 | the tests the template defines run them; called directly, the compiler warns |
-| `Alerts.Twilio.max_segments/0`, `sms_segments/1`, `sms_body/3`; `Alerts.Discord.embed_description/1`; `Alerts.Email.escape_html/1`; `Alerts.Webhook.body/1`; `Sources.PgCron.hold_ms/0`, `schedule/1`, `job_name/1`, `run_of/4`; `Triage.Anthropic.default_model/0`, `system/0` | nothing: internal to their channel, source or triage | 1.0 | hidden from HexDocs; called directly, the compiler warns |
+| `Cronwatch.StoreCase.contract/1`, `replay_fixture/2`, `make/1`, `scenarios/0`, `new_run/4`, and `canonical/1` | `use Cronwatch.StoreCase, store: ..., fixture: ...` | 1.0 | the tests the template defines run them; called directly, the compiler warns |
+| `Alerts.Twilio.max_segments/0`, `sms_segments/1`, `sms_body/3`; `Alerts.Discord.embed_description/1`; `Alerts.Email.escape_html/1`; `Alerts.Webhook.body/1`; `Sources.PgCron.hold_ms/0`, `schedule/1`, `job_name/1`, `run_of/4`; `Triage.Anthropic.default_model/0`, `system/0` | nothing: internal to their channel, source, or triage | 1.0 | hidden from HexDocs; called directly, the compiler warns |
 
-The modules and functions HexDocs stopped showing in 1.0 that the package itself calls across modules (`Cronwatch.JS`, `JSRE`, `Cron`, `Zone`, `Duration`, `Schedule`, `Output`, `Serialize`, `Alerts.Post`, `Store.SQL`, and helpers such as `Transport.check/2` and `JobState.sending/2`) carry no deprecation: they are internal, and may change in any release.
+The modules and functions HexDocs stopped showing in 0.11 that the package itself calls across modules (`Cronwatch.JS`, `JSRE`, `Cron`, `Zone`, `Duration`, `Schedule`, `Output`, `Serialize`, `Alerts.Post`, `Store.SQL`, and helpers such as `Transport.check/2` and `JobState.sending/2`) carry no deprecation: they are internal, and may change in any release.
 
-`Cronwatch.Error` has a `kind`: `:invalid` (an option, name, schedule or run id the SDK refuses, with its message), `:store` (the store's own error as `reason`) and `:other`. A failed run's error is written `Name: message` from the exception's module (`RuntimeError: disk full`), with up to five frames of its stacktrace, each `Module.function/arity (file:line)`; a throw is written `throw: <value>`, an exit `exit: <reason>`, and a returned `{:error, reason}` as its reason (an exception in it as the exception, `:error` alone as `error`).
+`Cronwatch.Error` has a `kind`: `:invalid` (an option, name, schedule, or run id the SDK refuses, with its message), `:store` (the store's own error as `reason`), and `:other`. A failed run's error is written `Name: message` from the exception's module (`RuntimeError: disk full`), with up to five frames of its stacktrace, each `Module.function/arity (file:line)`; a throw is written `throw: <value>`, an exit `exit: <reason>`, and a returned `{:error, reason}` as its reason (an exception in it as the exception, `:error` alone as `error`).
 
 ## Runs that span calls
 
@@ -412,13 +412,13 @@ Cronwatch.flush(run)                                          # appends what was
 Cronwatch.finish(run)                                         # or Cronwatch.fail(run, reason)
 ```
 
-`id:` takes your own stable id, 1 to 200 characters: a start with an id already recorded for this job records nothing and answers a handle on that run, and one recorded for another job is an error, as is an id starting `pgcron:`. A store that fails is reported to the error handler, never returned. The handle has `id`, `job` and `started_at`, with `log/2`, `metric/3`, `flush/1`, `finish/2`, `fail/2` and `active?/1`. A run is judged once however many processes finish it: only the process whose conditional write lands evaluates it. A handle whose process ends while it is active records nothing; a run that is never finished is marked stuck by the first check after the job's `timeout`, so set it to cover the whole span.
+`id:` takes your own stable id, 1 to 200 characters: a start with an id already recorded for this job records nothing and answers a handle on that run, and one recorded for another job is an error, as is an id starting `pgcron:`. A store that fails is reported to the error handler, never returned. The handle has `id`, `job`, and `started_at`, with `log/2`, `metric/3`, `flush/1`, `finish/2`, `fail/2`, and `active?/1`. A run is judged once however many processes finish it: only the process whose conditional write lands evaluates it. A handle whose process ends while it is active records nothing; a run that is never finished is marked stuck by the first check after the job's `timeout`, so set it to cover the whole span.
 
 ## Sharing a database with the other languages
 
-The Ecto store writes the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the Python, PHP, Go, Rust, Java and .NET stores (the MySQL tables are the PHP, Go, Rust, Java and .NET ports'): the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns, byte for byte, keys in the SDK's order. The package's tests share a SQLite file with the built SDK, and have a Node client and an Elixir client take turns on one job's state. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
+The Ecto store writes the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the Python, PHP, Go, Rust, Java, and .NET stores (the MySQL tables are the PHP, Go, Rust, Java, and .NET ports'): the same names, columns, and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns, byte for byte, keys in the SDK's order. The package's tests share a SQLite file with the built SDK, and have a Node client and an Elixir client take turns on one job's state. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
 
-A 1.x release keeps what it does not know in the stored data: a field of a job's state or definition, a condition, a run status or a trigger that a newer release wrote is read, kept and written back as it was (a status or trigger stays a string, never an atom), so any 1.x release of any language can share a store with any other. The 0.x releases are not covered: upgrade every process to 1.0 together.
+A 1.x release keeps what it does not know in the stored data: a field of a job's state or definition, a condition, a run status, or a trigger that a newer release wrote is read, kept, and written back as it was (a status or trigger stays a string, never an atom), so any 1.x release of any language can share a store with any other. Releases before 0.11 are not covered: upgrade every process to 0.11 or newer together.
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses.
 
@@ -426,4 +426,4 @@ A map given where the SDK keeps an object's order (a `budget` or `floor`, metric
 
 ## Kept in step
 
-The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, redaction, each channel's requests, stats and health) into `conformance/` in the repository, and the Elixir tests replay every one, as the Ruby gem's and the Python, PHP, Go, Rust, Java and .NET packages' do; the dashboard is checked against the SDK's pages byte for byte, straight into the plug, through a `Plug.Router` under Bandit and through a Phoenix endpoint. Cron parsing is also checked against croner itself on thousands of generated expressions. A change of behaviour lands in TypeScript first, the cases are regenerated, and the port is fixed until they pass. Where they disagree, the port is wrong: [open an issue](https://github.com/cronwatchdev/cronwatch/issues).
+The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, redaction, each channel's requests, stats, and health) into `conformance/` in the repository, and the Elixir tests replay every one, as the Ruby gem's and the Python, PHP, Go, Rust, Java, and .NET packages' do; the dashboard is checked against the SDK's pages byte for byte, straight into the plug, through a `Plug.Router` under Bandit, and through a Phoenix endpoint. Cron parsing is also checked against croner itself on thousands of generated expressions. A change of behaviour lands in TypeScript first, the cases are regenerated, and the port is fixed until they pass. Where they disagree, the port is wrong: [open an issue](https://github.com/cronwatchdev/cronwatch/issues).

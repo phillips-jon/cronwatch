@@ -17,9 +17,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * makes that worker as the plugin system would have (through its create()
  * when it has one) and hands each item to it, recording the processing as a
  * run of the worker's job (Recorder::queueItem()). What the worker throws
- * (a failure, or a RequeueException, DelayedRequeueException or
+ * (a failure, or a RequeueException, DelayedRequeueException, or
  * SuspendQueueException asking for the item back) is recorded as a failed
- * attempt and thrown on, so the queue runner releases, delays or keeps the
+ * attempt and thrown on, so the queue runner releases, delays, or keeps the
  * item as it would: failing attempts open one alert, and the attempt that
  * succeeds closes it.
  */

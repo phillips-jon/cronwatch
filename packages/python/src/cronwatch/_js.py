@@ -1,7 +1,7 @@
 """The few places JavaScript and Python disagree about text and numbers,
 settled the JavaScript way.
 
-The SDK writes the stored rows, alert text and webhook bodies, so this port
+The SDK writes the stored rows, alert text, and webhook bodies, so this port
 reproduces them byte for byte: Math.round, String(number), JSON.stringify
 (number formatting, key order, escaping), String.prototype.trim, the \\s
 class, and lengths counted in UTF-16 code units.
@@ -56,7 +56,7 @@ _TRAILING = re.compile(f"[{WHITESPACE}]+\\Z")
 MAX_SAFE_INTEGER = 2**53 - 1
 
 _ESCAPES = {'"': '\\"', "\\": "\\\\", "\b": "\\b", "\f": "\\f", "\n": "\\n", "\r": "\\r", "\t": "\\t"}
-# Control characters, the quote, the backslash and lone surrogates.
+# Control characters, the quote, the backslash, and lone surrogates.
 _NEEDS_ESCAPE = re.compile('["\\\\\x00-\x1f\ud800-\udfff]')
 # An array index is a canonical integer below 2**32 - 1; JavaScript lists those keys first.
 _INDEX_KEY = re.compile(r"(?:0|[1-9][0-9]{0,9})\Z")
@@ -171,7 +171,7 @@ def length16(text: str) -> int:
 def head16(text: str, units: int) -> str:
     """text.slice(0, units), counted in UTF-16 code units. A surrogate pair cut
     in half leaves U+FFFD, the character a lone surrogate becomes once written
-    out as UTF-8 (to a store, a hash or a network)."""
+    out as UTF-8 (to a store, a hash, or a network)."""
     if text.isascii():
         return text[: max(units, 0)]
     data = text.encode("utf-16-le", "surrogatepass")
@@ -230,7 +230,7 @@ def to_json_value(value: Any) -> Any:
 
 def dumps(value: Any) -> str:
     """JSON.stringify for plain data: dicts, lists, strings, numbers, True,
-    False and None, and anything with a to_dict() (this package's types).
+    False, and None, and anything with a to_dict() (this package's types).
     Raises TypeError for anything else."""
     if value is None:
         return "null"

@@ -120,55 +120,55 @@
     },
     {
       "input": "abc",
-      "error": "duration \"abc\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "duration \"abc\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": "5",
-      "error": "duration \"5\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "duration \"5\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": "5 minutes",
-      "error": "duration \"5 minutes\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "duration \"5 minutes\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": "-1m",
-      "error": "duration \"-1m\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "duration \"-1m\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": "1m2",
-      "error": "duration \"1m2\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "duration \"1m2\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": "1.m",
-      "error": "duration \"1.m\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "duration \"1.m\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": ".5m",
-      "error": "duration \".5m\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "duration \".5m\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": "m",
-      "error": "duration \"m\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "duration \"m\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": "1mm",
-      "error": "duration \"1mm\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "duration \"1mm\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": "1 h 30",
-      "error": "duration \"1 h 30\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "duration \"1 h 30\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": "1y",
-      "error": "duration \"1y\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "duration \"1y\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": "1h,30m",
-      "error": "duration \"1h,30m\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "duration \"1h,30m\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": "+1m",
-      "error": "duration \"+1m\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "duration \"+1m\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": 1234,
@@ -207,7 +207,7 @@
     {
       "input": "soon",
       "label": "grace",
-      "error": "grace \"soon\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "grace \"soon\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": "",
@@ -222,7 +222,7 @@
     {
       "input": "every",
       "label": "schedule interval",
-      "error": "schedule interval \"every\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "schedule interval \"every\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": "2h",
@@ -251,7 +251,7 @@
     },
     {
       "input": "1111111111111111111111111111111111111111111111111111111111111111",
-      "error": "duration \"1111111111111111111111111111111111111111111111111111111111111111\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "duration \"1111111111111111111111111111111111111111111111111111111111111111\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": "11111111111111111111111111111111111111111111111111111111111111111",
@@ -268,11 +268,11 @@
     },
     {
       "input": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
-      "error": "duration \"😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "duration \"😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
-      "error": "duration \"😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      "error": "duration \"😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀\" is not a duration like \"15m\", \"1h30m\", or \"90s\""
     },
     {
       "input": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",

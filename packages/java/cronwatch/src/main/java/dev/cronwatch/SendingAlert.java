@@ -20,7 +20,7 @@ public record SendingAlert(@Nullable Long until, @Nullable Alert alert) {
 
   /**
    * The entry as the SDK writes it. One read from JSON keeps what this release does not read (a key
-   * a newer writer added, a {@code until} or {@code alert} it could not read), as the SDK carries
+   * a newer writer added, a {@code until}, or {@code alert} it could not read), as the SDK carries
    * an entry unchanged.
    */
   public JsObject toValue() {

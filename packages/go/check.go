@@ -1,6 +1,6 @@
 package cronwatch
 
-// Checks, reads and the interval (client.ts check(), jobs(), silence(),
+// Checks, reads, and the interval (client.ts check(), jobs(), silence(),
 // start()).
 
 import (
@@ -349,7 +349,7 @@ func (c *Client) Unsilence(ctx context.Context, name string) (JobState, error) {
 	return c.patchState(ctx, name, func(s *JobState) { s.SilencedUntil = nil })
 }
 
-// patchState reads, changes and writes one job's state, in turn with every
+// patchState reads, changes, and writes one job's state, in turn with every
 // other update to it.
 func (c *Client) patchState(ctx context.Context, name string, change func(*JobState)) (JobState, error) {
 	if err := c.ensureReady(ctx); err != nil {
@@ -467,7 +467,7 @@ func (c *Client) stopTicking() chan struct{} {
 }
 
 // Close stops the interval, waits for a check already under way (the
-// interval's, or one a caller began: bounded by its own channel, triage and
+// interval's, or one a caller began: bounded by its own channel, triage, and
 // retry timeouts; what it returns went to whoever started it), then closes
 // the store, so that check neither writes after the store is closed nor
 // loses the alerts it would queue. Call it from outside a check (not from a

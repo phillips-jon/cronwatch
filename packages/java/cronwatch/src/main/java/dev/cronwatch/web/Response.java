@@ -29,7 +29,7 @@ public final class Response {
     this.body = body;
   }
 
-  /** An answer with this status, no headers and no body. */
+  /** An answer with this status, no headers, and no body. */
   public static Response of(int status) {
     return new Response(status, List.of(), new byte[0]);
   }

@@ -2,7 +2,7 @@ package dev.cronwatch.internal.sql;
 
 /**
  * The database's SQL: SQLite's and Postgres's are the SDK's {@code stores/sql.ts}, text for text;
- * MySQL's (and MariaDB's) is the PHP, Go, Rust and Elixir ports' own.
+ * MySQL's (and MariaDB's) is the PHP, Go, Rust, and Elixir ports' own.
  */
 public enum Dialect {
   /** SQLite, as the SDK's {@code sqlite()} store writes it. */
@@ -20,7 +20,9 @@ public enum Dialect {
     this.label = label;
   }
 
-  /** The dialect's name as the SDK writes it: {@code sqlite}, {@code postgres} or {@code mysql}. */
+  /**
+   * The dialect's name as the SDK writes it: {@code sqlite}, {@code postgres}, or {@code mysql}.
+   */
   public String label() {
     return label;
   }

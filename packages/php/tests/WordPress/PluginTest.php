@@ -136,7 +136,7 @@ final class PluginTest extends TestCase
             $this->assertContains('cronwatch/includes/AdminDashboard.php', $names);
             $this->assertContains('cronwatch/lib/src/Web/Dashboard.php', $names);
             // The dashboard's stylesheet is the library's, as a file of the plugin's, which it registers,
-            // enqueues and prints through WordPress's styles (AdminDashboard::head()) for every dashboard it makes.
+            // enqueues, and prints through WordPress's styles (AdminDashboard::head()) for every dashboard it makes.
             $this->assertContains('cronwatch/css/dashboard.css', $names);
             $this->assertSame(ltrim(\Cronwatch\Web\Html::CSS, "\n"), $stylesheet);
             $this->assertStringContainsString("public const STYLESHEET = 'css/dashboard.css';", $adminDashboard);

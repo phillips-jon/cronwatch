@@ -1,7 +1,7 @@
 defmodule Cronwatch.Test.RewriteTransport do
   @moduledoc """
   A transport that sends every request to a local test server instead of
-  where it was addressed (the scheme, host and port rewritten, the path and
+  where it was addressed (the scheme, host, and port rewritten, the path and
   query kept) through `Cronwatch.Transport.HTTP`, so a provider's channel
   can be pointed at `Cronwatch.Test.HTTPServer`. Options: `to:` the
   server's URL, and any `Cronwatch.Transport.HTTP` options.

@@ -11,7 +11,7 @@ defmodule Cronwatch.Release do
   repo, then an instance named `MyApp.Cronwatch` with the options the app
   keeps under `config :my_app, MyApp.Cronwatch` in `config/runtime.exs`),
   without starting the app's endpoint or queues, runs one check, prints what
-  it did and stops what it started, as the Ecto migration helpers apps keep
+  it did, and stops what it started, as the Ecto migration helpers apps keep
   in `MyApp.Release` do. It exits non-zero when the check fails, so cron
   mails the failure. From source, `mix cronwatch.check` does the same.
 
@@ -20,7 +20,7 @@ defmodule Cronwatch.Release do
   says: an app whose job nodes queue their alerts (`deliver: :check`) has
   this check send them, so it sends them itself. Called where the instance
   is already running (`bin/my_app rpc` into the live app), it checks that
-  instance, leaves it running and never halts, since halting would stop the
+  instance, leaves it running, and never halts, since halting would stop the
   app; an instance there that delivers at check time sends nothing, which
   the line it prints says, with a warning on standard error.
   """

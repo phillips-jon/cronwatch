@@ -142,7 +142,7 @@ public sealed class WebRequest
     /// <summary>A <see cref="CronwatchRequest"/> under the former name.</summary>
     public static WebRequest FromCronwatchRequest(CronwatchRequest request) => request;
 
-    /// <summary>Names the method, the path and the header names, never a value.</summary>
+    /// <summary>Names the method, the path, and the header names, never a value.</summary>
     public override string ToString() => Request.ToString();
 }
 
@@ -163,7 +163,7 @@ public sealed class WebResponse
         _response = response;
     }
 
-    /// <summary>An answer with this status, no headers and no body.</summary>
+    /// <summary>An answer with this status, no headers, and no body.</summary>
     public WebResponse(int status)
         : this(new CronwatchResponse(status))
     {

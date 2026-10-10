@@ -1,4 +1,4 @@
-"""Rows a foreign, hand-edited or damaged writer could leave (conformance
+"""Rows a foreign, hand-edited, or damaged writer could leave (conformance
 store.json foreignRows, written by the TypeScript SDK): each is read
 leniently, and one affects only its own job (the SDK's stores.test.ts)."""
 

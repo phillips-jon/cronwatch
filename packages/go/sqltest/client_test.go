@@ -16,7 +16,7 @@ import (
 
 // A client from end to end on each dialect: jobs declared, runs that
 // succeed and fail, a check that finds a stuck run and a missed one, the
-// alerts sent and the state's version moving on every write.
+// alerts sent, and the state's version moving on every write.
 
 func endToEnd(t *testing.T, store cronwatch.Store) {
 	const min = 60_000

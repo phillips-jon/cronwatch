@@ -12,7 +12,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Sends one POST and answers its status and body, whatever the status: the one request every
  * channel and Claude triage make. {@link JdkTransport} over the JDK's {@code HttpClient} is the
- * default; an app that wants OkHttp, Apache HttpClient, a proxy or its own trust store writes one,
+ * default; an app that wants OkHttp, Apache HttpClient, a proxy, or its own trust store writes one,
  * and gives it to the client ({@code Cronwatch.builder().transport(...)}) or to a channel's
  * options.
  *
@@ -41,8 +41,8 @@ public interface Transport {
   /**
    * One POST, as a {@link Transport} is asked to send it: an http or https URL as the WHATWG URL
    * parser (and so fetch) writes it, the headers in the order they are sent, and the body. Its
-   * {@code toString} shows the URL's origin, the header names and the body's length only, since the
-   * rest carries the channel's credentials.
+   * {@code toString} shows the URL's origin, the header names, and the body's length only, since
+   * the rest carries the channel's credentials.
    */
   final class Request {
     private final String url;
@@ -81,7 +81,7 @@ public interface Transport {
       return body.clone();
     }
 
-    /** The URL's origin, the header names and the body's length. */
+    /** The URL's origin, the header names, and the body's length. */
     @Override
     public String toString() {
       List<String> names = new ArrayList<>(headers.size());

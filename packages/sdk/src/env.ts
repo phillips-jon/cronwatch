@@ -9,7 +9,7 @@ export function readEnv(name: string): string | undefined {
 
 /**
  * A secret from the environment (CRONWATCH_TOKEN, CRON_SECRET): undefined
- * when the variable is unset, empty or only whitespace (as
+ * when the variable is unset, empty, or only whitespace (as
  * String.prototype.trim sees it), so a blank value counts as not set and the
  * routes and handlers fail closed. Any other value is used as it is, untrimmed.
  */
@@ -19,7 +19,7 @@ export function readSecretEnv(name: string): string | undefined {
 }
 
 /**
- * A token or secret passed in code: a string, null (the opt-out) or
+ * A token or secret passed in code: a string, null (the opt-out), or
  * undefined (not given). A string that is empty or only whitespace counts as
  * not given. Anything else (false, a number, an object) throws a TypeError
  * naming the option, so it never becomes a password.
@@ -34,9 +34,9 @@ export function secretOption(value: unknown, what: string): string | null | unde
 
 /**
  * The environment's name, as every CronWatch library reads it: the first of
- * CRONWATCH_ENV, APP_ENV and NODE_ENV that holds more than spaces, trimmed
+ * CRONWATCH_ENV, APP_ENV, and NODE_ENV that holds more than spaces, trimmed
  * and lowercased, with "prod" read as "production" and "dev", "local",
- * "test" and "testing" as "development"; "" when none is set, which is not
+ * "test", and "testing" as "development"; "" when none is set, which is not
  * development. The variables are written out in full so that bundlers which
  * inline process.env.NODE_ENV still can.
  */

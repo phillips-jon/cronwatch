@@ -9,7 +9,7 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Where jobs, runs and state live: the SDK's {@code Store}. {@link MemoryStore} is one, and {@code
+ * Where jobs, runs, and state live: the SDK's {@code Store}. {@link MemoryStore} is one, and {@code
  * SqlStore} keeps them in the app's own database. A store of the app's own should pass {@code
  * dev.cronwatch.storetest.StoreContract}.
  *
@@ -51,7 +51,7 @@ public interface Store extends AutoCloseable {
   List<StoredJob> listJobs() throws Exception;
 
   /**
-   * Removes a job, its runs and its state.
+   * Removes a job, its runs, and its state.
    *
    * @throws Exception when the store fails
    */
@@ -65,7 +65,7 @@ public interface Store extends AutoCloseable {
   void insertRun(Run run) throws Exception;
 
   /**
-   * Writes a run's status, finish, duration, error, output and metrics. A run that is gone stays
+   * Writes a run's status, finish, duration, error, output, and metrics. A run that is gone stays
    * gone.
    *
    * @throws Exception when the store fails
@@ -163,7 +163,7 @@ public interface Store extends AutoCloseable {
    * Deletes the run {@code id} only when its stored job is {@code job} and its status is {@code
    * status} (SQL: {@code DELETE ... WHERE id = ? AND job = ? AND status = ?}), and says whether it
    * deleted. The SDK has no counterpart: it is how an attempt a scheduler gave back without failing
-   * leaves no run behind, as the Go, PHP, Rust and Elixir ports' stores take one back.
+   * leaves no run behind, as the Go, PHP, Rust, and Elixir ports' stores take one back.
    *
    * @throws UnsupportedOperationException when the store cannot (the default)
    * @throws Exception when the store fails

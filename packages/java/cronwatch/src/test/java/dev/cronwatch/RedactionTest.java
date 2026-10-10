@@ -58,7 +58,7 @@ class RedactionTest {
     assertFalse(bearerOutput.contains("opaqueTOKEN"));
     assertTrue(bearerOutput.length() <= Output.OUTPUT_CAP + TRIMMED.length());
 
-    // Errors, recorded runs and flushed lines the same way.
+    // Errors, recorded runs, and flushed lines the same way.
     assertThrows(
         IllegalStateException.class,
         () ->

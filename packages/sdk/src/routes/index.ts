@@ -16,8 +16,8 @@ export interface RoutesOptions {
    * have no process, pass env.CRONWATCH_TOKEN); an empty string or one of
    * only whitespace, given here or in the variable, counts as unset, and any
    * other type (false, a number) throws.
-   * With no token in development (the first of CRONWATCH_ENV, APP_ENV and
-   * NODE_ENV that is set names "development", "dev", "local", "test" or
+   * With no token in development (the first of CRONWATCH_ENV, APP_ENV, and
+   * NODE_ENV that is set names "development", "dev", "local", "test", or
    * "testing"), the routes make a random one and print a sign-in link to the
    * server log on their first request; with no token otherwise they answer
    * 503. Pass `null` to opt out
@@ -36,10 +36,10 @@ export interface RoutesOptions {
    * carry an internal host or scheme. Used in place of the request URL's
    * origin for the cross-site check on writes, the sign-in redirect (its
    * cookie is Secure when this is https, and the redirect back after a form
-   * follows a Referer on this origin) and the development sign-in line.
+   * follows a Referer on this origin), and the development sign-in line.
    * Takes precedence over trustProxy. Without it, the development sign-in
    * line shows the request's origin only when its host is loopback
-   * (localhost, *.localhost, 127.0.0.0/8 or ::1), and otherwise leaves the
+   * (localhost, *.localhost, 127.0.0.0/8, or ::1), and otherwise leaves the
    * host out, since a client controls it.
    */
   origin?: string;
@@ -102,7 +102,7 @@ async function boardLanes(cw: Cronwatch, entries: { job: JobSummary; runs: Run[]
 }
 
 // 'self' only for what the app shell needs: app.js (which registers the
-// service worker and the theme toggle), the manifest, the worker and the icons.
+// service worker and the theme toggle), the manifest, the worker, and the icons.
 // No inline script, and the pages work without any.
 const CSP = "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 /** For the SVG icons, should one be opened on its own. */
@@ -128,9 +128,9 @@ function developmentToken(): string {
  *   [cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: <origin><base>/?token=<token>
  *
  * <origin> is the `origin` option when set. Otherwise it is the first
- * request's public origin (scheme, host and any port: the forwarded one
+ * request's public origin (scheme, host, and any port: the forwarded one
  * under trustProxy, else the request URL's), but only when its host is
- * loopback ("localhost", a name ending in ".localhost", 127.0.0.0/8 or
+ * loopback ("localhost", a name ending in ".localhost", 127.0.0.0/8, or
  * ::1). That host comes from the request, which a client controls, so for
  * any other host the line leaves it out, and a spoofed first request cannot
  * point the link, token and all, somewhere else:
@@ -217,7 +217,7 @@ function forwardedOrigin(request: Request, url: URL): string {
   if (proto !== null && proto !== "http" && proto !== "https") return url.origin;
   try {
     const built = new URL(`${proto ?? url.protocol.slice(0, -1)}://${host ?? url.host}`);
-    // A "host" carrying a path, credentials, a query or a fragment is not a host.
+    // A "host" carrying a path, credentials, a query, or a fragment is not a host.
     if (built.pathname !== "/" || built.username || built.password || built.search || built.hash) return url.origin;
     return built.origin;
   } catch {
@@ -331,7 +331,7 @@ export function buildRoutes(cw: Cronwatch, options: RoutesOptions = {}): Routes 
   const originOf = (request: Request, url: URL): string =>
     fixedOrigin ?? (trustProxy ? forwardedOrigin(request, url) : url.origin);
   // A fetch handler cannot tell a local caller from a remote one (proxies,
-  // tunnels and `next dev` listening on every interface all look alike), so
+  // tunnels, and `next dev` listening on every interface all look alike), so
   // development gets a token too: made here, and shown only in the server log.
   const generated = !configured && !optedOut && developing;
   const token = generated ? developmentToken() : configured;
@@ -350,7 +350,7 @@ export function buildRoutes(cw: Cronwatch, options: RoutesOptions = {}): Routes 
       console.info(developmentSignInLine(shown, base, token!));
     }
 
-    // The app shell: the manifest, icons, service worker, app.js and the
+    // The app shell: the manifest, icons, service worker, app.js, and the
     // offline page. Served to anyone, since a browser fetches some of it
     // without cookies and none of it says anything about the jobs.
     if (method === "GET" || method === "HEAD") {

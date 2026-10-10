@@ -63,7 +63,7 @@ fn js_string(v: &Value) -> String {
 }
 
 fn not_a_duration(label: &str, value: &str) -> String {
-    format!("{label} \"{value}\" is not a duration like \"15m\", \"1h30m\" or \"90s\"")
+    format!("{label} \"{value}\" is not a duration like \"15m\", \"1h30m\", or \"90s\"")
 }
 
 /// The longest duration string read, in characters (code points). No real

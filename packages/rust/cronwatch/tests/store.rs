@@ -1,4 +1,4 @@
-//! The memory store against the store contract, the store.json replay and
+//! The memory store against the store contract, the store.json replay, and
 //! the finish-once scenarios (the `storetest` feature).
 
 use std::sync::Arc;
@@ -32,7 +32,7 @@ async fn a_run_is_finished_once_across_processes() {
     .await;
 }
 
-/// The names this module had before 1.0 still work, deprecated, until 1.0.
+/// The names this module had before 0.11 still work, deprecated, until 1.0.
 #[tokio::test]
 #[allow(deprecated)]
 async fn the_deprecated_helpers_still_work() {

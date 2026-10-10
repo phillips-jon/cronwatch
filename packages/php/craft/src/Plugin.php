@@ -24,7 +24,7 @@ use yii\queue\Queue;
 /**
  * CronWatch for Craft CMS: queue jobs and console commands watched, the
  * check (`craft cronwatch/check`), the store in Craft's database, the
- * dashboard in the Control Panel and the channels in the plugin settings.
+ * dashboard in the Control Panel, and the channels in the plugin settings.
  *
  * @property-read Recorder $recorder
  */
@@ -32,7 +32,7 @@ final class Plugin extends BasePlugin
 {
     /** Add or change alert channels (an AlertsEvent). */
     public const EVENT_ALERTS = 'cronwatchAlerts';
-    /** Silence, forget and check jobs from the dashboard (viewing it is accessPlugin-cronwatch). */
+    /** Silence, forget, and check jobs from the dashboard (viewing it is accessPlugin-cronwatch). */
     public const PERMISSION_MANAGE = 'cronwatch-manage';
 
     public string $schemaVersion = '1.0.0';
@@ -81,7 +81,7 @@ final class Plugin extends BasePlugin
             $event->permissions[] = [
                 'heading' => 'CronWatch',
                 'permissions' => [
-                    self::PERMISSION_MANAGE => ['label' => 'Silence, forget and check jobs from the dashboard'],
+                    self::PERMISSION_MANAGE => ['label' => 'Silence, forget, and check jobs from the dashboard'],
                 ],
             ];
         });

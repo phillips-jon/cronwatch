@@ -2,7 +2,7 @@ defmodule Cronwatch.Output do
   @moduledoc false
   # Internal: not the package's API, and it can change in any release.
   #
-  # The SDK's `output.ts`: the output cap, error text and secret redaction.
+  # The SDK's `output.ts`: the output cap, error text, and secret redaction.
   #
   # Lengths and cuts are in UTF-16 code units, as JavaScript counts them, so the
   # same output is capped at the same character here and in every other port.
@@ -255,7 +255,7 @@ defmodule Cronwatch.Output do
     # Incoming webhook URLs carry their secret in the path.
     {~S"(\bhooks\.slack\.com\/(?:services|workflows|triggers)\/)[A-Za-z0-9/_-]{1,255}", "gi", "$1[redacted]"},
     {~S"(\bdiscord(?:app)?\.com\/api\/(?:v\d{1,2}\/)?webhooks\/)[A-Za-z0-9/_-]{1,255}", "gi", "$1[redacted]"},
-    # Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI
+    # Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI,
     # and Google style keys.
     {~S"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b", "g", "[redacted]"},
     {~S"\b(?:gh[pousr]_[A-Za-z0-9]{30,255}|github_pat_[A-Za-z0-9_]{20,255})\b", "g", "[redacted]"},
@@ -293,8 +293,8 @@ defmodule Cronwatch.Output do
   @doc """
   The default redaction: blanks values that look like secrets (key=value
   pairs with secret-ish names, Authorization headers, URL credentials, bearer
-  tokens, JWTs, PEM private keys, webhook URLs and well-known token formats)
-  before output or an error is stored, shown or sent anywhere, exactly as the
+  tokens, JWTs, PEM private keys, webhook URLs, and well-known token formats)
+  before output or an error is stored, shown, or sent anywhere, exactly as the
   SDK's `redactSecrets` does. An app's own `redact` function can call it and
   add patterns of its own.
 

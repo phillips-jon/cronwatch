@@ -52,7 +52,7 @@ final class MysqlStore extends PdoStore
         }
         $url ??= self::databaseUrl();
         if ($url === null) {
-            throw new \InvalidArgumentException('MysqlStore needs a mysql:// URL, a PDO DSN or a PDO (or DATABASE_URL set to a mysql:// URL)');
+            throw new \InvalidArgumentException('MysqlStore needs a mysql:// URL, a PDO DSN, or a PDO (or DATABASE_URL set to a mysql:// URL)');
         }
         [$this->dsn, $this->username, $this->password] = self::connection($url, $username, $password);
         $this->tls = self::urlOptions($url);
@@ -66,7 +66,7 @@ final class MysqlStore extends PdoStore
     }
 
     /**
-     * A PDO DSN, user and password from a mysql:// (or mariadb://) URL, or a
+     * A PDO DSN, user, and password from a mysql:// (or mariadb://) URL, or a
      * DSN passed through with utf8mb4 added when it names no charset.
      *
      * @return array{string, ?string, ?string}
@@ -142,7 +142,7 @@ final class MysqlStore extends PdoStore
             if ($lower === 'ssl-mode' || $lower === 'sslmode') {
                 $mode = strtoupper(str_replace('-', '_', $value));
                 if (!in_array($mode, ['DISABLED', 'PREFERRED', 'REQUIRED', 'VERIFY_CA', 'VERIFY_IDENTITY', 'REQUIRE', 'DISABLE', 'PREFER', 'VERIFY_FULL'], true)) {
-                    throw new \InvalidArgumentException("MysqlStore does not know the ssl-mode {$value}: DISABLED, PREFERRED, REQUIRED, VERIFY_CA or VERIFY_IDENTITY");
+                    throw new \InvalidArgumentException("MysqlStore does not know the ssl-mode {$value}: DISABLED, PREFERRED, REQUIRED, VERIFY_CA, or VERIFY_IDENTITY");
                 }
                 continue;
             }

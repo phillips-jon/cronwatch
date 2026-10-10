@@ -6,7 +6,7 @@ using Xunit;
 namespace Cronwatch.Tests.PgCron;
 
 /// <summary>
-/// Replays <c>conformance/pgcron.json</c>: the SDK's <c>pgCronSchedule</c>, <c>pgCronJobName</c>
+/// Replays <c>conformance/pgcron.json</c>: the SDK's <c>pgCronSchedule</c>, <c>pgCronJobName</c>,
 /// and <c>pgCronRun</c> over every case, and its hold.
 /// </summary>
 public class PgCronConformanceTests

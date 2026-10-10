@@ -30,7 +30,7 @@ export const digest = cw.job("daily-digest", { schedule: "0 6 * * *", grace: "10
 
 Which store depends on the adapter. On `adapter-vercel` or `adapter-netlify` there is no disk, so use Postgres. On `adapter-node` with a persistent volume, SQLite works (`sqlite({ path: "./data/cronwatch.db" })`, from `@cronwatch/sdk/sqlite`). The stores are Node drivers, so the server code must run on Node.
 
-The SDK reads `CRON_SECRET`, `CRONWATCH_TOKEN` and `DATABASE_URL` from `process.env`, which every Node adapter populates at runtime. To pass values from `$env/dynamic/private` instead, give them to `cronwatch({ cronSecret })`, `cw.routes({ token })` and `postgres({ connectionString })`.
+The SDK reads `CRON_SECRET`, `CRONWATCH_TOKEN`, and `DATABASE_URL` from `process.env`, which every Node adapter populates at runtime. To pass values from `$env/dynamic/private` instead, give them to `cronwatch({ cronSecret })`, `cw.routes({ token })`, and `postgres({ connectionString })`.
 
 ## A job endpoint
 
@@ -47,7 +47,7 @@ const run = digest.handler(async (job) => {
 export const GET: RequestHandler = ({ request }) => run(request);
 ```
 
-`handler()` checks `Authorization: Bearer <CRON_SECRET>`, runs the function, records the run and answers 200 or 500. Point the platform's cron at the path. On Vercel that is `vercel.json`, whose crons run in UTC, the reason for `timezone: "UTC"` above:
+`handler()` checks `Authorization: Bearer <CRON_SECRET>`, runs the function, records the run, and answers 200 or 500. Point the platform's cron at the path. On Vercel that is `vercel.json`, whose crons run in UTC, the reason for `timezone: "UTC"` above:
 
 ```json
 {

@@ -102,6 +102,19 @@ public final class Format {
     return diff < 0 ? text + " ago" : "in " + text;
   }
 
+  /**
+   * Words joined as an English list, with a serial comma from three on: "a", "a and b", "a, b, and
+   * c". Every port joins the same way.
+   */
+  public static String andList(List<String> words) {
+    if (words.size() <= 2) {
+      return String.join(" and ", words);
+    }
+    return String.join(", ", words.subList(0, words.size() - 1))
+        + ", and "
+        + words.get(words.size() - 1);
+  }
+
   private static String firstLines(String text, int n) {
     String[] lines = text.split("\n", -1);
     return String.join("\n", List.of(lines).subList(0, Math.min(n, lines.length)));
@@ -292,7 +305,7 @@ public final class Format {
         for (Condition c : r.after()) {
           after.add(c.value().replaceFirst("_", " "));
         }
-        String joined = String.join(", ", after);
+        String joined = andList(after);
         String at = run == null ? "just now" : when(run.startedAt(), now);
         lines.add(
             "A run " + at + " succeeded" + (joined.isEmpty() ? "" : " after: " + joined) + ".");

@@ -1,5 +1,5 @@
 /**
- * Everything public about a job, a run and an alert. Kept in one file so the
+ * Everything public about a job, a run, and an alert. Kept in one file so the
  * store and alert adapters, which are built as separate entry points, share
  * one definition.
  */
@@ -13,7 +13,7 @@ export interface JobOptions {
   /**
    * When the job is supposed to run. A five or six field cron expression
    * ("0 2 * * *"), a cron nickname ("@hourly"), or an interval ("every 5m").
-   * Leave it out for a job that has no fixed cadence: failures, duration and
+   * Leave it out for a job that has no fixed cadence: failures, duration, and
    * budgets are still watched, but nothing is ever reported as missed.
    */
   schedule?: string;
@@ -95,7 +95,7 @@ export interface Run {
   metrics: Record<string, number>;
   /**
    * What started the run: "run", "start", "handler", an integration's name
-   * ("pg_cron" for the pg_cron source) or a value you pass.
+   * ("pg_cron" for the pg_cron source), or a value you pass.
    */
   trigger: string;
 }
@@ -183,7 +183,7 @@ interface AlertBase {
   message: string;
   /**
    * A short diagnosis from the triage function, when one is configured. Null
-   * when triage was tried and gave nothing (it threw, timed out or answered
+   * when triage was tried and gave nothing (it threw, timed out, or answered
    * empty); it is not tried again for this alert.
    */
   triage?: string | null;
@@ -217,9 +217,9 @@ export interface AlertChannel {
 }
 
 /**
- * Where jobs, runs and state are kept. A store holds text without U+0000,
+ * Where jobs, runs, and state are kept. A store holds text without U+0000,
  * which Postgres refuses: it drops every NUL from a run's trigger, output,
- * error and metric names, and from every key and string of a definition and
+ * error, and metric names, and from every key and string of a definition and
  * a state, as it writes them. Job names and run ids never hold one.
  */
 export interface Store {
@@ -232,7 +232,7 @@ export interface Store {
   insertRun(run: Run): Promise<void>;
   updateRun(run: Run): Promise<void>;
   /**
-   * Write a run's status, finishedAt, durationMs, error, output and metrics
+   * Write a run's status, finishedAt, durationMs, error, output, and metrics
    * only when its stored status is one of `fromStatuses`, in one step (SQL:
    * `UPDATE ... WHERE id = ? AND status IN (...)`). Returns whether it wrote.
    * This is what lets exactly one of several processes finishing the same run

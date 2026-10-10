@@ -52,7 +52,7 @@ defmodule Cronwatch.Web.RoutesTest do
     assert Cronwatch.Web.token(w.opts) == "tok"
   end
 
-  test "a token or secret given in code that is not a string, nil or false is refused" do
+  test "a token or secret given in code that is not a string, nil, or false is refused" do
     %{cw: cw} = make()
 
     for bad <- [true, 5, 1.5, :sym, ~c"tok", %{}, {:system, :not_a_name}] do
@@ -73,7 +73,7 @@ defmodule Cronwatch.Web.RoutesTest do
       assert message =~ "cron_secret must be a string, or false to opt out", inspect(bad)
     end
 
-    # nil (left out), false (the opt-out) and a string are taken.
+    # nil (left out), false (the opt-out), and a string are taken.
     for good <- [nil, false, "s", {:system, "VAR"}] do
       assert %Cronwatch.Web{} = Cronwatch.Web.init(instance: cw, token: good)
     end
@@ -146,7 +146,7 @@ defmodule Cronwatch.Web.RoutesTest do
     assert get(w, "/cronwatch/api/check?token=#{secret}").status == 401, "only as a bearer"
   end
 
-  test "GET /api names the library, the language and the versions" do
+  test "GET /api names the library, the language, and the versions" do
     secret = "cron-" <> "s3cret"
     w = web([], cron_secret: secret)
     want = ~s({"ok":true,"library":"cronwatch","language":"elixir","version":"#{Cronwatch.version()}","api":1})

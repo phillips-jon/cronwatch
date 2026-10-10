@@ -70,7 +70,7 @@ def unreadable_definition(name: str) -> JobDefinition:
 
 def read_stored_job(stored: StoredJob) -> tuple[StoredJob, bool]:
     """A stored job as the client reads it (serialize.ts readStoredJob), so a
-    foreign, hand-edited or damaged row affects only its own job. A
+    foreign, hand-edited, or damaged row affects only its own job. A
     definition that is not a JSON object becomes ``{name}`` and ``readable``
     is False. ``tags`` is kept only when it is a list of strings. Every other
     field is kept as stored."""

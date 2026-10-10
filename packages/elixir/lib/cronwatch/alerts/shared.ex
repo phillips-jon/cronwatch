@@ -60,7 +60,7 @@ defmodule Cronwatch.Alerts.Shared do
   def hmac_sha256(key, data), do: :crypto.mac(:hmac, :sha256, key, data)
 
   @doc """
-  A stable 32 hex character id for one alert: the same job, type and time
+  A stable 32 hex character id for one alert: the same job, type, and time
   always give the same id, so a provider that deduplicates on it drops a
   resend of an alert it already took.
   """
@@ -103,7 +103,7 @@ defmodule Cronwatch.Alerts.Shared do
     end
   end
 
-  @doc "The title, message, triage and link as one plain text block, the way every channel reads."
+  @doc "The title, message, triage, and link as one plain text block, the way every channel reads."
   def plain_text(%Alert{} = a, link) do
     t = triage(a)
 
@@ -131,7 +131,7 @@ defmodule Cronwatch.Alerts.Shared do
     Enum.map_join(pairs, "&", fn {k, v} -> percent(k, ~c"*-._", true) <> "=" <> percent(v, ~c"*-._", true) end)
   end
 
-  @doc "Percent-encodes every byte but ASCII letters, digits and `safe`; a space as `+` when `plus`."
+  @doc "Percent-encodes every byte but ASCII letters, digits, and `safe`; a space as `+` when `plus`."
   def percent(text, safe, plus) do
     for <<c <- text>>, into: "" do
       cond do

@@ -59,7 +59,7 @@ public class CronwatchQuartzTests
             Assert.Contains("repeats every 500ms, more often than CronWatch's shortest schedule of one second", errors, StringComparison.Ordinal);
             Assert.Contains("\"two\" is run by 2 Quartz entries on different schedules", errors, StringComparison.Ordinal);
 
-            // Each cron is walked once for its job, expression, zone and year: another read walks
+            // Each cron is walked once for its job, expression, zone, and year: another read walks
             // nothing, and reports nothing again.
             int walks = q.Checks.Walks;
             int reported = m.Errors.Count;

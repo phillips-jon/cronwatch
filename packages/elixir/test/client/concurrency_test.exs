@@ -205,7 +205,7 @@ defmodule Cronwatch.ConcurrencyTest do
     assert schedule(store, "nightly") == "every 5m"
     assert length(Cronwatch.runs!("nightly", 50, instance: web.cw)) == 1
 
-    # So does a started run, a check, the board and the job's page in the
+    # So does a started run, a check, the board, and the job's page in the
     # process that declares it.
     forgotten.()
     {:ok, handle} = Cronwatch.start(nightly)

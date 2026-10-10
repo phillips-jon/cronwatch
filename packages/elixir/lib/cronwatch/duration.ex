@@ -66,7 +66,7 @@ defmodule Cronwatch.Duration do
   defp js_string(_), do: "[object Object]"
 
   defp not_a_duration(label, value) do
-    ~s(#{label} "#{value}" is not a duration like "15m", "1h30m" or "90s")
+    ~s(#{label} "#{value}" is not a duration like "15m", "1h30m", or "90s")
   end
 
   defp parse_text(value, label) do

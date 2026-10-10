@@ -113,7 +113,7 @@ defmodule Cronwatch.Zone do
 
   defp known?(name), do: match?({:ok, _}, Tz.PeriodsProvider.periods(name))
 
-  # "+HH", "+HHMM" or "+HH:MM" (or "-"), as Intl reads an offset time zone.
+  # "+HH", "+HHMM", or "+HH:MM" (or "-"), as Intl reads an offset time zone.
   defp fixed_offset(<<sign, rest::binary>>) when sign in [?+, ?-] do
     parts =
       case rest do

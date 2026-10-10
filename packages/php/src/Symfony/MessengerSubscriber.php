@@ -20,7 +20,7 @@ use Symfony\Component\Messenger\Stamp\TransportMessageIdStamp;
  * Messages whose class carries #[Cronwatch\Watch], recorded where a worker
  * handles them (messenger:consume), so queued work is the run rather than
  * its dispatch: WorkerMessageReceivedEvent starts the run (trigger
- * "symfony-messenger", "messenger" before 1.0; the handler's
+ * "symfony-messenger", "messenger" before 0.11; the handler's
  * Cronwatch::current() is its context),
  * WorkerMessageHandledEvent ends it ok with the handler's result, and
  * WorkerMessageFailedEvent ends it failed with what the handler threw.

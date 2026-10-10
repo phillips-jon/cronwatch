@@ -88,7 +88,7 @@ Every Strapi instance runs every cron task. With more than one instance, all the
 
 ## The dashboard
 
-Strapi's HTTP server is Koa. A global middleware made with `toKoaMiddleware` from `@cronwatch/sdk/node` hands `/cronwatch` and everything under it to the routes, before Strapi's body parser reads the request, and passes every other path on (see [Express, Koa and plain Node servers](/docs/node/#express-koa-and-plain-node-servers)).
+Strapi's HTTP server is Koa. A global middleware made with `toKoaMiddleware` from `@cronwatch/sdk/node` hands `/cronwatch` and everything under it to the routes, before Strapi's body parser reads the request, and passes every other path on (see [Express, Koa, and plain Node servers](/docs/node/#express-koa-and-plain-node-servers)).
 
 ```ts
 // src/middlewares/cronwatch.ts

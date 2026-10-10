@@ -1,7 +1,7 @@
 /**
- * What every email channel sends: one subject, a plain text body and a small
+ * What every email channel sends: one subject, a plain text body, and a small
  * HTML body, so an alert reads the same whichever provider carries it. Not an
- * entry point; resend, postmark, sendgrid, mailgun and ses each bundle it.
+ * entry point; resend, postmark, sendgrid, mailgun, and ses each bundle it.
  */
 import type { Alert } from "../types.js";
 import { cut, plainText } from "./shared.js";

@@ -16,7 +16,7 @@ use Illuminate\Contracts\Container\Container;
  * is watched with no code changes:
  *
  * - ScheduledTaskStarting starts the run (trigger "laravel-scheduler",
- *   "schedule" before 1.0); a callback's
+ *   "schedule" before 0.11); a callback's
  *   Cronwatch::current() is its context while it runs.
  * - ScheduledTaskFinished ends it: ok, or failed with "Exited with code N"
  *   for a command that exited non-zero (a callback returning false, "Returned
@@ -40,7 +40,7 @@ use Illuminate\Contracts\Container\Container;
 final class ScheduleWatcher
 {
     public const TRIGGER = 'laravel-scheduler';
-    /** The trigger runs recorded before 1.0 carry; read back through 1.x so a run open across the upgrade is still finished. */
+    /** The trigger runs recorded before 0.11 carry; read back through 1.x so a run open across the upgrade is still finished. */
     private const OLD_TRIGGER = 'schedule';
     /** How much of an output file's end a run reads. */
     private const OUTPUT_READ = 256 * 1024;

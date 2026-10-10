@@ -64,8 +64,8 @@ public final class MailgunOptions {
     /**
      * The options.
      *
-     * @throws dev.cronwatch.CronwatchException without an API key, a domain, a from address or a to
-     *     address
+     * @throws dev.cronwatch.CronwatchException without an API key, a domain, a from address, or a
+     *     to address
      */
     public MailgunOptions build() {
       // A pasted credential often carries a stray space or newline, which a header would refuse.

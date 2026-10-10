@@ -425,7 +425,7 @@ func (p *parser) escape(set *charSet, inClass bool) error {
 		set.add(0)
 	case '1', '2', '3', '4', '5', '6', '7', '8', '9', 'c', 'k', 'p', 'P':
 		// JavaScript reads these as a backreference, a control character,
-		// a named backreference or a property; read as the plain letter they
+		// a named backreference, or a property; read as the plain letter they
 		// would match something else, so they are refused.
 		return fmt.Errorf("jsre: \\%c is not supported", c)
 	case 'x', 'u':
@@ -527,7 +527,7 @@ func (s *charSet) single() (rune, bool) {
 	return found, found >= 0
 }
 
-// freeze works out the final membership bitmap: \s, "everything but \s"
+// freeze works out the final membership bitmap: \s, "everything but \s",
 // and negation folded in.
 func (s *charSet) freeze() {
 	if s.final != nil {

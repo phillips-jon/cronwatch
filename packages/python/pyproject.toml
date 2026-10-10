@@ -41,7 +41,7 @@ tzdata = ["tzdata"]
 postgres = ["psycopg>=3.2"]
 # cronwatch.triage.anthropic.
 anthropic = ["anthropic>=0.40"]
-# cronwatch.django: the settings, the dashboard's URLs and the cronwatch_check command.
+# cronwatch.django: the settings, the dashboard's URLs, and the cronwatch_check command.
 django = ["django>=5.2"]
 # cronwatch.celery: tasks watched through Celery's signals, beat's schedules, the check task.
 celery = ["celery>=5.5"]
@@ -59,7 +59,7 @@ Issues = "https://github.com/cronwatchdev/cronwatch/issues"
 # psycopg for the Postgres and pg_cron tests (run when CRONWATCH_TEST_PG or
 # CRONWATCH_TEST_PGCRON is set), anthropic to check triage requests against the
 # real SDK, Django for the Django integration (CI runs each supported series
-# with `uv run --with "django~=X.Y.0"`), Celery, django-celery-beat and redis
+# with `uv run --with "django~=X.Y.0"`), Celery, django-celery-beat, and redis
 # for cronwatch.celery (a prefork worker on Redis runs when
 # CRONWATCH_TEST_REDIS is set), APScheduler 3, and Flask and Starlette for
 # handler()'s adapters.

@@ -16,7 +16,7 @@
   <packaging>pom</packaging>
 
   <name>CronWatch (parent)</name>
-  <description>Monitoring for scheduled jobs on the JVM: missed, failed, stuck, slow, over-budget and under-floor runs, alerted once and recovered once.</description>
+  <description>Monitoring for scheduled jobs on the JVM: missed, failed, stuck, slow, over-budget, and under-floor runs, alerted once and recovered once.</description>
   <url>https://cronwatch.dev</url>
 
   <licenses>
@@ -336,7 +336,7 @@
             <!--
               Error Prone's warnings fail the build too (-Werror). The checks
               switched off are named here, each for the code it would flag:
-              the croner port, the regular expression engine and the JSON
+              the croner port, the regular expression engine, and the JSON
               reader follow their originals line for line.
             -->
             <arg>-Xplugin:ErrorProne -XepDisableWarningsInGeneratedCode -Xep:MissingSummary:OFF -Xep:InlineMeSuggester:OFF -Xep:NarrowingCompoundAssignment:OFF -Xep:OperatorPrecedence:OFF -Xep:UnusedVariable:ERROR -Xep:JavaTimeDefaultTimeZone:OFF -Xep:StatementSwitchToExpressionSwitch:OFF</arg>

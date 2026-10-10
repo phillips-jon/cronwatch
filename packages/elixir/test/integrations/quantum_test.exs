@@ -95,7 +95,7 @@ defmodule Cronwatch.QuantumTest do
     assert anon =~ "anonymous function"
   end
 
-  test "each run is a run, with its logs, failures and errors" do
+  test "each run is a run, with its logs, failures, and errors" do
     start_scheduler(
       report: [schedule: "0 2 1 7 *", task: {QJobs, :report, []}],
       broken: [schedule: "0 2 1 7 *", task: {QJobs, :broken, []}],

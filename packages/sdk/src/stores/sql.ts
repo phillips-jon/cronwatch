@@ -2,7 +2,7 @@ import { stripJsonNul, stripNul } from "../output.js";
 import type { JobState, Run, StoredJob, StoredJobDefinition } from "../types.js";
 
 /**
- * The schema, statements and row mapping shared by the SQLite and Postgres
+ * The schema, statements, and row mapping shared by the SQLite and Postgres
  * stores. Imports no driver, so either entry point can pull it in alone.
  * Statements are written with `?` placeholders; Postgres numbers them.
  */
@@ -22,7 +22,7 @@ const MAX_PREFIX = 63 - "runs_job_started".length;
 export function tablePrefix(prefix: string = DEFAULT_PREFIX): string {
   if (!/^[a-z_][a-z0-9_]*$/.test(prefix) || prefix.length > MAX_PREFIX) {
     throw new Error(
-      `cronwatch: invalid table prefix ${JSON.stringify(prefix)}. Use lowercase letters, digits and underscores, ` +
+      `cronwatch: invalid table prefix ${JSON.stringify(prefix)}. Use lowercase letters, digits, and underscores, ` +
         `not starting with a digit, at most ${MAX_PREFIX} characters.`,
     );
   }
@@ -130,7 +130,7 @@ export function updateRunIfSql(dialect: Dialect, p: string, count: number): stri
 /**
  * Postgres refuses U+0000 in TEXT and JSONB, and a refused write loses the
  * whole row, so every dialect writes text without it: a run's trigger,
- * output, error and metric names, and every key and string of a definition
+ * output, error, and metric names, and every key and string of a definition
  * and a state. Identifiers (a job's name, a run's id) are written as given;
  * the client refuses one with a NUL before it gets here.
  */
@@ -164,7 +164,7 @@ export interface RunRow {
 export interface StateRow { state: Json<JobState> }
 
 /**
- * Rows are read leniently: a foreign, hand-edited or damaged row (SQLite
+ * Rows are read leniently: a foreign, hand-edited, or damaged row (SQLite
  * keeps whatever type it is given, in any column) must affect only its own
  * job, never every read. JSON text that does not parse reads as null, which
  * the client takes as no state, or as an unreadable definition it reports.

@@ -14,7 +14,7 @@ use yii\db\Connection;
 /**
  * The store in Craft's own database: the library's MySQL (and MariaDB) or
  * Postgres store, made from Craft's database connection (its DSN,
- * credentials, PDO attributes and Postgres schema), through a PDO
+ * credentials, PDO attributes, and Postgres schema), through a PDO
  * connection of its own. So CronWatch's writes never join a transaction
  * Craft has open (a run recorded inside one survives its rollback), and the
  * tables are the library's, byte for byte, as every port writes them.
@@ -47,7 +47,7 @@ final class Storage
     }
 
     /**
-     * The PDO DSN, credentials and attributes of Craft's connection.
+     * The PDO DSN, credentials, and attributes of Craft's connection.
      *
      * @return array{string, string, ?string, ?string, array<int, mixed>}
      */
@@ -67,7 +67,7 @@ final class Storage
             }
             $kind = 'pgsql';
         } else {
-            throw new \RuntimeException("CronWatch keeps its tables in MySQL, MariaDB or Postgres; Craft's database driver is {$driver}.");
+            throw new \RuntimeException("CronWatch keeps its tables in MySQL, MariaDB, or Postgres; Craft's database driver is {$driver}.");
         }
         $options = [];
         foreach ((array) $db->attributes as $key => $value) {

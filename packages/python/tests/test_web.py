@@ -1,7 +1,7 @@
 """The SDK's routes tests (routes.test.ts, routes-security.test.ts,
-routes-origin.test.ts, routes-pwa.test.ts and routes-timeline.test.ts)
+routes-origin.test.ts, routes-pwa.test.ts, and routes-timeline.test.ts)
 against cronwatch.web, through its WSGI app, plus what only a Python server
-needs: decoded paths, the mount point, HEAD and the ASGI app."""
+needs: decoded paths, the mount point, HEAD, and the ASGI app."""
 
 from __future__ import annotations
 

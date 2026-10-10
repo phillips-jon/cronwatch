@@ -1,6 +1,6 @@
 defmodule Cronwatch.Test.FakeCron do
   @moduledoc """
-  `cron.job`, `cron.job_run_details` and the settings a role can read, in
+  `cron.job`, `cron.job_run_details`, and the settings a role can read, in
   memory, answering the source's queries through its `query:` option with
   ids as text, as the SDK's fakeCron() gives them.
   """
@@ -221,7 +221,7 @@ defmodule Cronwatch.Sources.PgCronTest do
     assert count == 29
   end
 
-  test "a pick, job_name or options function that fails fails only its job, reported once" do
+  test "a pick, job_name, or options function that fails fails only its job, reported once" do
     c = Clock.new()
     cron = FakeCron.new()
     for {id, name} <- [{1, "one"}, {2, "two"}, {3, "three"}, {4, "four"}], do: FakeCron.job(cron, id, name, "0 * * * *")

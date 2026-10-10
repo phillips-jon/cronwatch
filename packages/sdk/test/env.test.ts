@@ -20,7 +20,7 @@ function withEnv(values: Partial<Record<(typeof NAMES)[number], string>>, fn: ()
   }
 }
 
-test("the environment is the first of CRONWATCH_ENV, APP_ENV and NODE_ENV that is set, as in every port", () => {
+test("the environment is the first of CRONWATCH_ENV, APP_ENV, and NODE_ENV that is set, as in every port", () => {
   const cases: [Partial<Record<(typeof NAMES)[number], string>>, string][] = [
     [{}, ""],
     [{ NODE_ENV: "development" }, "development"],
@@ -29,7 +29,7 @@ test("the environment is the first of CRONWATCH_ENV, APP_ENV and NODE_ENV that i
     [{ APP_ENV: "local", NODE_ENV: "production" }, "development"],
     [{ CRONWATCH_ENV: "production", APP_ENV: "dev", NODE_ENV: "development" }, "production"],
     [{ CRONWATCH_ENV: "staging", NODE_ENV: "development" }, "staging"],
-    // Trimmed and lowercased; "prod" is production; dev, local, test and testing are development.
+    // Trimmed and lowercased; "prod" is production; dev, local, test, and testing are development.
     [{ CRONWATCH_ENV: "  PROD " }, "production"],
     [{ APP_ENV: "Testing" }, "development"],
     [{ APP_ENV: "DEV" }, "development"],

@@ -11,7 +11,7 @@ import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 
 /**
- * What every email channel sends ({@code alerts/email.ts}): one subject, a plain text body and a
+ * What every email channel sends ({@code alerts/email.ts}): one subject, a plain text body, and a
  * small HTML body, so an alert reads the same whichever provider carries it.
  */
 final class Email {

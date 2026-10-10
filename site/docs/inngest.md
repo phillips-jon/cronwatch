@@ -7,7 +7,7 @@ group: More JavaScript platforms
 
 # Inngest
 
-Inngest schedules the function and calls it over HTTP, but the code runs in your app, behind the endpoint that `serve()` mounts. So the client, the store and the dashboard are your app's own, set up as on the page for your framework ([Next.js](/docs/nextjs/), [Servers and scripts](/docs/node/)). What needs care is how Inngest runs a function.
+Inngest schedules the function and calls it over HTTP, but the code runs in your app, behind the endpoint that `serve()` mounts. So the client, the store, and the dashboard are your app's own, set up as on the page for your framework ([Next.js](/docs/nextjs/), [Servers and scripts](/docs/node/)). What needs care is how Inngest runs a function.
 
 ## How a function runs
 
@@ -62,9 +62,9 @@ export const dailyDigest = inngest.createFunction(
 
 Put the zone in both places: a `TZ=` prefix on Inngest's expression and `timezone` on the job, so the two read the schedule the same way.
 
-The start is its own step so it runs once: later calls get its saved result and do not touch the store. If that step is retried, a second `start()` with the same id records nothing new and hands back the run already started. The finish step reads the run back with `resume()`, adds what it logged and its metrics, and judges it: `expect`, duration from the start, budgets. A step in the middle can add lines too, with `resume()`, `log()` and `await run.flush()`.
+The start is its own step so it runs once: later calls get its saved result and do not touch the store. If that step is retried, a second `start()` with the same id records nothing new and hands back the run already started. The finish step reads the run back with `resume()`, adds what it logged and its metrics, and judges it: `expect`, duration from the start, budgets. A step in the middle can add lines too, with `resume()`, `log()`, and `await run.flush()`.
 
-A step that throws is retried by Inngest while the CronWatch run stays running, so a retry that succeeds sends nothing. Once a step has used its last retry, the function fails and `onFailure` runs with Inngest's run id in `event.data.run_id` and the final error; `fail()` records it as the run's failure and alerts. So `failuresBeforeAlert` counts failed function runs, not attempts, and the default of 1 alerts on the first function run that fails. `resume()`, `finish()` and `fail()` never throw for the store: what goes wrong is reported to `onError`, so a store outage cannot fail the function.
+A step that throws is retried by Inngest while the CronWatch run stays running, so a retry that succeeds sends nothing. Once a step has used its last retry, the function fails and `onFailure` runs with Inngest's run id in `event.data.run_id` and the final error; `fail()` records it as the run's failure and alerts. So `failuresBeforeAlert` counts failed function runs, not attempts, and the default of 1 alerts on the first function run that fails. `resume()`, `finish()`, and `fail()` never throw for the store: what goes wrong is reported to `onError`, so a store outage cannot fail the function.
 
 ## Runs that never finish
 

@@ -2,9 +2,9 @@
 
 module Cronwatch
   module Alerts
-    # What every email channel sends: one subject, a plain text body and a
+    # What every email channel sends: one subject, a plain text body, and a
     # small HTML body, so an alert reads the same whichever provider carries
-    # it (the SDK's alerts/email.ts). Resend, Postmark, SendGrid, Mailgun and
+    # it (the SDK's alerts/email.ts). Resend, Postmark, SendGrid, Mailgun, and
     # SES each take the same options:
     #
     #   from:           the sender, "alerts@example.com" or "CronWatch <alerts@example.com>"

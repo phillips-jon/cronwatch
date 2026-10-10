@@ -1,13 +1,13 @@
 ---
 title: Ruby on Rails
-description: The cronwatch gem in a Rails app: the install generator, ActiveJob and Sidekiq jobs, schedules read from Solid Queue or sidekiq-cron, the check job and the dashboard.
+description: The cronwatch gem in a Rails app: the install generator, ActiveJob and Sidekiq jobs, schedules read from Solid Queue or sidekiq-cron, the check job, and the dashboard.
 order: 3.51
 group: Ruby
 ---
 
 # Ruby on Rails
 
-The `cronwatch` gem is the Ruby port of `@cronwatch/sdk`: the same conditions, the same alert text and the same stored rows. In Rails it records runs through ActiveRecord, watches your ActiveJob and Sidekiq classes, reads their schedules from Solid Queue or sidekiq-cron, and runs its check as a job of its own. It needs Ruby 3.2 or newer, and is tested on Rails 7.2, 8.0 and 8.1.
+The `cronwatch` gem is the Ruby port of `@cronwatch/sdk`: the same conditions, the same alert text, and the same stored rows. In Rails it records runs through ActiveRecord, watches your ActiveJob and Sidekiq classes, reads their schedules from Solid Queue or sidekiq-cron, and runs its check as a job of its own. It needs Ruby 3.2 or newer, and is tested on Rails 7.2, 8.0, and 8.1.
 
 ## Install
 
@@ -22,16 +22,16 @@ bin/rails generate cronwatch:install
 bin/rails db:migrate
 ```
 
-Bundler requires the gem after Rails has loaded, so `gem "cronwatch"` alone brings in the Rails integration: the Railtie, `Cronwatch::ActiveJob`, `Cronwatch::CheckJob`, the `cronwatch:check` task and the generator. With Sidekiq in the Gemfile (before or after `cronwatch`), `Cronwatch::Sidekiq` loads too. So does the dashboard, `Cronwatch::Web` (see [Mount the dashboard](#mount-the-dashboard)). The ActiveRecord store loads the first time it is used.
+Bundler requires the gem after Rails has loaded, so `gem "cronwatch"` alone brings in the Rails integration: the Railtie, `Cronwatch::ActiveJob`, `Cronwatch::CheckJob`, the `cronwatch:check` task, and the generator. With Sidekiq in the Gemfile (before or after `cronwatch`), `Cronwatch::Sidekiq` loads too. So does the dashboard, `Cronwatch::Web` (see [Mount the dashboard](#mount-the-dashboard)). The ActiveRecord store loads the first time it is used.
 
 The generator writes two files:
 
-- `db/migrate/<timestamp>_create_cronwatch_tables.rb`, which creates the three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) with the SDK's own statements, so a Node, Python, PHP, Go, Rust, Elixir, Java or .NET process can share them. Running the generator again leaves an existing migration alone.
+- `db/migrate/<timestamp>_create_cronwatch_tables.rb`, which creates the three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) with the SDK's own statements, so a Node, Python, PHP, Go, Rust, Elixir, Java, or .NET process can share them. Running the generator again leaves an existing migration alone.
 - `config/initializers/cronwatch.rb`, which sets the store and the channels.
 
-It takes two options. `--prefix ops_` names the tables `ops_jobs`, `ops_runs` and `ops_state`, in the migration and in the initializer's store; a prefix is lowercase letters, digits and underscores, and a bad one is refused before anything is written. `--database` (or `--db`) puts the migration in that database's migrations directory, in an app with several, and points the store at the same database: it writes `app/models/cronwatch_record.rb`, an abstract `CronwatchRecord` that `connects_to database: { writing: :<name> }`, and the initializer's store takes `connection_class: "CronwatchRecord"`.
+It takes two options. `--prefix ops_` names the tables `ops_jobs`, `ops_runs`, and `ops_state`, in the migration and in the initializer's store; a prefix is lowercase letters, digits, and underscores, and a bad one is refused before anything is written. `--database` (or `--db`) puts the migration in that database's migrations directory, in an app with several, and points the store at the same database: it writes `app/models/cronwatch_record.rb`, an abstract `CronwatchRecord` that `connects_to database: { writing: :<name> }`, and the initializer's store takes `connection_class: "CronwatchRecord"`.
 
-Rails needs the store. The web process, each worker and the check all have to see the same runs, and the in-memory store keeps each process's runs to itself (and warns about it in production). Leave the generated store line in.
+Rails needs the store. The web process, each worker, and the check all have to see the same runs, and the in-memory store keeps each process's runs to itself (and warns about it in production). Leave the generated store line in.
 
 When it is done the generator prints what to do next:
 
@@ -83,7 +83,7 @@ The generated one, trimmed to what it sets:
 ```ruby
 # config/initializers/cronwatch.rb
 Cronwatch.configure do |c|
-  # Jobs, runs and alert state, in this app's database.
+  # Jobs, runs, and alert state, in this app's database.
   c.store = Cronwatch::Stores::ActiveRecord.new
 
   # Where alerts go. With none set, they are written to standard error.
@@ -100,7 +100,7 @@ Cronwatch.configure do |c|
 end
 ```
 
-`Cronwatch.configure` builds the one client the app uses, and `Cronwatch.client` returns it. Configuring again replaces the client. The settings are `store`, `alerts`, `triage`, `cron_secret`, `retention`, `defaults`, `redact`, `deliver`, `sources`, `on_error` and `now`, the same as `Cronwatch.new` takes (see [Ruby](/docs/ruby/#api)); anything left unset takes the client's default. Errors outside jobs (the store, a channel, triage) go to `Rails.logger` unless `on_error` says otherwise.
+`Cronwatch.configure` builds the one client the app uses, and `Cronwatch.client` returns it. Configuring again replaces the client. The settings are `store`, `alerts`, `triage`, `cron_secret`, `retention`, `defaults`, `redact`, `deliver`, `sources`, `on_error`, and `now`, the same as `Cronwatch.new` takes (see [Ruby](/docs/ruby/#api)); anything left unset takes the client's default. Errors outside jobs (the store, a channel, triage) go to `Rails.logger` unless `on_error` says otherwise.
 
 The store takes `prefix:` and `connection_class:`. To keep the tables in another database, pass a class that `connects_to` it:
 
@@ -112,11 +112,11 @@ A class name is looked up on first use, so the initializer does not have to load
 
 On Postgres the store never joins a transaction your code has open. A job that runs inside `ActiveRecord::Base.transaction` has its run recorded as it happens, and the run stays recorded if the transaction rolls back, so its alert is not sent again on the next failure. To do that the store connects through a pool of its own, with the writing database config of `connection_class` (`ActiveRecord::Base` by default): each process may open up to that config's `pool` (5 unless set) more connections, only as it needs them. Count them against your database's connection limit, or point `connection_class` at a class whose config sets a smaller `pool`. SQLite allows one writer at a time, so there the store uses your pool and, inside an open transaction, runs in a savepoint of it: a store error cannot abort your transaction, and the rows commit or roll back with it.
 
-Postgres and SQLite are supported and tested. MySQL is not supported: the gem writes only the SDK's Postgres and SQLite statements, not the MySQL tables the PHP, Go, Rust, Elixir, Java and .NET ports use, and any other adapter is refused with `Cronwatch::Stores::ActiveRecord::UnsupportedAdapter` when the store is first used.
+Postgres and SQLite are supported and tested. MySQL is not supported: the gem writes only the SDK's Postgres and SQLite statements, not the MySQL tables the PHP, Go, Rust, Elixir, Java, and .NET ports use, and any other adapter is refused with `Cronwatch::Stores::ActiveRecord::UnsupportedAdapter` when the store is first used.
 
-## Email, SMS and error trackers
+## Email, SMS, and error trackers
 
-Besides Slack, Discord and webhooks, the gem sends alerts by email (Resend, Postmark, SendGrid, Mailgun, Amazon SES), by text (Twilio) and to error trackers (Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, New Relic), all on the standard library. Keep the keys in credentials or the environment:
+Besides Slack, Discord, and webhooks, the gem sends alerts by email (Resend, Postmark, SendGrid, Mailgun, Amazon SES), by text (Twilio), and to error trackers (Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, New Relic), all on the standard library. Keep the keys in credentials or the environment:
 
 ```ruby
 # config/initializers/cronwatch.rb
@@ -174,15 +174,15 @@ class NightlyReportJob < ApplicationJob
 end
 ```
 
-Every `perform` is recorded as a run with the trigger `"active-job"` (runs recorded before 1.0 carry `"active_job"`, which nothing changes; see [triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)). The job is named after the class, without `Job`, underscored and dasherized, with `::` becoming `:`: `NightlyReportJob` is `nightly-report` and `Reports::NightlyJob` is `reports:nightly`. Pass `name:` to choose another; an anonymous class must. Keep names stable: they are the key everything in the store hangs off. The gem prefixes none of them, since a Rails app's class names do not collide with anything of the platform's ([job names](/docs/dashboard/#triggers-tags-and-job-names) are prefixed only where they would).
+Every `perform` is recorded as a run with the trigger `"active-job"` (runs recorded before 0.11 carry `"active_job"`, which nothing changes; see [triggers, tags, and job names](/docs/dashboard/#triggers-tags-and-job-names)). The job is named after the class, without `Job`, underscored and dasherized, with `::` becoming `:`: `NightlyReportJob` is `nightly-report` and `Reports::NightlyJob` is `reports:nightly`. Pass `name:` to choose another; an anonymous class must. Keep names stable: they are the key everything in the store hangs off. The gem prefixes none of them, since a Rails app's class names do not collide with anything of the platform's ([job names](/docs/dashboard/#triggers-tags-and-job-names) are prefixed only where they would).
 
-`cronwatch` takes `name` and the options a job declared by hand takes: `schedule`, `timezone`, `grace`, `timeout`, `max_duration`, `budget`, `floor`, `expect`, `failures_before_alert`, `description` and `tags`. A bad option raises `ArgumentError`.
+`cronwatch` takes `name` and the options a job declared by hand takes: `schedule`, `timezone`, `grace`, `timeout`, `max_duration`, `budget`, `floor`, `expect`, `failures_before_alert`, `description`, and `tags`. A bad option raises `ArgumentError`.
 
 Only a class that calls `cronwatch` is monitored. Including the concern without it does nothing, and a subclass of a monitored job is not monitored until it calls `cronwatch` itself.
 
-Inside a monitored `perform`, `cronwatch` is the run's context: `log(*parts)`, `metric(name, value)`, `metrics(hash)`, `aborted?` (true once `timeout` has passed), `signal`, `name`, `run_id` and `started_at`. Outside one (a class that is not monitored, or a direct call to `perform` that skips ActiveJob's callbacks) it is a stand-in that takes `log` and `metric` and drops them, so the job's code runs the same either way.
+Inside a monitored `perform`, `cronwatch` is the run's context: `log(*parts)`, `metric(name, value)`, `metrics(hash)`, `aborted?` (true once `timeout` has passed), `signal`, `name`, `run_id`, and `started_at`. Outside one (a class that is not monitored, or a direct call to `perform` that skips ActiveJob's callbacks) it is a stand-in that takes `log` and `metric` and drops them, so the job's code runs the same either way.
 
-A job that raises still raises. The run is recorded as failed first, then the error goes on to ActiveJob, so `retry_on`, `discard_on` and your error reporter see it exactly as before. Each retry is a run of its own. To alert only when failures repeat, set `failures_before_alert`. A store that is down never stops a job: the job performs, unrecorded, and the error goes to `on_error`.
+A job that raises still raises. The run is recorded as failed first, then the error goes on to ActiveJob, so `retry_on`, `discard_on`, and your error reporter see it exactly as before. Each retry is a run of its own. To alert only when failures repeat, set `failures_before_alert`. A store that is down never stops a job: the job performs, unrecorded, and the error goes to `on_error`.
 
 ### When jobs are declared
 
@@ -208,7 +208,7 @@ end
 
 `cronwatch` takes the same options and follows the same rules as in an ActiveJob class: the same default name (`HardWorker` is `hard-worker`), declared once the app has booted, `cronwatch` inside `perform` for `log` and `metric`. Each `perform` is a run with the trigger `"sidekiq"`.
 
-The runs are recorded by `Cronwatch::Sidekiq::ServerMiddleware`, which the Railtie adds to Sidekiq's server middleware when the process is a Sidekiq server; web processes are left alone. A job that raises is recorded as failed and the error goes on to Sidekiq, so retries, the dead set and your error handlers see it as before; each retry is a run of its own. Outside Rails, add the middleware yourself (see [Sidekiq without Rails](/docs/ruby/#sidekiq-without-rails)).
+The runs are recorded by `Cronwatch::Sidekiq::ServerMiddleware`, which the Railtie adds to Sidekiq's server middleware when the process is a Sidekiq server; web processes are left alone. A job that raises is recorded as failed and the error goes on to Sidekiq, so retries, the dead set, and your error handlers see it as before; each retry is a run of its own. Outside Rails, add the middleware yourself (see [Sidekiq without Rails](/docs/ruby/#sidekiq-without-rails)).
 
 An ActiveJob class on Sidekiq's adapter keeps `Cronwatch::ActiveJob`. Sidekiq runs it inside ActiveJob's wrapper, which the middleware passes through, so the run is recorded once, by the ActiveJob side. Including `Cronwatch::Sidekiq` in an ActiveJob class raises.
 
@@ -260,7 +260,7 @@ Cronwatch::Scheduler.sources = [
 
 ### How schedules are converted
 
-Both schedulers parse schedules with Fugit, which reads cron lines and phrases such as `every day at 3am`, `every 5 minutes` or `every hour at minute 12`. CronWatch reads cron expressions, not phrases, so each schedule is parsed with Fugit exactly as the scheduler parses it and written out as the cron expression Fugit made of it: `every day at 3am` is `0 3 * * *`, `every 5 minutes` is `0,5,10,15,20,25,30,35,40,45,50,55 * * * *`, `every hour at minute 12` is `12 * * * *`. What CronWatch expects is what the scheduler runs, even where the phrase says something else (Fugit reads `every 90 minutes` as every hour).
+Both schedulers parse schedules with Fugit, which reads cron lines and phrases such as `every day at 3am`, `every 5 minutes`, or `every hour at minute 12`. CronWatch reads cron expressions, not phrases, so each schedule is parsed with Fugit exactly as the scheduler parses it and written out as the cron expression Fugit made of it: `every day at 3am` is `0 3 * * *`, `every 5 minutes` is `0,5,10,15,20,25,30,35,40,45,50,55 * * * *`, `every hour at minute 12` is `12 * * * *`. What CronWatch expects is what the scheduler runs, even where the phrase says something else (Fugit reads `every 90 minutes` as every hour).
 
 The timezone is the one the scheduler reads the schedule in: the zone at the end of the schedule (`every day at 3am America/New_York`, `0 2 * * * Europe/London`) when there is one. Without one, Solid Queue 1.5 and later use `config.solid_queue.time_zone`, which is `config.time_zone` unless you set it; sidekiq-cron and older Solid Queue use Fugit's local zone, which is `TZ`, then Rails' `Time.zone`, then the system's. A schedule with several times in one phrase (`every day at 9:15 and 17:30`) is refused by Solid Queue and read as its first time by sidekiq-cron's default `:single` mode (refused in its `:strict` mode), and CronWatch does the same.
 
@@ -292,11 +292,11 @@ Cronwatch.declare_from_scheduler!(grace: "10m")
 Once the app has booted, every enabled entry in the scheduler's config becomes a job, with the schedule and zone converted as above, so the check reports one that never runs:
 
 - A class that calls `cronwatch` declares itself, as usual; its entry is left to it.
-- Any other class is named as `cronwatch` would name it (`DailyDigestJob` is `daily-digest`) and each of its performs is recorded: ActiveJob classes with the trigger `"active-job"` (`"active_job"` before 1.0), Sidekiq jobs through the server middleware with `"sidekiq"`.
+- Any other class is named as `cronwatch` would name it (`DailyDigestJob` is `daily-digest`) and each of its performs is recorded: ActiveJob classes with the trigger `"active-job"` (`"active_job"` before 0.11), Sidekiq jobs through the server middleware with `"sidekiq"`.
 - A Solid Queue `command:` task is named after its key (`clear_solid_queue_finished_jobs`), and each run of Solid Queue's job with that command is recorded.
 - `Cronwatch::CheckJob` and `Cronwatch::Sidekiq::CheckWorker` are left out.
 
-It takes the options of a declared job other than `schedule`, `timezone` and `name` (`grace`, `timeout`, `failures_before_alert`, `tags`, and so on), applied to every job it declares; an entry's `description` becomes the job's. `except:` leaves keys out: `Cronwatch.declare_from_scheduler!(except: %w[one_off_import])`. An entry that cannot be watched stops the boot with an error that says so: a class that does not load, two entries that would be the same job (one class scheduled twice), a key that is not a valid job name, or a schedule that cannot be converted. Leave it out with `except:`, or give its class a `cronwatch` of its own.
+It takes the options of a declared job other than `schedule`, `timezone`, and `name` (`grace`, `timeout`, `failures_before_alert`, `tags`, and so on), applied to every job it declares; an entry's `description` becomes the job's. `except:` leaves keys out: `Cronwatch.declare_from_scheduler!(except: %w[one_off_import])`. An entry that cannot be watched stops the boot with an error that says so: a class that does not load, two entries that would be the same job (one class scheduled twice), a key that is not a valid job name, or a schedule that cannot be converted. Leave it out with `except:`, or give its class a `cronwatch` of its own.
 
 Every perform of a watched class counts as a run, whoever enqueued it, as with `cronwatch`. Inside `perform`, `cronwatch` (for `log` and `metric`) exists only in a class that includes `Cronwatch::ActiveJob` or `Cronwatch::Sidekiq`.
 
@@ -304,7 +304,7 @@ Every perform of a watched class counts as a run, whoever enqueued it, as with `
 
 **Run exactly one checker.** Schedule `Cronwatch::CheckJob` once, as one recurring entry, not per process or per machine, and do not also call `Cronwatch.client.start_checking` or hit `/cronwatch/api/check` from elsewhere. Two checks against one database at the same moment can each open the same condition and send the same alert twice.
 
-Failures are caught as they happen. A run that never started, or never finished, can only be noticed by looking. `Cronwatch::CheckJob` (or `Cronwatch::Sidekiq::CheckWorker`, for Sidekiq without ActiveJob) looks: it loads `app/jobs` (and `app/workers` and `app/sidekiq`, when they exist) when the app does not eager load, declares every monitored job, and calls `Cronwatch.client.check`, which finds missed and stuck runs, sends their alerts, retries alerts no channel accepted and prunes old runs. It returns the check's result and is queued on `default`. Schedule it every five minutes beside your other recurring jobs; these are the entries the generator prints.
+Failures are caught as they happen. A run that never started, or never finished, can only be noticed by looking. `Cronwatch::CheckJob` (or `Cronwatch::Sidekiq::CheckWorker`, for Sidekiq without ActiveJob) looks: it loads `app/jobs` (and `app/workers` and `app/sidekiq`, when they exist) when the app does not eager load, declares every monitored job, and calls `Cronwatch.client.check`, which finds missed and stuck runs, sends their alerts, retries alerts no channel accepted, and prunes old runs. It returns the check's result and is queued on `default`. Schedule it every five minutes beside your other recurring jobs; these are the entries the generator prints.
 
 Solid Queue:
 
@@ -344,25 +344,25 @@ Rails.application.routes.draw do
 end
 ```
 
-`Cronwatch::Web` is a Rack app serving the same dashboard and JSON API as the TypeScript routes, at the same paths, with the same token rules. The board counts jobs by health, draws the last 24 hours as a lane per job (when each was due, every run as long as it took, any slot it missed) above a table of every job, and each job's page draws its last seven days above its runs and definition; [Dashboard and API](/docs/dashboard/#pages) describes what the marks mean. `gem "cronwatch"` loads it in a Rails app, so the route needs no `require`. `Cronwatch.client.routes(token:, base_path:, origin:)` builds it for the client the initializer configured (`Cronwatch::Web.new(Cronwatch.client)` did the same before 1.0, and still works, deprecated; see [Ruby](/docs/ruby/#deprecated)), and takes:
+`Cronwatch::Web` is a Rack app serving the same dashboard and JSON API as the TypeScript routes, at the same paths, with the same token rules. The board counts jobs by health, draws the last 24 hours as a lane per job (when each was due, every run as long as it took, any slot it missed) above a table of every job, and each job's page draws its last seven days above its runs and definition; [Dashboard and API](/docs/dashboard/#pages) describes what the marks mean. `gem "cronwatch"` loads it in a Rails app, so the route needs no `require`. `Cronwatch.client.routes(token:, base_path:, origin:)` builds it for the client the initializer configured (`Cronwatch::Web.new(Cronwatch.client)` did the same before 0.11, and still works, deprecated; see [Ruby](/docs/ruby/#deprecated)), and takes:
 
 - `token`: leave it out to read `CRONWATCH_TOKEN`. An empty string, passed or in the variable, counts as unset. `nil` opts out of the token entirely and serves the app to anyone who reaches it, for a mount that sits behind your own sign in.
 - `base_path`: where it is mounted, so links resolve. It defaults to the mount point Rack reports (`SCRIPT_NAME`), which is right under Rails' `mount` and Rack's `map`.
-- `origin`: the public origin, such as `"https://app.example.com"`, to use in place of each request's own (see below). It is read as the TypeScript routes read it: whitespace around it is dropped, the host is lowercased and a host that is not ASCII becomes punycode (through the `simpleidn` gem, or Addressable when the app has it; without either, write it as `xn--...`). An empty string counts as unset; anything that is not an absolute `http` or `https` URL, or has a port outside 1 to 65535, raises `ArgumentError` when the routes load.
+- `origin`: the public origin, such as `"https://app.example.com"`, to use in place of each request's own (see below). It is read as the TypeScript routes read it: whitespace around it is dropped, the host is lowercased, and a host that is not ASCII becomes punycode (through the `simpleidn` gem, or Addressable when the app has it; without either, write it as `xn--...`). An empty string counts as unset; anything that is not an absolute `http` or `https` URL, or has a port outside 1 to 65535, raises `ArgumentError` when the routes load.
 
-Set `CRONWATCH_TOKEN` to a long random string and open `/cronwatch?token=<it>` once; the browser keeps a cookie holding a digest of the token. Scripts and the [MCP server](/docs/mcp/) send `Authorization: Bearer <token>` instead. Without a token, while the app is in development (`CRONWATCH_ENV`, else `APP_ENV`, else `Rails.env`, names `development`, `dev`, `local`, `test` or `testing`; see [Ruby](/docs/ruby/#the-dashboard-in-any-rack-app)), it makes a token of its own (32 random bytes, made when the routes load, so new each time the app starts) and prints a sign-in link to the server's standard output on its first request:
+Set `CRONWATCH_TOKEN` to a long random string and open `/cronwatch?token=<it>` once; the browser keeps a cookie holding a digest of the token. Scripts and the [MCP server](/docs/mcp/) send `Authorization: Bearer <token>` instead. Without a token, while the app is in development (`CRONWATCH_ENV`, else `APP_ENV`, else `Rails.env`, names `development`, `dev`, `local`, `test`, or `testing`; see [Ruby](/docs/ruby/#the-dashboard-in-any-rack-app)), it makes a token of its own (32 random bytes, made when the routes load, so new each time the app starts) and prints a sign-in link to the server's standard output on its first request:
 
 ```text
 [cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: http://localhost:3000/cronwatch/?token=...
 ```
 
-The link names the host only when `origin:` is set or the request's host is loopback (`localhost`, a name ending in `.localhost`, `127.0.0.0/8` or `::1`). A request's host is the client's to choose, so for any other host the line leaves it out, and a spoofed first request cannot point the link, token and all, somewhere else:
+The link names the host only when `origin:` is set or the request's host is loopback (`localhost`, a name ending in `.localhost`, `127.0.0.0/8`, or `::1`). A request's host is the client's to choose, so for any other host the line leaves it out, and a spoofed first request cannot point the link, token and all, somewhere else:
 
 ```text
 [cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: /cronwatch/?token=... on this server (the first request's host is not local, so the link leaves it out)
 ```
 
-Open that link once and the browser stays signed in; until then every request answers 401 and the page says the link is in the server log. Nothing about a request itself lets it in, since proxies, tunnels and `bin/rails server -b 0.0.0.0` all make a remote caller look local. In any other environment it answers 503 until a token is set.
+Open that link once and the browser stays signed in; until then every request answers 401 and the page says the link is in the server log. Nothing about a request itself lets it in, since proxies, tunnels, and `bin/rails server -b 0.0.0.0` all make a remote caller look local. In any other environment it answers 503 until a token is set.
 
 To put it behind the app's own sign in instead, mount it inside that check and pass `token: nil`, so it serves whoever gets through. With Devise:
 
@@ -374,7 +374,7 @@ end
 
 Without Devise, a routing constraint does the same job: `constraints ->(request) { AdminSession.valid?(request) } do ... end` around the mount.
 
-The dashboard installs as an app on a desktop, an Android phone or an iPhone ([Install it as an app](/docs/dashboard/#install-it-as-an-app)): its manifest, icons and service worker are served under the mount point without the token, and hold nothing about your jobs. Browsers fetch the manifest without cookies, so behind your own sign in the dashboard installs only if that check lets the shell paths (`manifest.webmanifest`, `icons/`, `sw.js`, `app.js` and `offline` under the mount) through; otherwise it stays a web page. On an iPhone the home screen app keeps its own cookies, so paste the token into the sign-in page's form once inside the app.
+The dashboard installs as an app on a desktop, an Android phone, or an iPhone ([Install it as an app](/docs/dashboard/#install-it-as-an-app)): its manifest, icons, and service worker are served under the mount point without the token, and hold nothing about your jobs. Browsers fetch the manifest without cookies, so behind your own sign in the dashboard installs only if that check lets the shell paths (`manifest.webmanifest`, `icons/`, `sw.js`, `app.js`, and `offline` under the mount) through; otherwise it stays a web page. On an iPhone the home screen app keeps its own cookies, so paste the token into the sign-in page's form once inside the app.
 
 A request with any method other than `GET` and `HEAD` carrying an `Origin` that is not the request's own, or a `Sec-Fetch-Site` other than `same-origin` or `none`, is refused with 403, so another site cannot silence or forget a job with a signed-in cookie. The request's own origin reads the host and scheme Rack reports, which already follow `X-Forwarded-Host` and `X-Forwarded-Proto` as the rest of Rails does, so there is no `trustProxy` option as in the TypeScript routes. Behind a proxy, make sure those (or `Host`) carry the public host and scheme, or the dashboard's own forms will look foreign. Behind more than one proxy, set `origin:`: where `X-Forwarded-Host` or `X-Forwarded-Proto` lists several values, Rack takes the last, the hop nearest the app, rather than the public one. The host is compared lowercased, as browsers send it. To pin it instead, pass `origin:`:
 
@@ -468,7 +468,7 @@ end
 
 It records and evaluates every run, but queues each alert in the store instead of sending it. The next check in a process that sends normally (the worker that runs `Cronwatch::CheckJob`, or whatever calls `/cronwatch/api/check`) delivers it, adds triage if that process has it, and marks it sent. Both must use the same database. A queued alert whose condition has closed since is dropped rather than sent late, and one check spends at most 20 seconds retrying across all jobs. See [processes that cannot send](/docs/alerts/#processes-that-cannot-send) and [Ruby](/docs/ruby/#processes-that-cannot-send).
 
-Every process writes a job's state with a `version` that goes up on each write, and a write based on a stale read is refused and worked out again, so a web server, a Sidekiq process and a Node service sharing the database never lose each other's failures, alerts or silences.
+Every process writes a job's state with a `version` that goes up on each write, and a write based on a stale read is refused and worked out again, so a web server, a Sidekiq process, and a Node service sharing the database never lose each other's failures, alerts, or silences.
 
 ## Development and tests
 
@@ -499,4 +499,4 @@ Cronwatch.configure do |c|
 end
 ```
 
-Triage runs once per alert: when it gives nothing (it raised, timed out or answered empty) the alert's `triage` is `null` and it is not asked again on a retry. The Ruby options and defaults are in [Ruby](/docs/ruby/#triage); what is sent is in [AI triage](/docs/triage/).
+Triage runs once per alert: when it gives nothing (it raised, timed out, or answered empty) the alert's `triage` is `null` and it is not asked again on a retry. The Ruby options and defaults are in [Ruby](/docs/ruby/#triage); what is sent is in [AI triage](/docs/triage/).

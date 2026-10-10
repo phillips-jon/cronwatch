@@ -33,7 +33,7 @@ final class Unscheduled
 
     /**
      * The tag that names the app under an integration's tag: "<tag>:<app>",
-     * the app's name lowercased, with anything but letters, digits, ".", "_"
+     * the app's name lowercased, with anything but letters, digits, ".", "_",
      * and "-" made "-". A name that is empty once cleaned, or longer than 48
      * characters, is cut and given 8 hex characters of its MD5, so two names
      * never share a tag.

@@ -4,7 +4,7 @@ module Cronwatch
   class Web
     # What makes the dashboard an installable web app, as the SDK's
     # routes/pwa.ts has it: a manifest, icons, a service worker, the script
-    # that registers it and a page to show offline. None of it says anything
+    # that registers it, and a page to show offline. None of it says anything
     # about the jobs, so it is served without the token (a browser fetches the
     # manifest and icons without cookies in some flows).
     #
@@ -46,7 +46,7 @@ module Cronwatch
       JS
 
       # The service worker. It caches the app shell (the offline page, the
-      # manifest, the icons and app.js) and nothing else: every other request
+      # manifest, the icons, and app.js) and nothing else: every other request
       # goes to the network as the page made it, and its answer is never
       # stored, since the pages and the JSON carry job data. When a page
       # cannot be reached it shows the offline page. Its scope gives the base,
@@ -95,7 +95,7 @@ module Cronwatch
         });
       JS
 
-      # One app shell file: its type, body and Cache-Control, and whether it
+      # One app shell file: its type, body, and Cache-Control, and whether it
       # is the service worker (which may control everything under the base).
       Asset = Struct.new(:type, :body, :cache, :worker, keyword_init: true)
 
@@ -120,7 +120,7 @@ module Cronwatch
           id: "#{base}/",
           name: "CronWatch",
           short_name: "CronWatch",
-          description: "The scheduled jobs of this app: their health, their last day and their runs.",
+          description: "The scheduled jobs of this app: their health, their last day, and their runs.",
           start_url: "#{base}/",
           scope: "#{base}/",
           display: "standalone",

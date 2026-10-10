@@ -1,5 +1,5 @@
 //! Replays `conformance/*.json`, the cases `scripts/conformance.mjs` writes
-//! by running the TypeScript SDK. `evaluate`, `format` and `health` are
+//! by running the TypeScript SDK. `evaluate`, `format`, and `health` are
 //! replayed here, `channels` with the `alerts` feature and `triage` with the
 //! `triage` feature, `duration` and `schedule` by the schedule module,
 //! `output` by the output module, `store.json` against every store (the

@@ -2,7 +2,7 @@ defmodule Cronwatch.JSONPropertyTest do
   # The Rust port's `json` and `rows` fuzz targets as properties: any text
   # JSON.parse reads is read here without raising, and what it reads is
   # written back as JSON that reads to the same text; a stored run, state
-  # and alert, each read, written and read back to the same text, whatever
+  # and alert, each read, written, and read back to the same text, whatever
   # shape another writer gave it. `CRONWATCH_PROPERTY_RUNS` asks for more.
   use ExUnit.Case, async: true
   use ExUnitProperties
@@ -59,7 +59,7 @@ defmodule Cronwatch.JSONPropertyTest do
     end
   end
 
-  property "stored rows of any shape are read, written and read back the same" do
+  property "stored rows of any shape are read, written, and read back the same" do
     check all(value <- json(), max_runs: @runs) do
       for {module, reader} <- [
             {Run, &Run.from_value/1},

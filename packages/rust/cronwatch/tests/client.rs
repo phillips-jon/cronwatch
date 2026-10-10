@@ -101,14 +101,14 @@ async fn run_declares_on_first_use_and_options_are_validated() {
         (
             "bad name!",
             JobOptions::new(),
-            r#"job name "bad name!" must be 1 to 120 characters of letters, digits, ".", "_", ":" or "-""#,
+            r#"job name "bad name!" must be 1 to 120 characters of letters, digits, ".", "_", ":", or "-""#,
         ),
         (
             "x",
             JobOptions::new().schedule("nope"),
             r#"schedule "nope" is not a cron expression or "every <duration>": "#,
         ),
-        ("x", JobOptions::new().grace("soon"), r#"grace "soon" is not a duration like "15m", "1h30m" or "90s""#),
+        ("x", JobOptions::new().grace("soon"), r#"grace "soon" is not a duration like "15m", "1h30m", or "90s""#),
         ("x", JobOptions::new().timezone("Mars/Base"), r#"job "x": timezone "Mars/Base" is not an IANA timezone"#),
     ];
     for (name, options, want) in cases {
@@ -116,7 +116,7 @@ async fn run_declares_on_first_use_and_options_are_validated() {
         assert!(err.starts_with(want), "{want}\n{err}");
     }
     let err = cronwatch::Client::builder().defaults(JobOptions::new().schedule("@hourly")).build().unwrap_err();
-    assert_eq!(err.to_string(), "defaults takes grace, timeout, timezone and failuresBeforeAlert, not schedule");
+    assert_eq!(err.to_string(), "defaults takes grace, timeout, timezone, and failuresBeforeAlert, not schedule");
 }
 
 #[tokio::test]
@@ -468,7 +468,7 @@ async fn a_secret_split_by_the_16_kb_cut_is_redacted_whole() {
     assert!(!output.contains("opaqueTOKEN"));
     assert!(output.len() <= CAP + TRIMMED.len());
 
-    // Errors, recorded runs and flushed lines the same way.
+    // Errors, recorded runs, and flushed lines the same way.
     let thrown = format!("{} {bearer} {}", "e".repeat(CAP), "z".repeat(CAP - 40));
     let _ = k.cw.run("thrown", None, move |_| std::future::ready(Err::<(), _>(thrown))).await.unwrap();
     assert!(!k.runs("thrown").await[0].error.clone().unwrap().contains("opaqueTOKEN"));
