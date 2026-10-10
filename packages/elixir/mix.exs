@@ -2,7 +2,7 @@ defmodule Cronwatch.MixProject do
   use Mix.Project
 
   # The release's version, the one place it lives; scripts/release.mjs bumps it.
-  @version "0.12.4"
+  @version "0.12.5"
   @source_url "https://github.com/cronwatchdev/cronwatch"
 
   def project do

@@ -5,7 +5,7 @@ Cron and scheduled-job monitoring that lives inside your .NET service. Wrap a jo
 This is the .NET port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text, and the same stored rows, so a .NET process and a Node, Ruby, Python, PHP, Go, Rust, Elixir, or Java process can share one database, and every port reads the tables the others write. It has jobs, runs in the caller's flow, runs that span calls, checks, silences, the current run across tasks and threads, and a process-exit hook; the memory store and a SQL store over ADO.NET on SQLite, Postgres, MySQL, and MariaDB; the fifteen alert channels, Claude triage, and the pg_cron source; the dashboard and a job's handler, framework-free in the core, `Cronwatch.Hosting` (the client in the Generic Host's container, and hosted jobs with `AddCronwatchJob`), and `Cronwatch.AspNetCore` (the dashboard and handler on ASP.NET Core); `Cronwatch.Hangfire` and `Cronwatch.Quartz`; and `cronwatch check` from a crontab. [DESIGN.md](https://github.com/cronwatchdev/cronwatch/blob/main/packages/dotnet/DESIGN.md) has how each part works.
 
 ```bash
-dotnet add package Cronwatch --version 0.12.4
+dotnet add package Cronwatch --version 0.12.5
 ```
 
 ## Install

@@ -1,6 +1,6 @@
 # Release Notes for CronWatch
 
-## Unreleased
+## 0.12.5 - 2026-10-10
 
 ### Changed
 - From the library: alert text, the dashboard, and messages use the serial (Oxford) comma in lists of three or more, and a recovery alert names what closed as a list ("succeeded after: missed, failed, and over budget"). A filter that matches alert text word for word may need updating.

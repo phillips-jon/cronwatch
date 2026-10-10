@@ -1,6 +1,6 @@
 {
   "generatedBy": "scripts/conformance.mjs",
-  "sdkVersion": "0.12.4",
+  "sdkVersion": "0.12.5",
   "schedules": [
     {
       "schedule": "30 seconds",

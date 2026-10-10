@@ -7,7 +7,7 @@ readme = "README.md"
 # from the workspace's 1.0, scripts/release.mjs moves this to the next 0.x
 # minor (or patch, for a patch release). Back to version.workspace once
 # apalis 1.0 is final.
-version = "0.12.4"
+version = "0.12.5"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

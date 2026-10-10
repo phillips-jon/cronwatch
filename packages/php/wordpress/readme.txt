@@ -4,7 +4,7 @@ Tags: cron, wp-cron, monitoring, scheduled tasks, alerts
 Requires at least: 6.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 0.12.4
+Stable tag: 0.12.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -137,7 +137,7 @@ No. It is in wp-admin, for users who may manage options, and every change it mak
 
 == Changelog ==
 
-= Unreleased =
+= 0.12.5 =
 
 * From the library: alert text, the dashboard, and messages use the serial (Oxford) comma in lists of three or more, and a recovery alert names what closed as a list ("succeeded after: missed, failed, and over budget"). A filter that matches alert text word for word may need updating.
 * Settings and notice text use the serial comma too.
